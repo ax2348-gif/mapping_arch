@@ -271,8 +271,10 @@ class EpisodeStream:
     def __init__(self, config, bank, batch):
         self.config, self.bank, self.batch = config, bank, batch
 
-    def batches(self, worker=0, workers=1):
-        index = worker
+    def batches(self, worker=0, workers=1, start=0):
+        """Batches ``start + worker, start + worker + workers, ...``; a
+        resumed run passes the number of batches already consumed."""
+        index = start + worker
         while True:
             rng = np.random.default_rng([self.config.seed, index])
             yield make_batch(rng, self.config, self.bank, self.batch)

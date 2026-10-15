@@ -12,6 +12,15 @@ Evaluation is reported twice at every interval: on the held-out set, and
 on the same set with each episode's directions permuted in time. A model
 whose error does not rise under the permutation is not using the
 odometry, whatever its loss says.
+
+Schedules. ``cosine`` (the original) warms up then decays to zero at
+``--steps``. ``wsd`` (warmup-stable-decay) holds the peak rate and decays
+linearly to zero over the last ``--cooldown`` fraction of ``--steps``.
+With ``--save-every N`` the run writes ``step<k>.pt`` (model, optimizer,
+step) during training, and ``--branch step<k>.pt --steps S`` starts a new
+run from that state, continuing the data stream where it left off, with
+the schedule computed for total length S. One long stable run plus one
+short branch per budget gives a compute curve under one recipe.
 """
 import argparse
 import json
@@ -48,6 +57,13 @@ def parse():
                    help="default: the model module's LR[size] if it "
                         f'defines one, else {DEFAULT_LR}')
     p.add_argument('--warmup', type=int, default=100)
+    p.add_argument('--schedule', default='cosine', choices=('cosine', 'wsd'))
+    p.add_argument('--cooldown', type=float, default=0.2,
+                   help='wsd: fraction of --steps spent decaying to zero')
+    p.add_argument('--save-every', type=int, default=0,
+                   help='write step<k>.pt (with optimizer) every k steps')
+    p.add_argument('--branch', default=None,
+                   help='a step<k>.pt to continue from, into a new run')
     p.add_argument('--weight-decay', type=float, default=0.1)
     p.add_argument('--clip', type=float, default=1.0)
     p.add_argument('--eval-batches', type=int, default=16)
@@ -69,6 +85,12 @@ def parse():
 def lr_at(step, args):
     if step < args.warmup:
         return args.lr * (step + 1) / args.warmup
+    if args.schedule == 'wsd':
+        decay_start = int(round(args.steps * (1 - args.cooldown)))
+        if step < decay_start:
+            return args.lr
+        return args.lr * max(0.0, (args.steps - step)
+                             / max(1, args.steps - decay_start))
     progress = (step - args.warmup) / max(1, args.steps - args.warmup)
     return args.lr * 0.5 * (1 + math.cos(math.pi * progress))
 
@@ -110,7 +132,21 @@ def main():
     config, spec = tasks.config_and_spec(args.task, args.episode_steps,
                                          args.queries, args.seed)
     train_bank, eval_bank = load_banks(args.bank, config)
-    loader = train_loader(config, train_bank, args.batch, args.workers)
+    start = 0
+    branch = None
+    if args.branch:
+        branch = torch.load(args.branch, map_location='cpu',
+                            weights_only=False)
+        start = branch['step']
+        for key in ('task', 'model', 'size', 'batch', 'seed'):
+            if branch['args'][key] != vars(args)[key]:
+                raise SystemExit(f'--branch {key} mismatch: checkpoint '
+                                 f'{branch["args"][key]!r}, run '
+                                 f'{vars(args)[key]!r}')
+        if start >= args.steps:
+            raise SystemExit(f'checkpoint step {start} >= --steps {args.steps}')
+    loader = train_loader(config, train_bank, args.batch, args.workers,
+                          start)
     held_out = eval_set(config, eval_bank, args.batch, args.eval_batches,
                         args.seed)
     floor = constant_floor([b['target'].float() / 255 for b in held_out])
@@ -118,6 +154,9 @@ def main():
     module = models.get(args.model)
     if args.lr is None:
         args.lr = getattr(module, 'LR', {}).get(args.size, DEFAULT_LR)
+    if branch is not None and branch['args']['lr'] != args.lr:
+        raise SystemExit(f'--branch lr mismatch: checkpoint '
+                         f'{branch["args"]["lr"]}, run {args.lr}')
     model = module.build(args.size, spec).to(device)
     params = models.count_params(model)
     raw_model = model
@@ -138,6 +177,10 @@ def main():
                               'weight_decay': args.weight_decay},
                              {'params': no_decay, 'weight_decay': 0.0}],
                             lr=args.lr, betas=(0.9, 0.95))
+    if branch is not None:
+        raw_model.load_state_dict(branch['model'])
+        opt.load_state_dict(branch['opt'])
+        print(f'branched from {args.branch} at step {start}', flush=True)
 
     print(f'{args.task} {args.model}/{args.size} -> {out}: {params:,} params, '
           f'lr {args.lr:.2g}; floor mse {floor["mse"]:.4f}, '
@@ -145,14 +188,16 @@ def main():
     log = open(os.path.join(out, 'log.jsonl'), 'w')
     log.write(json.dumps({'step': 0, 'task': args.task, 'model': args.model,
                           'size': args.size, 'run': run, 'params': params,
-                          'lr': args.lr, 'floor': floor}) + '\n')
+                          'lr': args.lr, 'floor': floor,
+                          'schedule': args.schedule, 'branch': args.branch,
+                          'start': start}) + '\n')
     log.flush()
     best, best_step = None, -1
     t_start = time.perf_counter()
     running, since = 0.0, 0
     it = iter(loader)
     rec = None
-    for step in range(args.steps):
+    for step in range(start, args.steps):
         for g in opt.param_groups:
             g['lr'] = lr_at(step, args)
         obs, directions, offset, target = prepare(next(it), device)
@@ -191,12 +236,18 @@ def main():
                       f'({rec["steps_per_s"]:.1f} it/s)', flush=True)
             log.write(json.dumps(rec) + '\n')
             log.flush()
+        if args.save_every and (step + 1) % args.save_every == 0 and not last:
+            torch.save({'model': raw_model.state_dict(),
+                        'opt': opt.state_dict(), 'step': step + 1,
+                        'args': vars(args)},
+                       os.path.join(out, f'step{step + 1}.pt'))
     log.close()
 
     final = {'task': args.task, 'model': args.model, 'size': args.size,
-             'run': run,
+             'run': run, 'schedule': args.schedule, 'branch': args.branch,
+             'start': start,
              'params': params, 'steps': args.steps, 'batch': args.batch,
-             'episodes_seen': args.steps * args.batch,
+             'episodes_seen': args.steps * args.batch,   # including the parent's
              'final_eval': rec['eval'],
              'final_eval_shuffled': rec['eval_shuffled'],
              'best_eval': best, 'best_step': best_step, 'floor': floor,

@@ -19,20 +19,24 @@ EVAL_SEED_TAG = 7919   # mixed into the eval seed so it never equals a train see
 class StreamDataset(IterableDataset):
     """Infinite stream; worker j of n takes batch indices j, j + n, ..."""
 
-    def __init__(self, config, bank, batch):
+    def __init__(self, config, bank, batch, start=0):
         self.stream = EpisodeStream(config, bank, batch)
+        self.start = start
 
     def __iter__(self):
         info = torch.utils.data.get_worker_info()
         worker, workers = (0, 1) if info is None else (info.id,
                                                        info.num_workers)
-        for batch in self.stream.batches(worker, workers):
+        for batch in self.stream.batches(worker, workers, self.start):
             batch.pop('episodes')
             yield {k: torch.from_numpy(v) for k, v in batch.items()}
 
 
-def train_loader(config, bank, batch, workers):
-    ds = StreamDataset(config, bank, batch)
+def train_loader(config, bank, batch, workers, start=0):
+    """``start`` is the number of batches a resumed run has consumed; the
+    stream continues from there with the same multiset of batches as an
+    uninterrupted run would have produced."""
+    ds = StreamDataset(config, bank, batch, start)
     return DataLoader(ds, batch_size=None, num_workers=workers,
                       persistent_workers=workers > 0,
                       prefetch_factor=4 if workers > 0 else None,
