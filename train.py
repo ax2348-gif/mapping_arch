@@ -102,14 +102,14 @@ def lr_at(step, args):
     return args.lr * 0.5 * (1 + math.cos(math.pi * progress))
 
 
-@torch.no_grad()
-def call(model, obs, directions, offset, time, takes_time):
+def call(model, obs, directions, offset, qtime, takes_time):
     """Forward with the query times when the model accepts them."""
     if takes_time:
-        return model(obs, directions, offset, query_time=time)
+        return model(obs, directions, offset, query_time=qtime)
     return model(obs, directions, offset)
 
 
+@torch.no_grad()
 def evaluate(model, batches, device, autocast, prepare, metrics,
              takes_time, steps, shuffle_directions=False):
     """``shuffle_directions`` permutes each episode's odometry tokens in
@@ -119,20 +119,20 @@ def evaluate(model, batches, device, autocast, prepare, metrics,
     preds, targets, times = [], [], []
     gen = torch.Generator().manual_seed(0)
     for b in batches:
-        obs, directions, offset, target, time = prepare(b, device)
+        obs, directions, offset, target, qtime = prepare(b, device)
         if shuffle_directions:
             perm = torch.argsort(torch.rand(directions.shape, generator=gen),
                                  dim=1).to(device)
             directions = torch.gather(directions, 1, perm)
         with autocast:
-            pred = call(model, obs, directions, offset, time, takes_time)
+            pred = call(model, obs, directions, offset, qtime, takes_time)
         preds.append(pred.float())
         targets.append(target)
-        times.append(time)
+        times.append(qtime)
     model.train()
-    pred, target, time = torch.cat(preds), torch.cat(targets), torch.cat(times)
+    pred, target, qtime = torch.cat(preds), torch.cat(targets), torch.cat(times)
     out = metrics(pred, target)
-    out.update(metrics_by_time(pred, target, time, steps))
+    out.update(metrics_by_time(pred, target, qtime, steps))
     return out
 
 
@@ -224,9 +224,9 @@ def main():
     for step in range(start, args.steps):
         for g in opt.param_groups:
             g['lr'] = lr_at(step, args)
-        obs, directions, offset, target, time = prepare(next(it), device)
+        obs, directions, offset, target, qtime = prepare(next(it), device)
         with autocast:
-            pred = call(model, obs, directions, offset, time, takes_time)
+            pred = call(model, obs, directions, offset, qtime, takes_time)
         loss = loss_fn(pred, target)
         opt.zero_grad(set_to_none=True)
         loss.backward()
