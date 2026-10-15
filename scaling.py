@@ -23,9 +23,9 @@ import os
 import subprocess
 import sys
 
-import mapping.models as models
+import mapping.tasks as tasks
+from mapping.models import count_params
 from mapping.results import best_per_size, fit_power_law, load_runs, table
-from mapping.task import TaskSpec
 
 CLUSTER = dict(account='torch_pr_1024_tandon_advanced',
                partition='h200_public', gpus=1, cpus=8, mem='32G',
@@ -33,7 +33,7 @@ CLUSTER = dict(account='torch_pr_1024_tandon_advanced',
                workdir='/scratch/ax2348/mapping', max_concurrent=2)
 
 SBATCH = """#!/bin/bash
-#SBATCH --job-name=map-{model}
+#SBATCH --job-name=map-{task}-{model}
 #SBATCH --account={account}
 #SBATCH --partition={partition}
 #SBATCH --gres=gpu:{gpus}
@@ -41,7 +41,7 @@ SBATCH = """#!/bin/bash
 #SBATCH --mem={mem}
 #SBATCH --time={time}
 #SBATCH --array=0-{last}%{max_concurrent}
-#SBATCH --output={workdir}/jobs/logs/{model}-%A_%a.out
+#SBATCH --output={workdir}/jobs/logs/{task}-{model}-%A_%a.out
 set -euo pipefail
 SIZES=({sizes})
 LRS=({lrs})
@@ -51,18 +51,19 @@ LRFLAG=""; RUN=seed{seed}
 if [ "$LR" != "default" ]; then LRFLAG="--lr $LR"; RUN=${{RUN}}_lr$LR; fi
 source {venv}/bin/activate
 cd {workdir}
-python train.py --model {model} --size $SIZE --run $RUN --steps {steps} \\
+python train.py --task {task} --model {model} --size $SIZE --run $RUN --steps {steps} \\
     --batch {batch} --seed {seed} --workers {workers} $LRFLAG {extra}
 """
 
 
 def ladder(module, spec):
     for size, kwargs in module.SIZES.items():
-        yield size, models.count_params(module.build(size, spec)), kwargs
+        yield size, count_params(module.build(size, spec)), kwargs
 
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument('--task', default='z2', choices=sorted(tasks.TASKS))
     p.add_argument('--model', required=True)
     p.add_argument('--sizes', nargs='*', default=None)
     p.add_argument('--steps', type=int, default=2000)
@@ -81,8 +82,9 @@ def main():
                    default=CLUSTER['max_concurrent'])
     args = p.parse_args()
 
-    module = models.get(args.model)
-    spec = TaskSpec()
+    task = tasks.get(args.task)
+    module = task['models'].get(args.model)
+    spec = task['task'].TaskSpec()
     sizes = args.sizes or list(module.SIZES)
     lrs = args.lr_grid or ['default']
 
@@ -99,7 +101,8 @@ def main():
         for size in sizes:
             for lr in lrs:
                 run = f'seed{args.seed}'
-                cmd = [sys.executable, 'train.py', '--model', args.model,
+                cmd = [sys.executable, 'train.py', '--task', args.task,
+                       '--model', args.model,
                        '--size', size, '--steps', str(args.steps),
                        '--batch', str(args.batch), '--seed', str(args.seed),
                        '--workers', str(args.workers)]
@@ -112,9 +115,11 @@ def main():
 
     if args.slurm:
         os.makedirs('jobs/logs', exist_ok=True)
-        path = f'jobs/{args.model}.sbatch'
+        path = (f'jobs/{args.model}.sbatch' if args.task == 'z2'
+                else f'jobs/{args.task}_{args.model}.sbatch')
         with open(path, 'w') as f:
-            f.write(SBATCH.format(model=args.model, sizes=' '.join(sizes),
+            f.write(SBATCH.format(task=args.task, model=args.model,
+                                  sizes=' '.join(sizes),
                                   lrs=' '.join(lrs),
                                   last=len(sizes) * len(lrs) - 1,
                                   steps=args.steps, batch=args.batch,
@@ -128,7 +133,7 @@ def main():
               f'{path}"')
 
     if args.fit:
-        rows = best_per_size(load_runs(model=args.model))
+        rows = best_per_size(load_runs(task['root'], args.model))
         if not rows:
             print('no runs found')
             return

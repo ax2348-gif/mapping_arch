@@ -15,19 +15,21 @@ A run directory ``results/<model>/<size>/<run>/`` holds
 """
 import torch
 
-import mapping.models as models
-from mapping.task import TaskSpec
+import mapping.tasks as tasks
 
 
-def save_checkpoint(path, model, args, spec):
+def save_checkpoint(path, model, args, spec, task='z2'):
     torch.save({'model': model.state_dict(), 'args': dict(args),
-                'spec': spec.__dict__}, path)
+                'spec': spec.__dict__, 'task': task}, path)
 
 
 def load_checkpoint(path, device='cpu'):
-    """``(model in eval mode, args dict, TaskSpec)`` from ``final.pt``."""
+    """``(model in eval mode, args dict, TaskSpec, task name)`` from
+    ``final.pt``. Checkpoints written before tasks existed are z2."""
     state = torch.load(path, map_location='cpu', weights_only=False)
-    args, spec = state['args'], TaskSpec(**state['spec'])
-    model = models.get(args['model']).build(args['size'], spec)
+    task = state.get('task', 'z2')
+    t = tasks.get(task)
+    args, spec = state['args'], t['task'].TaskSpec(**state['spec'])
+    model = t['models'].get(args['model']).build(args['size'], spec)
     model.load_state_dict(state['model'])
-    return model.to(device).eval(), args, spec
+    return model.to(device).eval(), args, spec, task

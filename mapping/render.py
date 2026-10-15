@@ -14,7 +14,7 @@ import numpy as np
 import torch
 from PIL import Image, ImageDraw, ImageFont
 
-from mapping.task import prepare
+from mapping.task import prepare as prepare_z2
 
 SCALE = 8          # output pixels per cell
 GAP = 6
@@ -40,7 +40,8 @@ def run_title(final):
     """Title line from a run's final.json dict."""
     e, s = final['final_eval'], final.get('final_eval_shuffled')
     shuffled = f', dirs shuffled {s["mse"]:.4f}' if s else ''
-    return (f'{final["model"]}/{final["size"]}/{final.get("run", "")}  '
+    return (f'{final.get("task", "z2")} {final["model"]}/{final["size"]}/'
+            f'{final.get("run", "")}  '
             f'{final["params"]:,} params, {final["steps"]} steps, eval mse '
             f'{e["mse"]:.4f}{shuffled}, floor {final["floor"]["mse"]:.4f}')
 
@@ -54,13 +55,14 @@ def _to_image(x):
 
 @torch.no_grad()
 def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
-                autocast=None, title=''):
+                autocast=None, title='', prepare=prepare_z2):
     """Write a grid of ``rows`` sampled queries from ``batches`` to ``out``.
 
     model    the module, in eval mode on ``device``
     batches  list of loader batches (CPU tensors), e.g. the held-out set
     view     window side in pixels
     title    one line naming the run; see ``run_title``
+    prepare  the task's batch-to-inputs function (z2 by default)
     """
     device = device or next(model.parameters()).device
     autocast = autocast or torch.autocast('cuda', enabled=False)

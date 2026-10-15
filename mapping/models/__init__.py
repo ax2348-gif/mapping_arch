@@ -42,4 +42,5 @@ def count_params(module):
 
 # import every sibling module so its register() runs
 for _info in pkgutil.iter_modules(__path__):
-    importlib.import_module(f'{__name__}.{_info.name}')
+    if not _info.ispkg:                     # subpackages are other tasks' registries
+        importlib.import_module(f'{__name__}.{_info.name}')

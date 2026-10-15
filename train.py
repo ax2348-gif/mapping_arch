@@ -21,19 +21,21 @@ import time
 
 import torch
 
-import mapping.models as models
+import mapping.tasks as tasks
 from mapping.checkpoint import save_checkpoint
-from mapping.data import Config
 from mapping.loader import eval_set, load_banks, train_loader
 from mapping.plot import plot_run
 from mapping.render import render_grid, run_title
-from mapping.task import TaskSpec, constant_floor, loss_fn, metrics, prepare
 
 DEFAULT_LR = 3e-4
 
 
 def parse():
     p = argparse.ArgumentParser()
+    p.add_argument('--task', default='z2', choices=sorted(tasks.TASKS),
+                   help='which contract: z2 (CONTRACT.md) or se2 '
+                        '(CONTRACT_SE2.md); picks the model registry, the '
+                        'batch layout and the results root')
     p.add_argument('--model', required=True)
     p.add_argument('--size', required=True)
     p.add_argument('--run', default=None,
@@ -72,7 +74,10 @@ def lr_at(step, args):
 
 
 @torch.no_grad()
-def evaluate(model, batches, device, autocast, shuffle_directions=False):
+def evaluate(model, batches, device, autocast, prepare, metrics,
+             shuffle_directions=False):
+    """``shuffle_directions`` permutes each episode's odometry tokens in
+    time (directions on z2, symbols on se2)."""
     model.eval()
     preds, targets = [], []
     gen = torch.Generator().manual_seed(0)
@@ -94,14 +99,16 @@ def main():
     args = parse()
     torch.manual_seed(args.seed)
     device = torch.device(args.device)
+    task = tasks.get(args.task)
+    models, prepare = task['models'], task['task'].prepare
+    loss_fn, metrics = task['task'].loss_fn, task['task'].metrics
+    constant_floor = task['task'].constant_floor
     run = args.run or f'seed{args.seed}'
-    out = args.out or os.path.join('results', args.model, args.size, run)
+    out = args.out or os.path.join(task['root'], args.model, args.size, run)
     os.makedirs(out, exist_ok=True)
 
-    config = Config(steps=args.episode_steps, queries=args.queries,
-                    seed=args.seed)
-    spec = TaskSpec(view=config.obs, steps=config.steps,
-                    step_px=config.step, queries=config.queries)
+    config, spec = tasks.config_and_spec(args.task, args.episode_steps,
+                                         args.queries, args.seed)
     train_bank, eval_bank = load_banks(args.bank, config)
     loader = train_loader(config, train_bank, args.batch, args.workers)
     held_out = eval_set(config, eval_bank, args.batch, args.eval_batches,
@@ -132,7 +139,7 @@ def main():
                              {'params': no_decay, 'weight_decay': 0.0}],
                             lr=args.lr, betas=(0.9, 0.95))
 
-    print(f'{args.model}/{args.size} -> {out}: {params:,} params, '
+    print(f'{args.task} {args.model}/{args.size} -> {out}: {params:,} params, '
           f'lr {args.lr:.2g}; floor mse {floor["mse"]:.4f}, '
           f'floor fg_mae {floor["fg_mae"]:.4f}', flush=True)
     log = open(os.path.join(out, 'log.jsonl'), 'w')
@@ -164,10 +171,12 @@ def main():
                    'steps_per_s': (step + 1) / elapsed}
             running, since = 0.0, 0
             if (step + 1) % args.eval_every == 0 or last:
-                ev = evaluate(model, held_out, device, autocast)
+                ev = evaluate(model, held_out, device, autocast, prepare,
+                              metrics)
                 rec['eval'] = ev
                 rec['eval_shuffled'] = evaluate(model, held_out, device,
-                                                autocast, True)
+                                                autocast, prepare, metrics,
+                                                True)
                 if best is None or ev['mse'] < best['mse']:
                     best, best_step = ev, step + 1
                 print(f'step {step + 1:6d} train {rec["train_mse"]:.4f} '
@@ -180,7 +189,8 @@ def main():
             log.flush()
     log.close()
 
-    final = {'model': args.model, 'size': args.size, 'run': run,
+    final = {'task': args.task, 'model': args.model, 'size': args.size,
+             'run': run,
              'params': params, 'steps': args.steps, 'batch': args.batch,
              'episodes_seen': args.steps * args.batch,
              'final_eval': rec['eval'],
@@ -193,10 +203,10 @@ def main():
     with open(os.path.join(out, 'final.json'), 'w') as f:
         json.dump(final, f, indent=1)
     save_checkpoint(os.path.join(out, 'final.pt'), raw_model, vars(args),
-                    spec)
+                    spec, args.task)
     render_grid(raw_model, held_out[:2], spec.view,
                 os.path.join(out, 'grid.png'), device=device,
-                autocast=autocast, title=run_title(final))
+                autocast=autocast, title=run_title(final), prepare=prepare)
     plot_run(out, final)
     print(f'done: eval mse {final["final_eval"]["mse"]:.4f} '
           f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}, '
