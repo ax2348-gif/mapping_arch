@@ -13,7 +13,7 @@ import torch
 from mapping.checkpoint import load_checkpoint
 from mapping.data import Config
 from mapping.loader import eval_set, load_banks
-from mapping.render import render_grid
+from mapping.render import render_grid, run_title
 
 
 def main():
@@ -31,7 +31,14 @@ def main():
     _, eval_bank = load_banks(args['bank'], config)
     batches = eval_set(config, eval_bank, 64, 2, args['seed'])
     out = a.out or os.path.join(os.path.dirname(a.checkpoint), 'grid.png')
-    render_grid(model, batches, spec.view, out, rows=a.rows, seed=a.seed)
+    title = ''
+    summary = os.path.join(os.path.dirname(a.checkpoint), 'final.json')
+    if os.path.exists(summary):
+        import json
+        with open(summary) as f:
+            title = run_title(json.load(f))
+    render_grid(model, batches, spec.view, out, rows=a.rows, seed=a.seed,
+                title=title)
     print(f'{args["model"]}/{args["size"]}: wrote {out}')
 
 

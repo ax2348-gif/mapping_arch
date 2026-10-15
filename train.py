@@ -25,7 +25,7 @@ import mapping.models as models
 from mapping.checkpoint import save_checkpoint
 from mapping.data import Config
 from mapping.loader import eval_set, load_banks, train_loader
-from mapping.render import render_grid
+from mapping.render import render_grid, run_title
 from mapping.task import TaskSpec, constant_floor, loss_fn, metrics, prepare
 
 DEFAULT_LR = 3e-4
@@ -191,7 +191,7 @@ def main():
                     spec)
     render_grid(raw_model, held_out[:2], spec.view,
                 os.path.join(out, 'grid.png'), device=device,
-                autocast=autocast)
+                autocast=autocast, title=run_title(final))
     print(f'done: eval mse {final["final_eval"]["mse"]:.4f} '
           f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}, '
           f'floor {floor["mse"]:.4f}); wrote {out}')
