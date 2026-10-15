@@ -339,11 +339,12 @@ class Hybrid(nn.Module):
         dir_key = steps[:-1] * 30 + 20
         ctx_key = torch.cat([obs_key.view(t1, 9), F.pad(dir_key, (0, 1))[:, None]],
                             1).reshape(-1)[:-1]                     # (t1*10-1,)
-        qry_key = (query_time[:, :, None] * 30 + 10
-                   + torch.arange(9, device=dev)).reshape(b, -1)   # (b, q*9)
-        key = torch.cat([ctx_key[None].expand(b, -1), qry_key], 1).float()
-        # stable: break ties by layout position so queries keep their order
-        key = key + torch.arange(key.shape[1], device=dev) * 1e-4
+        qry_key = (query_time[:, :, None] * 30 + 10).expand(-1, -1, 9)
+        qry_key = qry_key.reshape(b, -1)                           # (b, q*9)
+        key = torch.cat([ctx_key[None].expand(b, -1), qry_key], 1).double()
+        # ties (the nine tokens of a query, several queries at one step)
+        # keep their layout order: query index, then patch index
+        key = key + torch.arange(key.shape[1], device=dev, dtype=key.dtype) * 1e-4
         return torch.argsort(key, 1)
 
     def forward(self, obs, directions, query_offset, query_time=None):
