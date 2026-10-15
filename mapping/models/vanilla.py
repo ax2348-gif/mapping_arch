@@ -200,11 +200,12 @@ class Block(nn.Module):
 
 
 class VanillaTransformer(nn.Module):
-    def __init__(self, spec, width, patch=3, octaves=9):
+    def __init__(self, spec, width, depth=None, patch=3, octaves=9):
         super().__init__()
         assert width % HEAD_DIM == 0 and spec.view % patch == 0
         heads = width // HEAD_DIM
-        depth = heads + 2
+        depth = heads + 2 if depth is None else depth   # ladder rule, or
+        #                                               # fixed by vanilla_depth
         hidden = 64 * math.ceil(8 * width / 3 / 64)
         self.spec, self.patch, self.width = spec, patch, width
         self.grid = spec.view // patch                        # patches per side
