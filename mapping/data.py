@@ -31,12 +31,19 @@ class Config:
     cutoff: int = 32        # brightness below this is zeroed in the bank
     dihedral: bool = True   # each tile gets a random one of its 8 symmetries
     heading: bool = False   # SE(2) task: a heading per step, see mapping.se2
+    query_times: str = 'last'   # 'last': every query is asked at the final
+                                # step; 'uniform': each query at a step drawn
+                                # uniformly from 0..T and answerable from the
+                                # observations up to that step
     seed: int = 0
 
     def __post_init__(self):
         if self.start_window < self.tile:
             raise ValueError('start_window below one tile leaves the phase '
                              'non-uniform')
+        if self.query_times not in ('last', 'uniform'):
+            raise ValueError(f'query_times {self.query_times!r}')
+
 
 
 @dataclass
@@ -50,11 +57,15 @@ class Episode:
                augmentation is off
     positions  (T + 1, 2) int32 window top-left corners, local pixels
     queries    (Q, 2) int32 query top-left corners, local pixels
+    query_times (Q,) int64 the step each query is asked at; every query's
+               pixels were observed by that step. All T when the config's
+               ``query_times`` is 'last'.
     """
     tile_grid: np.ndarray
     tile_sym: np.ndarray
     positions: np.ndarray
     queries: np.ndarray
+    query_times: np.ndarray
 
 
 def apply_dihedral(tiles, sym):
@@ -117,13 +128,18 @@ def random_walk(rng, batch, steps, step):
 
 
 # ------------------------------------------------------------- one episode
-def coverage(positions, obs, height, width):
-    """Last time each local pixel was observed, ``(height, width)``, -1
-    never."""
-    last_seen = np.full((height, width), -1, dtype=np.int32)
+def coverage(positions, obs, height, width, first=False):
+    """Last (or, with ``first``, first) time each local pixel was observed,
+    ``(height, width)``, -1 never. A query asked at step t needs the
+    first-seen map: a pixel re-observed later is still known at t."""
+    seen = np.full((height, width), -1, dtype=np.int32)
     for t, (y, x) in enumerate(positions):
-        last_seen[y:y + obs, x:x + obs] = t
-    return last_seen
+        block = seen[y:y + obs, x:x + obs]
+        if first:
+            block[block < 0] = t
+        else:
+            block[...] = t
+    return seen
 
 
 def fully_covered_corners(seen, obs):
@@ -141,8 +157,9 @@ def fully_covered_corners(seen, obs):
 
 def sample_queries(rng, last_seen, obs, count, at_time=None):
     """``count`` window corners whose every pixel was seen by ``at_time``,
-    uniform over the valid corners. The observation windows themselves
-    are valid corners, so there is always at least one."""
+    uniform over the valid corners. With ``at_time`` pass the first-seen
+    map from ``coverage(..., first=True)``; the window at that step is
+    then always a valid corner, so there is at least one."""
     seen = last_seen >= 0
     if at_time is not None:
         seen &= last_seen <= at_time
@@ -178,8 +195,16 @@ def make_episode(rng, config, bank_size, displacement):
     positions = (positions - tile_low * c.tile).astype(np.int32)
     height, width = shape * c.tile
     last_seen = coverage(positions, c.obs, height, width)
-    queries, _ = sample_queries(rng, last_seen, c.obs, c.queries)
-    return Episode(tile_grid, tile_sym, positions, queries), last_seen
+    if c.query_times == 'last':
+        queries, _ = sample_queries(rng, last_seen, c.obs, c.queries)
+        times = np.full(c.queries, c.steps, dtype=np.int64)
+    else:
+        times = rng.integers(0, c.steps + 1, size=c.queries)
+        first_seen = coverage(positions, c.obs, height, width, first=True)
+        queries = np.concatenate(
+            [sample_queries(rng, first_seen, c.obs, 1, at_time=t)[0]
+             for t in times])
+    return Episode(tile_grid, tile_sym, positions, queries, times), last_seen
 
 
 def render_map(bank, tile_grid, tile, tile_sym=None):
@@ -209,8 +234,11 @@ def make_batch(rng, config, bank, batch):
     observations (b, T + 1, S, S) uint8
     directions   (b, T)           int64, index into MOVES
     positions    (b, T + 1, 2)    int32, absolute in each local map
-    query_offset (b, Q, 2)        int32, relative to the last window
-    target       (b, Q, S, S)     uint8, every pixel observed earlier
+    query_offset (b, Q, 2)        int32, relative to the window at the
+                                  query's step (the last window unless
+                                  ``config.query_times`` varies them)
+    query_time   (b, Q)           int64, the step each query is asked at
+    target       (b, Q, S, S)     uint8, every pixel observed by that step
     episodes     list of Episode, the stored form
 
     With ``config.heading`` (the SE(2) task, ``mapping.se2``) the batch is
@@ -220,8 +248,9 @@ def make_batch(rng, config, bank, batch):
     odometry     (b, T)           int64 in 0..15, egocentric move and turn
     positions    (b, T + 1, 2)    int32, world, diagnostics only
     headings     (b, T + 1)       int64 in 0..3, world, diagnostics only
-    query_pose   (b, Q, 3)        int32, body-frame (dy, dx) from the last
-                                  pose and the heading change
+    query_pose   (b, Q, 3)        int32, body-frame (dy, dx) from the pose
+                                  at the query's step and the heading change
+    query_time   (b, Q)           int64, the step each query is asked at
     target       (b, Q, S, S)     uint8, rotated to face the query heading
     episodes     list of Episode
 
@@ -236,6 +265,7 @@ def make_batch(rng, config, bank, batch):
     targets = np.empty((batch, c.queries, c.obs, c.obs), np.uint8)
     positions = np.empty((batch, c.steps + 1, 2), np.int32)
     offsets = np.empty((batch, c.queries, 2), np.int32)
+    times = np.empty((batch, c.queries), np.int64)
     episodes = []
     for i in range(batch):
         episode, _ = make_episode(rng, c, bank_size(bank), displacement[i])
@@ -243,21 +273,24 @@ def make_batch(rng, config, bank, batch):
         observations[i] = crop_windows(image, episode.positions, c.obs)
         targets[i] = crop_windows(image, episode.queries, c.obs)
         positions[i] = episode.positions
-        offsets[i] = episode.queries - episode.positions[-1]
+        offsets[i] = episode.queries - episode.positions[episode.query_times]
+        times[i] = episode.query_times
         episodes.append(episode)
     if not c.heading:
         return dict(observations=observations, directions=directions,
                     positions=positions, query_offset=offsets,
-                    target=targets, episodes=episodes)
+                    query_time=times, target=targets, episodes=episodes)
     from mapping import se2
     headings = rng.integers(0, 4, size=(batch, c.steps + 1))
     query_headings = rng.integers(0, 4, size=(batch, c.queries))
     queries = np.stack([e.queries for e in episodes])
+    rows = np.arange(batch)[:, None]
+    pose = se2.query_pose(queries, query_headings, positions[rows, times],
+                          headings[rows, times])
     return dict(observations=se2.face(observations, headings),
                 odometry=se2.encode(directions, headings),
                 positions=positions, headings=headings,
-                query_pose=se2.query_pose(queries, query_headings, positions,
-                                          headings).astype(np.int32),
+                query_pose=pose.astype(np.int32), query_time=times,
                 target=se2.face(targets, query_headings), episodes=episodes)
 
 

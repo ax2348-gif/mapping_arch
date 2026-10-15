@@ -15,9 +15,23 @@ a query position, given only:
 | --- | --- | --- |
 | `obs` | `(B, 33, 9, 9)` float in [0, 1] | the observations, in order |
 | `directions` | `(B, 32)` long in 0..3 | step direction from t to t+1; `mapping.data.MOVES[k]` is the (dy, dx) unit move |
-| `query_offset` | `(B, 8, 2)` long | query corner minus the last window's corner, pixels (y, x), within ±288 |
+| `query_offset` | `(B, 8, 2)` long | query corner minus the corner of the window at the query's step, pixels (y, x), within ±288 |
+| `query_time` | `(B, 8)` long in 0..32 | the step each query is asked at; every target pixel was observed by that step |
 
 Output: `pred (B, 8, 9, 9)` float, the window at each query. Loss is MSE.
+
+Query times (added 2026-10-15): by default every query is asked at the
+last step, which is the task as originally stated, and `query_time` is
+all 32. With `--query-times uniform` each query's step is drawn uniformly
+from 0..32, its offset is measured from the window at that step, and its
+pixels are guaranteed observed by then; the model still sees the whole
+episode. A query at step t needs only the first t moves composed, so the
+eight queries of an episode span the difficulty range, and evaluation
+reports error per prefix length and for the last-step queries alone.
+`forward` takes `query_time` as an optional keyword argument; a model
+without it can only be trained on last-step queries, and the harness
+refuses otherwise. Add the query time to the query tokens through a
+step embedding (a sequence index); never use it to index the odometry.
 Every query pixel was observed at some earlier step, so the task is fully
 determined by the inputs: there is nothing to guess, only to assemble.
 Query offsets fall at arbitrary pixel positions, so a target straddles up
@@ -115,7 +129,7 @@ able to find it.
   `mapping/models/mlp.py` for the pattern and `mapping/models/__init__.py`
   for the registry.
 - `build` returns an `nn.Module` whose `forward(obs, directions,
-  query_offset)` returns `pred`. `spec` is a `mapping.task.TaskSpec` with
+  query_offset, query_time=None)` returns `pred`. `spec` is a `mapping.task.TaskSpec` with
   `view`, `steps`, `directions`, `step_px`, `queries`, `offset_max`.
 - `SIZES` is an ordered ladder of at least five rungs, smallest first,
   spanning at least two orders of magnitude in parameters. The smallest

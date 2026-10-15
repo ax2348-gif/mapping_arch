@@ -25,9 +25,11 @@ def main():
     p.add_argument('--device', default='cuda' if torch.cuda.is_available()
                    else 'cpu')
     a = p.parse_args()
+    import inspect
     model, args, spec, task = load_checkpoint(a.checkpoint, a.device)
     config, _ = tasks.config_and_spec(task, spec.steps, spec.queries,
-                                      args['seed'])
+                                      args['seed'],
+                                      args.get('query_times', 'last'))
     _, eval_bank = load_banks(args['bank'], config)
     batches = eval_set(config, eval_bank, 64, 2, args['seed'])
     out = a.out or os.path.join(os.path.dirname(a.checkpoint), 'grid.png')
@@ -40,7 +42,9 @@ def main():
         final.setdefault('run', os.path.basename(os.path.dirname(summary)))
         title = run_title(final)
     render_grid(model, batches, spec.view, out, rows=a.rows, seed=a.seed,
-                title=title, prepare=tasks.get(task)['task'].prepare)
+                title=title, prepare=tasks.get(task)['task'].prepare,
+                takes_time='query_time' in inspect.signature(
+                    model.forward).parameters)
     print(f'{args["model"]}/{args["size"]}: wrote {out}')
 
 

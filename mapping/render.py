@@ -20,8 +20,8 @@ SCALE = 8          # output pixels per cell
 GAP = 6
 LABEL_W = 150
 HEADER = 58        # title and column legend
-COLUMNS = ('last obs', 'target', 'prediction', 'dirs shuffled', '|error|')
-LEGEND = ('last obs: the final context window.  target: the true view at '
+COLUMNS = ('obs at t', 'target', 'prediction', 'dirs shuffled', '|error|')
+LEGEND = ('obs at t: the window at the query\'s step.  target: the true view at '
           'the query.  dirs shuffled: prediction with the episode\'s '
           'directions permuted in time.')
 
@@ -55,7 +55,8 @@ def _to_image(x):
 
 @torch.no_grad()
 def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
-                autocast=None, title='', prepare=prepare_z2):
+                autocast=None, title='', prepare=prepare_z2,
+                takes_time=False):
     """Write a grid of ``rows`` sampled queries from ``batches`` to ``out``.
 
     model    the module, in eval mode on ``device``
@@ -71,18 +72,20 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
     gen = torch.Generator().manual_seed(0)
     samples = []
     for b in batches:
-        obs, directions, offset, target = prepare(b, device)
+        obs, directions, offset, target, time = prepare(b, device)
+        kw = {'query_time': time} if takes_time else {}
         with autocast:
-            pred = model(obs, directions, offset).float()
+            pred = model(obs, directions, offset, **kw).float()
             perm = torch.argsort(torch.rand(directions.shape, generator=gen),
                                  dim=1).to(device)
             shuffled = model(obs, torch.gather(directions, 1, perm),
-                             offset).float()
+                             offset, **kw).float()
         for i in range(obs.shape[0]):
             for q in range(offset.shape[1]):
-                samples.append((obs[i, -1].cpu(), target[i, q].cpu(),
+                t = int(time[i, q])
+                samples.append((obs[i, t].cpu(), target[i, q].cpu(),
                                 pred[i, q].cpu(), shuffled[i, q].cpu(),
-                                offset[i, q].cpu()))
+                                offset[i, q].cpu(), t))
     if was_training:
         model.train()
 
@@ -107,10 +110,10 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
         draw.text((LABEL_W + c * (cell + GAP), HEADER + 2), name, fill=220,
                   font=small)
     for r, k in enumerate(picks):
-        last, tgt, prd, shf, off = samples[k]
+        last, tgt, prd, shf, off, t = samples[k]
         y = HEADER + 20 + r * (cell + GAP)
         mse = (prd - tgt).pow(2).mean().item()
-        label = f'off ({int(off[0]):+d},{int(off[1]):+d})'
+        label = f't{t} off ({int(off[0]):+d},{int(off[1]):+d})'
         if off.numel() > 2:                       # se2: heading change too
             label += f' turn {int(off[2])}'
         draw.text((4, y + 4), label, fill=220, font=small)

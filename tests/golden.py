@@ -13,7 +13,7 @@ from mapping.loader import eval_set
 def digest(batch):
     h = hashlib.sha256()
     for k in sorted(batch):
-        if k == 'episodes':
+        if k in ('episodes', 'query_time'):   # query_time: added 2026-10-15
             continue
         v = np.ascontiguousarray(batch[k])
         h.update(k.encode()); h.update(str(v.dtype).encode())

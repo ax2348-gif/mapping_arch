@@ -98,6 +98,10 @@ Audit: where positional or geometric information enters
 5. Sequence order: direction tokens are interleaved in time order between
    observation groups. Order is the sequence index; nothing is computed
    from the direction values to place tokens.
+6a. Query time (optional input ``query_time``): the step a query is asked
+   at, added to its tokens through the same time-step embedding as the
+   observations (item 2). A sequence index, allowed. Absent (the original
+   last-step tasks) nothing is added, so earlier checkpoints are unchanged.
 6. Query offset: Fourier features (sin/cos at 8 octave-spaced frequencies
    per axis, plus the two scalars scaled by ``offset_max``) of the raw
    offset through one linear layer, added to the query tokens. The offset
@@ -337,7 +341,7 @@ class Hybrid(nn.Module):
         return torch.cat([o, ang.sin().flatten(-2), ang.cos().flatten(-2)],
                          -1)
 
-    def forward(self, obs, odometry, query_pose):              # SE2
+    def forward(self, obs, odometry, query_pose, query_time=None):  # SE2
         directions = odometry                                     # SE2: same role
         query_offset, turn = query_pose[..., :2], query_pose[..., 2]  # SE2
         b, t1 = obs.shape[:2]
@@ -362,6 +366,8 @@ class Hybrid(nn.Module):
         qry = (self.offset_embed(self.offset_features(query_offset))[:, :, None]
                + self.turn_emb(turn)[:, :, None]                  # SE2
                + self.patch_pos(idx) + types[2])                  # (b,q,9,w)
+        if query_time is not None:                                # per-step queries
+            qry = qry + self.time_pos(query_time)[:, :, None]
         x = torch.cat([seq, qry.reshape(b, q * 9, w)], 1)         # (b,401,w)
         for block in self.blocks:
             x = block(x)

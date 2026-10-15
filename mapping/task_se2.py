@@ -6,9 +6,12 @@
                                                      in the body frame of t,
                                                      4 * turn + move
     query_pose    (B, Q, 3)        long              body-frame (dy, dx) of
-                                                     the query from the
-                                                     last pose, and the
-                                                     heading change 0..3
+                                                     the query from the pose
+                                                     at the query's step,
+                                                     and the heading change
+    query_time    (B, Q)           long in 0..T      the step each query is
+                                                     asked at; all T unless
+                                                     the run varies them
 and returns
 
     pred          (B, Q, S, S) float                 the view at each query,
@@ -19,7 +22,8 @@ Loss, metrics and the constant floor are those of the Z^2 task.
 """
 from dataclasses import dataclass
 
-from mapping.task import constant_floor, loss_fn, metrics  # noqa: F401
+from mapping.task import (constant_floor, loss_fn, metrics,  # noqa: F401
+                          metrics_by_time)
 
 
 @dataclass(frozen=True)
@@ -46,4 +50,5 @@ def prepare(batch, device):
     odometry = batch['odometry'].to(device, non_blocking=True)
     pose = batch['query_pose'].to(device, non_blocking=True).long()
     target = batch['target'].to(device, non_blocking=True).float() / 255
-    return obs, odometry, pose, target
+    time = batch['query_time'].to(device, non_blocking=True)
+    return obs, odometry, pose, target, time

@@ -16,9 +16,10 @@ Conventions, all on ``(y, x)`` pixel vectors with y down:
 - the odometry symbol from pose t to t+1 is ``4 * turn + move`` with
   ``move = (d_t - h_t) % 4`` (forward, right, back, left in the body
   frame) and ``turn = (h_{t+1} - h_t) % 4`` (none, right, around, left).
-- a query is the relative pose of the target window seen from the last
-  pose: ``rotate(q - p_T, h_T)`` and ``(q_h - h_T) % 4``, and the target is
-  the window rotated to face ``q_h``.
+- a query asked at step t is the relative pose of the target window seen
+  from pose t: ``rotate(q - p_t, h_t)`` and ``(q_h - h_t) % 4``, and the
+  target is the window rotated to face ``q_h``. By default every query is
+  asked at the last step.
 
 Recovering a pose from the odometry is a group composition: each move is
 rotated by the running heading before it is summed, so a prefix sum of
@@ -79,11 +80,10 @@ def face(windows, headings):
     return apply_dihedral(windows, np.asarray(headings, dtype=np.int8))
 
 
-def query_pose(queries, query_headings, positions, headings):
+def query_pose(queries, query_headings, anchor_positions, anchor_headings):
     """Relative query poses ``(..., Q, 3)``: body-frame (dy, dx) from the
-    last window and the heading change, as ints."""
-    last_p = positions[..., -1:, :]
-    last_h = headings[..., -1:]
-    body = rotate(queries - last_p, np.broadcast_to(last_h, queries.shape[:-1]))
-    turn = (query_headings - last_h) % 4
+    anchor window and the heading change, as ints. The anchors are the
+    poses at each query's step, ``(..., Q, 2)`` and ``(..., Q)``."""
+    body = rotate(queries - anchor_positions, anchor_headings)
+    turn = (query_headings - anchor_headings) % 4
     return np.concatenate([body, turn[..., None]], axis=-1)

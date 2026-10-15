@@ -30,7 +30,7 @@ def best_per_size(rows):
     mse: the way a learning-rate grid is read."""
     best = {}
     for r in rows:
-        key = (r['model'], r['size'])
+        key = (r['model'], r['size'], r.get('query_times', 'last'))
         if key not in best or (r['final_eval']['mse']
                                < best[key]['final_eval']['mse']):
             best[key] = r
@@ -49,7 +49,8 @@ def fit_power_law(params, losses):
 
 
 def table(rows, columns=('model', 'size', 'run', 'params', 'steps', 'lr',
-                         'mse', 'shuffled', 'fg_mae', 'fg<0.1', 'it/s')):
+                         'qt', 'mse', 'last', 'shuffled', 'fg_mae', 'fg<0.1',
+                         'it/s')):
     """Rows as aligned text."""
     def cell(r, c):
         e, s = r['final_eval'], r.get('final_eval_shuffled', {})
@@ -57,6 +58,8 @@ def table(rows, columns=('model', 'size', 'run', 'params', 'steps', 'lr',
             'model': r['model'], 'size': r['size'], 'run': r['run'],
             'params': f'{r["params"]:,}', 'steps': str(r['steps']),
             'lr': f'{r["args"]["lr"]:.2g}', 'mse': f'{e["mse"]:.4f}',
+            'qt': r.get('query_times', 'last')[:4],
+            'last': f'{e["mse_last"]:.4f}' if 'mse_last' in e else '-',
             'shuffled': f'{s["mse"]:.4f}' if s else '-',
             'fg_mae': f'{e["fg_mae"]:.3f}',
             'fg<0.1': f'{e["fg_within_0.1"]:.3f}',

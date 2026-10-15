@@ -20,7 +20,8 @@ world frame; it knows only how each pose relates to the previous one.
 | --- | --- | --- |
 | `obs` | `(B, 33, 9, 9)` float in [0, 1] | the observations, each facing its own heading |
 | `odometry` | `(B, 32)` long in 0..15 | relative pose from t to t+1 in the body frame of t: `4 * turn + move`, with `move` in {forward, right, back, left} and `turn` in {none, right, around, left}; `mapping.se2.decode` splits it |
-| `query_pose` | `(B, 8, 3)` long | the target window relative to the last pose: body-frame `(dy, dx)` within ±288, and the heading change in 0..3 |
+| `query_pose` | `(B, 8, 3)` long | the target window relative to the pose at the query's step: body-frame `(dy, dx)` within ±288, and the heading change in 0..3 |
+| `query_time` | `(B, 8)` long in 0..32 | the step each query is asked at, as in `CONTRACT.md`; all 32 by default |
 
 Output: `pred (B, 8, 9, 9)` float, the window at each query **facing the
 query heading**. Loss is MSE. As before, every target pixel was observed,
@@ -65,7 +66,8 @@ All exclusions in `CONTRACT.md` apply, read with "odometry" for
 ## Files and interface
 
 - One module `mapping/models/<name>.py` as before. `forward(obs, odometry,
-  query_pose)` returns `pred`. The task spec is `mapping.task_se2.TaskSpec`
+  query_pose, query_time=None)` returns `pred`; the query-times rules of
+  `CONTRACT.md` apply. The task spec is `mapping.task_se2.TaskSpec`
   with `view`, `steps`, `odometry` (16), `turns` (4), `step_px`,
   `queries`, `offset_max`.
 - A Z² model is **not** expected to run on this task. Porting one is its
@@ -87,6 +89,6 @@ fragments in it.
 
 ## Status
 
-The data side (generator, `mapping.se2`, tests) is complete. The task
-spec, the trainer's `--task se2` switch, and the first model port are
-not written yet; they come as separate, reviewed steps.
+Generator, `mapping.se2`, tests, the task spec, the trainer's `--task
+se2` switch and the hybrid port (`mapping/models/se2/hybrid.py`) exist.
+No other model is ported yet.

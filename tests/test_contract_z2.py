@@ -1,5 +1,9 @@
-"""The Z^2 contract is frozen: every batch an old-contract model receives
-is byte-identical to what commit 4dc94de produced."""
+"""The Z^2 contract is frozen: every field an old-contract model receives
+is byte-identical to what commit 4dc94de produced. The contract was
+expanded once (query times, 2026-10-15): the batch gained ``query_time``,
+all T by default, and the original fields did not change."""
+import numpy as np
+
 from tests.golden import cases
 
 GOLDEN = {
@@ -16,10 +20,10 @@ def test_batches_unchanged():
     assert cases() == GOLDEN
 
 
-def test_z2_batch_has_no_se2_keys():
-    import numpy as np
+def test_z2_batch_keys_and_default_times():
     from mapping.data import Config, load_bank, make_batch
     bank, _ = load_bank('data/mnist.npz', 32, 'train', False)
     b = make_batch(np.random.default_rng(0), Config(), bank, 4)
     assert set(b) == {'observations', 'directions', 'positions',
-                      'query_offset', 'target', 'episodes'}
+                      'query_offset', 'query_time', 'target', 'episodes'}
+    assert (b['query_time'] == 32).all()

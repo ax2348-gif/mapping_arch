@@ -5,8 +5,12 @@ Scope: the single offline setting with relative odometry. A model receives
     obs           (B, T + 1, S, S) float in [0, 1]   the observations
     directions    (B, T)           long in 0..3      step direction t -> t+1
     query_offset  (B, Q, 2)        long              query corner minus the
-                                                     last window's corner,
+                                                     corner of the window
+                                                     at the query's step,
                                                      in pixels (y, x)
+    query_time    (B, Q)           long in 0..T      the step each query is
+                                                     asked at; all T unless
+                                                     the run varies them
 and returns
 
     pred          (B, Q, S, S) float                 the view at each query
@@ -46,7 +50,8 @@ def prepare(batch, device):
     directions = batch['directions'].to(device, non_blocking=True)
     offset = batch['query_offset'].to(device, non_blocking=True).long()
     target = batch['target'].to(device, non_blocking=True).float() / 255
-    return obs, directions, offset, target
+    time = batch['query_time'].to(device, non_blocking=True)
+    return obs, directions, offset, target, time
 
 
 def loss_fn(pred, target):
@@ -72,6 +77,20 @@ def metrics(pred, target):
                           if fg.any() else float('nan')),
         'fg_fraction': fg.float().mean().item(),
     }
+
+
+@torch.no_grad()
+def metrics_by_time(pred, target, time, steps):
+    """``mse`` of the queries asked at the last step, and per prefix-length
+    bin (quarters of the episode), as a dict; nan where a bin is empty."""
+    pred, err = pred.float(), (pred.float() - target).pow(2).mean((-1, -2))
+    out = {'mse_last': err[time == steps].mean().item()
+           if (time == steps).any() else float('nan')}
+    edges = [0, steps // 4, steps // 2, 3 * steps // 4, steps]
+    for lo, hi in zip(edges, edges[1:]):
+        m = (time >= lo) & (time < hi) if hi < steps else (time >= lo)
+        out[f'mse_t{lo}_{hi}'] = err[m].mean().item() if m.any() else float('nan')
+    return out
 
 
 @torch.no_grad()

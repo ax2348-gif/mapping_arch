@@ -23,6 +23,7 @@ the schedule computed for total length S. One long stable run plus one
 short branch per budget gives a compute curve under one recipe.
 """
 import argparse
+import inspect
 import json
 import math
 import os
@@ -35,6 +36,7 @@ from mapping.checkpoint import save_checkpoint
 from mapping.loader import eval_set, load_banks, train_loader
 from mapping.plot import plot_run
 from mapping.render import render_grid, run_title
+from mapping.task import metrics_by_time
 
 DEFAULT_LR = 3e-4
 
@@ -79,6 +81,11 @@ def parse():
     # data knobs that change the task; the defaults are the design
     p.add_argument('--episode-steps', type=int, default=32)
     p.add_argument('--queries', type=int, default=8)
+    p.add_argument('--query-times', default='last', choices=('last', 'uniform'),
+                   help="'last': queries at the final step (the original "
+                        "tasks); 'uniform': each query at a step drawn "
+                        "uniformly from 0..T, answerable from the "
+                        "observations up to it")
     return p.parse_args()
 
 
@@ -96,25 +103,37 @@ def lr_at(step, args):
 
 
 @torch.no_grad()
+def call(model, obs, directions, offset, time, takes_time):
+    """Forward with the query times when the model accepts them."""
+    if takes_time:
+        return model(obs, directions, offset, query_time=time)
+    return model(obs, directions, offset)
+
+
 def evaluate(model, batches, device, autocast, prepare, metrics,
-             shuffle_directions=False):
+             takes_time, steps, shuffle_directions=False):
     """``shuffle_directions`` permutes each episode's odometry tokens in
-    time (directions on z2, symbols on se2)."""
+    time (directions on z2, symbols on se2). Returns the whole-set metrics
+    plus the per-prefix-length breakdown."""
     model.eval()
-    preds, targets = [], []
+    preds, targets, times = [], [], []
     gen = torch.Generator().manual_seed(0)
     for b in batches:
-        obs, directions, offset, target = prepare(b, device)
+        obs, directions, offset, target, time = prepare(b, device)
         if shuffle_directions:
             perm = torch.argsort(torch.rand(directions.shape, generator=gen),
                                  dim=1).to(device)
             directions = torch.gather(directions, 1, perm)
         with autocast:
-            pred = model(obs, directions, offset)
+            pred = call(model, obs, directions, offset, time, takes_time)
         preds.append(pred.float())
         targets.append(target)
+        times.append(time)
     model.train()
-    return metrics(torch.cat(preds), torch.cat(targets))
+    pred, target, time = torch.cat(preds), torch.cat(targets), torch.cat(times)
+    out = metrics(pred, target)
+    out.update(metrics_by_time(pred, target, time, steps))
+    return out
 
 
 def main():
@@ -130,7 +149,8 @@ def main():
     os.makedirs(out, exist_ok=True)
 
     config, spec = tasks.config_and_spec(args.task, args.episode_steps,
-                                         args.queries, args.seed)
+                                         args.queries, args.seed,
+                                         args.query_times)
     train_bank, eval_bank = load_banks(args.bank, config)
     start = 0
     branch = None
@@ -160,6 +180,10 @@ def main():
     model = module.build(args.size, spec).to(device)
     params = models.count_params(model)
     raw_model = model
+    takes_time = 'query_time' in inspect.signature(model.forward).parameters
+    if args.query_times != 'last' and not takes_time:
+        raise SystemExit(f'{args.model} does not accept query_time; it cannot '
+                         f'be trained with --query-times {args.query_times}')
     if args.compile:
         model = torch.compile(model)
     use_bf16 = device.type == 'cuda' and not args.no_bf16
@@ -200,9 +224,9 @@ def main():
     for step in range(start, args.steps):
         for g in opt.param_groups:
             g['lr'] = lr_at(step, args)
-        obs, directions, offset, target = prepare(next(it), device)
+        obs, directions, offset, target, time = prepare(next(it), device)
         with autocast:
-            pred = model(obs, directions, offset)
+            pred = call(model, obs, directions, offset, time, takes_time)
         loss = loss_fn(pred, target)
         opt.zero_grad(set_to_none=True)
         loss.backward()
@@ -221,15 +245,18 @@ def main():
             running, since = 0.0, 0
             if (step + 1) % args.eval_every == 0 or last:
                 ev = evaluate(model, held_out, device, autocast, prepare,
-                              metrics)
+                              metrics, takes_time, spec.steps)
                 rec['eval'] = ev
                 rec['eval_shuffled'] = evaluate(model, held_out, device,
                                                 autocast, prepare, metrics,
-                                                True)
+                                                takes_time, spec.steps, True)
                 if best is None or ev['mse'] < best['mse']:
                     best, best_step = ev, step + 1
+                by_t = ('' if args.query_times == 'last' else
+                        f' last-step {ev["mse_last"]:.4f} ')
                 print(f'step {step + 1:6d} train {rec["train_mse"]:.4f} '
-                      f'eval mse {ev["mse"]:.4f} fg_mae {ev["fg_mae"]:.4f} '
+                      f'eval mse {ev["mse"]:.4f}{by_t} '
+                      f'fg_mae {ev["fg_mae"]:.4f} '
                       f'fg<0.1 {ev["fg_within_0.1"]:.3f} '
                       f'| dirs shuffled mse '
                       f'{rec["eval_shuffled"]["mse"]:.4f} '
@@ -244,7 +271,8 @@ def main():
     log.close()
 
     final = {'task': args.task, 'model': args.model, 'size': args.size,
-             'run': run, 'schedule': args.schedule, 'branch': args.branch,
+             'run': run, 'query_times': args.query_times,
+             'schedule': args.schedule, 'branch': args.branch,
              'start': start,
              'params': params, 'steps': args.steps, 'batch': args.batch,
              'episodes_seen': args.steps * args.batch,   # including the parent's
@@ -261,7 +289,8 @@ def main():
                     spec, args.task)
     render_grid(raw_model, held_out[:2], spec.view,
                 os.path.join(out, 'grid.png'), device=device,
-                autocast=autocast, title=run_title(final), prepare=prepare)
+                autocast=autocast, title=run_title(final), prepare=prepare,
+                takes_time=takes_time)
     plot_run(out, final)
     print(f'done: eval mse {final["final_eval"]["mse"]:.4f} '
           f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}, '

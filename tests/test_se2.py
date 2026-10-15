@@ -51,7 +51,7 @@ def test_batch_consistent():
     c = Config(heading=True)
     b = make_batch(np.random.default_rng(3), c, bank, 6)
     assert set(b) == {'observations', 'odometry', 'positions', 'headings',
-                      'query_pose', 'target', 'episodes'}
+                      'query_pose', 'query_time', 'target', 'episodes'}
     assert b['odometry'].min() >= 0 and b['odometry'].max() < 16
     disp, hh = se2.compose(b['odometry'], c.step, b['headings'][:, 0])
     assert (hh == b['headings']).all()
@@ -61,11 +61,33 @@ def test_batch_consistent():
         world_obs = crop_windows(image, e.positions, c.obs)
         assert (se2.face(world_obs, b['headings'][i]) == b['observations'][i]).all()
         q = b['query_pose'][i]
-        corners = e.positions[-1] + se2.unrotate(q[:, :2], b['headings'][i, -1])
+        t = b['query_time'][i]
+        corners = e.positions[t] + se2.unrotate(q[:, :2], b['headings'][i, t])
         assert (corners == e.queries).all()
-        qh = (q[:, 2] + b['headings'][i, -1]) % 4
+        qh = (q[:, 2] + b['headings'][i, t]) % 4
         assert (se2.face(crop_windows(image, e.queries, c.obs), qh)
                 == b['target'][i]).all()
+
+
+def test_query_times_uniform_both_tasks():
+    """Each query's pixels were all observed by its step, and offsets are
+    measured from the window at that step."""
+    from mapping.data import coverage
+    bank, _ = load_bank('data/mnist.npz', 32, 'train', True)
+    for heading in (False, True):
+        c = Config(heading=heading, query_times='uniform')
+        b = make_batch(np.random.default_rng(11), c, bank, 8)
+        t = b['query_time']
+        assert t.min() >= 0 and t.max() <= c.steps and len(np.unique(t)) > 4
+        for i, e in enumerate(b['episodes']):
+            h, w = (np.array(e.tile_grid.shape) * c.tile)
+            seen = coverage(e.positions, c.obs, h, w, first=True)
+            for q, tq in zip(e.queries, e.query_times):
+                win = seen[q[0]:q[0] + c.obs, q[1]:q[1] + c.obs]
+                assert ((win >= 0) & (win <= tq)).all()
+            if not heading:
+                assert (b['query_offset'][i]
+                        == e.queries - e.positions[e.query_times]).all()
 
 
 def test_loader_passes_se2_batches():

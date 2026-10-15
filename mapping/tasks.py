@@ -28,11 +28,11 @@ def get(name='z2'):
     return TASKS[name]
 
 
-def config_and_spec(name, steps, queries, seed):
+def config_and_spec(name, steps, queries, seed, query_times='last'):
     """The generator config and the model-facing spec for a task."""
     t = get(name)
     config = Config(steps=steps, queries=queries, seed=seed,
-                    heading=t['heading'])
+                    heading=t['heading'], query_times=query_times)
     spec = t['task'].TaskSpec(view=config.obs, steps=config.steps,
                               step_px=config.step, queries=config.queries)
     return config, spec
