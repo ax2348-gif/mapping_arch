@@ -100,8 +100,12 @@ Audit: where positional or geometric information enters
    from the direction values to place tokens.
 6a. Query time (optional input ``query_time``): the step a query is asked
    at, added to its tokens through the same time-step embedding as the
-   observations (item 2). A sequence index, allowed. Absent (the original
-   last-step tasks) nothing is added, so earlier checkpoints are unchanged.
+   observations (item 2), and used to place the query's tokens in the
+   sequence directly after that step's observation (``token_order``).
+   Both are sequence indices, allowed; nothing is computed from the
+   directions. Absent (the original last-step tasks) nothing changes, so
+   earlier checkpoints are unchanged; with every query at the last step
+   the placement is the original layout.
 6. Query offset: Fourier features (sin/cos at 8 octave-spaced frequencies
    per axis, plus the two scalars scaled by ``offset_max``) of the raw
    offset through one linear layer, added to the query tokens. The offset
@@ -341,6 +345,26 @@ class Hybrid(nn.Module):
         return torch.cat([o, ang.sin().flatten(-2), ang.cos().flatten(-2)],
                          -1)
 
+    @staticmethod
+    def token_order(query_time, t1, q):
+        """Permutation ``(b, t1*10 - 1 + q*9)`` placing query q's tokens
+        after observation ``query_time[q]``: a sort of the layout
+        [obs_0 x9, dir_0, ..., obs_T x9, query tokens] by (step, kind,
+        index) with kinds observation < query < direction."""
+        dev = query_time.device
+        b = query_time.shape[0]
+        steps = torch.arange(t1, device=dev)
+        obs_key = (steps[:, None] * 30 + torch.arange(9, device=dev)).reshape(-1)
+        dir_key = steps[:-1] * 30 + 20
+        ctx_key = torch.cat([obs_key.view(t1, 9), F.pad(dir_key, (0, 1))[:, None]],
+                            1).reshape(-1)[:-1]                     # (t1*10-1,)
+        qry_key = (query_time[:, :, None] * 30 + 10
+                   + torch.arange(9, device=dev)).reshape(b, -1)   # (b, q*9)
+        key = torch.cat([ctx_key[None].expand(b, -1), qry_key], 1).float()
+        # stable: break ties by layout position so queries keep their order
+        key = key + torch.arange(key.shape[1], device=dev) * 1e-4
+        return torch.argsort(key, 1)
+
     def forward(self, obs, odometry, query_pose, query_time=None):  # SE2
         directions = odometry                                     # SE2: same role
         query_offset, turn = query_pose[..., :2], query_pose[..., 2]  # SE2
@@ -366,11 +390,25 @@ class Hybrid(nn.Module):
         qry = (self.offset_embed(self.offset_features(query_offset))[:, :, None]
                + self.turn_emb(turn)[:, :, None]                  # SE2
                + self.patch_pos(idx) + types[2])                  # (b,q,9,w)
-        if query_time is not None:                                # per-step queries
-            qry = qry + self.time_pos(query_time)[:, :, None]
         x = torch.cat([seq, qry.reshape(b, q * 9, w)], 1)         # (b,401,w)
-        for block in self.blocks:
-            x = block(x)
+        if query_time is not None:                                # per-step queries
+            # Each query's nine tokens sit in the sequence right after the
+            # observation of its own step t (before direction t), so the
+            # scan state they read is the prefix up to their anchor. With
+            # every query at the last step this is the layout above.
+            x = x + torch.cat([torch.zeros_like(seq),
+                               self.time_pos(query_time)[:, :, None]
+                               .expand(-1, -1, 9, -1).reshape(b, q * 9, w)],
+                              1)
+            order = self.token_order(query_time, t1, q)           # (b,401)
+            x = torch.gather(x, 1, order[..., None].expand(-1, -1, w))
+            for block in self.blocks:
+                x = block(x)
+            inverse = torch.argsort(order, 1)                    # back to layout
+            x = torch.gather(x, 1, inverse[..., None].expand(-1, -1, w))
+        else:
+            for block in self.blocks:
+                x = block(x)
         y = self.readout(self.norm(x[:, -q * 9:]))                # (b,q*9,9)
         return (y.view(b, q, 3, 3, 3, 3).permute(0, 1, 2, 4, 3, 5)
                 .reshape(b, q, 9, 9))
