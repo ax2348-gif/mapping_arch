@@ -25,6 +25,7 @@ import mapping.models as models
 from mapping.checkpoint import save_checkpoint
 from mapping.data import Config
 from mapping.loader import eval_set, load_banks, train_loader
+from mapping.plot import plot_run
 from mapping.render import render_grid, run_title
 from mapping.task import TaskSpec, constant_floor, loss_fn, metrics, prepare
 
@@ -119,9 +120,13 @@ def main():
     autocast = torch.autocast('cuda', dtype=torch.bfloat16,
                               enabled=use_bf16)
 
+    # 1-D tensors (norms, biases) never decay. A model module may exclude
+    # more by name with NO_DECAY(name) -> bool, e.g. recurrent matrices.
+    exclude = getattr(module, 'NO_DECAY', lambda name: False)
     decay, no_decay = [], []
     for name, p in model.named_parameters():
-        (decay if p.dim() >= 2 else no_decay).append(p)
+        (decay if p.dim() >= 2 and not exclude(name)
+         else no_decay).append(p)
     opt = torch.optim.AdamW([{'params': decay,
                               'weight_decay': args.weight_decay},
                              {'params': no_decay, 'weight_decay': 0.0}],
@@ -192,6 +197,7 @@ def main():
     render_grid(raw_model, held_out[:2], spec.view,
                 os.path.join(out, 'grid.png'), device=device,
                 autocast=autocast, title=run_title(final))
+    plot_run(out, final)
     print(f'done: eval mse {final["final_eval"]["mse"]:.4f} '
           f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}, '
           f'floor {floor["mse"]:.4f}); wrote {out}')
