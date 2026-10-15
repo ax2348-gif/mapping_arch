@@ -88,16 +88,19 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
     picks = rng.choice(len(samples), size=min(rows, len(samples)),
                        replace=False)
     cell = view * SCALE
-    width = max(LABEL_W + len(COLUMNS) * (cell + GAP), 560)
+    big, small = _font(13), _font(10)
+    title = title or 'untitled run'
+    note = ('rows: held-out queries; label = query offset from the last '
+            'window (y, x) and per-query mse')
+    text_w = max(big.getlength(title), small.getlength(LEGEND),
+                 small.getlength(note)) + 12
+    width = int(max(LABEL_W + len(COLUMNS) * (cell + GAP), text_w))
     height = HEADER + 20 + len(picks) * (cell + GAP)
     canvas = Image.new('L', (width, height), 40)
     draw = ImageDraw.Draw(canvas)
-    big, small = _font(13), _font(10)
-    draw.text((6, 4), title or 'untitled run', fill=255, font=big)
+    draw.text((6, 4), title, fill=255, font=big)
     draw.text((6, 24), LEGEND, fill=190, font=small)
-    draw.text((6, 38), 'rows: held-out queries; label = query offset from '
-              'the last window (y, x) and per-query mse', fill=190,
-              font=small)
+    draw.text((6, 38), note, fill=190, font=small)
     for c, name in enumerate(COLUMNS):
         draw.text((LABEL_W + c * (cell + GAP), HEADER + 2), name, fill=220,
                   font=small)

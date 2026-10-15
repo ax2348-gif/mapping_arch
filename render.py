@@ -36,7 +36,9 @@ def main():
     if os.path.exists(summary):
         import json
         with open(summary) as f:
-            title = run_title(json.load(f))
+            final = json.load(f)
+        final.setdefault('run', os.path.basename(os.path.dirname(summary)))
+        title = run_title(final)
     render_grid(model, batches, spec.view, out, rows=a.rows, seed=a.seed,
                 title=title)
     print(f'{args["model"]}/{args["size"]}: wrote {out}')
