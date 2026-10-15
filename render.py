@@ -1,0 +1,39 @@
+"""Draw the prediction grid for any checkpoint.
+
+    python render.py results/vanilla/xs/seed0/final.pt [--out grid.png]
+
+``train.py`` already writes ``grid.png`` next to every checkpoint; this
+redraws one, for instance with more rows or a different sample.
+"""
+import argparse
+import os
+
+import torch
+
+from mapping.checkpoint import load_checkpoint
+from mapping.data import Config
+from mapping.loader import eval_set, load_banks
+from mapping.render import render_grid
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('checkpoint')
+    p.add_argument('--out', default=None, help='default: grid.png beside it')
+    p.add_argument('--rows', type=int, default=12)
+    p.add_argument('--seed', type=int, default=0)
+    p.add_argument('--device', default='cuda' if torch.cuda.is_available()
+                   else 'cpu')
+    a = p.parse_args()
+    model, args, spec = load_checkpoint(a.checkpoint, a.device)
+    config = Config(steps=spec.steps, queries=spec.queries,
+                    seed=args['seed'])
+    _, eval_bank = load_banks(args['bank'], config)
+    batches = eval_set(config, eval_bank, 64, 2, args['seed'])
+    out = a.out or os.path.join(os.path.dirname(a.checkpoint), 'grid.png')
+    render_grid(model, batches, spec.view, out, rows=a.rows, seed=a.seed)
+    print(f'{args["model"]}/{args["size"]}: wrote {out}')
+
+
+if __name__ == '__main__':
+    main()

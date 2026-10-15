@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pt
+results/
+shelved/results/
+jobs/logs/
+data/mnist.npz
+*.egg-info/
+jobs/
