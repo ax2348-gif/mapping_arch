@@ -110,8 +110,10 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
         last, tgt, prd, shf, off = samples[k]
         y = HEADER + 20 + r * (cell + GAP)
         mse = (prd - tgt).pow(2).mean().item()
-        draw.text((4, y + 4), f'off ({int(off[0]):+d},{int(off[1]):+d})',
-                  fill=220, font=small)
+        label = f'off ({int(off[0]):+d},{int(off[1]):+d})'
+        if off.numel() > 2:                       # se2: heading change too
+            label += f' turn {int(off[2])}'
+        draw.text((4, y + 4), label, fill=220, font=small)
         draw.text((4, y + 20), f'mse {mse:.3f}', fill=220, font=small)
         for c, img in enumerate((last, tgt, prd, shf, (prd - tgt).abs())):
             canvas.paste(_to_image(img), (LABEL_W + c * (cell + GAP), y))

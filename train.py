@@ -143,6 +143,10 @@ def main():
           f'lr {args.lr:.2g}; floor mse {floor["mse"]:.4f}, '
           f'floor fg_mae {floor["fg_mae"]:.4f}', flush=True)
     log = open(os.path.join(out, 'log.jsonl'), 'w')
+    log.write(json.dumps({'step': 0, 'task': args.task, 'model': args.model,
+                          'size': args.size, 'run': run, 'params': params,
+                          'lr': args.lr, 'floor': floor}) + '\n')
+    log.flush()
     best, best_step = None, -1
     t_start = time.perf_counter()
     running, since = 0.0, 0

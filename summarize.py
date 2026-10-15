@@ -1,20 +1,24 @@
 """Every run under results/ as one table, and power-law fits per model.
 
-    python summarize.py                 all runs
+    python summarize.py                 all z2 runs
+    python summarize.py --task se2      all se2 runs
     python summarize.py --model lstm    one model
     python summarize.py --fit           best run per rung, fitted per model
 """
 import argparse
 
+import mapping.tasks as tasks
 from mapping.results import best_per_size, fit_power_law, load_runs, table
 
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument('--task', default='z2', choices=sorted(tasks.TASKS))
     p.add_argument('--model', default=None)
-    p.add_argument('--root', default='results')
+    p.add_argument('--root', default=None, help="default: the task's")
     p.add_argument('--fit', action='store_true')
     a = p.parse_args()
+    a.root = a.root or tasks.get(a.task)['root']
     rows = load_runs(a.root, a.model)
     if not rows:
         print('no runs found')

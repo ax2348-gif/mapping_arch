@@ -1,13 +1,16 @@
 """Learning curves per model class: eval mse against training step, one
 line per size, on one chart.
 
-    python plot_curves.py                    every model
+    python plot_curves.py                    every z2 model
+    python plot_curves.py --task se2         the se2 runs
     python plot_curves.py --model vanilla    one model
     python plot_curves.py --shuffled         add the permuted-direction eval
                                              as a dotted line per size
+    python plot_curves.py --free-axis        no preset range or references
 
-Writes results/<model>/curves.png for each model and results/curves.png
-with every model on a shared axis. When a size has several runs (a
+Writes <root>/<model>/curves.png for each model and <root>/curves.png
+with every model on one figure, where <root> is the task's results
+directory (results/ for z2, results/se2/ for se2). When a size has several runs (a
 learning-rate grid, or different step budgets) the run with the lowest
 final eval mse is drawn, which is how the sweep is read. Every run also
 has its own curve.png, written by train.py.
@@ -17,16 +20,21 @@ import os
 
 import matplotlib.pyplot as plt
 
+import mapping.tasks as tasks
 from mapping.plot import draw_model, plot_model
 from mapping.results import best_per_size, load_runs
 
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument('--task', default='z2', choices=sorted(tasks.TASKS))
     p.add_argument('--model', default=None)
-    p.add_argument('--root', default='results')
+    p.add_argument('--root', default=None, help="default: the task's")
     p.add_argument('--shuffled', action='store_true')
+    p.add_argument('--free-axis', action='store_true')
     a = p.parse_args()
+    a.root = a.root or tasks.get(a.task)['root']
+    preset = not a.free_axis
 
     rows = best_per_size(load_runs(a.root, a.model))
     by_model = {}
@@ -38,7 +46,7 @@ def main():
     for model, runs in by_model.items():
         out = plot_model(model, runs,
                          os.path.join(a.root, model, 'curves.png'),
-                         a.shuffled)
+                         a.shuffled, preset)
         print(f'wrote {out} ({len(runs)} sizes)')
     if len(by_model) > 1:
         n, cols = len(by_model), 2
@@ -47,11 +55,12 @@ def main():
                                  figsize=(7 * cols, 4.5 * rows_n),
                                  squeeze=False)
         for ax, (model, runs) in zip(axes.flat, by_model.items()):
-            draw_model(ax, runs, model, a.shuffled)
-        lo = min(ax.get_ylim()[0] for ax in axes.flat[:n])
-        hi = max(ax.get_ylim()[1] for ax in axes.flat[:n])
-        for ax in axes.flat[:n]:
-            ax.set_ylim(lo, hi)
+            draw_model(ax, runs, f'{a.task} {model}', a.shuffled, preset)
+        if not preset:
+            lo = min(ax.get_ylim()[0] for ax in axes.flat[:n])
+            hi = max(ax.get_ylim()[1] for ax in axes.flat[:n])
+            for ax in axes.flat[:n]:
+                ax.set_ylim(lo, hi)
         for ax in list(axes.flat)[n:]:
             ax.axis('off')
         fig.tight_layout()
