@@ -30,6 +30,7 @@ class Config:
     start_window: int = 28  # one tile: uniform phase against the tile grid
     cutoff: int = 32        # brightness below this is zeroed in the bank
     dihedral: bool = True   # each tile gets a random one of its 8 symmetries
+    heading: bool = False   # SE(2) task: a heading per step, see mapping.se2
     seed: int = 0
 
     def __post_init__(self):
@@ -211,6 +212,23 @@ def make_batch(rng, config, bank, batch):
     query_offset (b, Q, 2)        int32, relative to the last window
     target       (b, Q, S, S)     uint8, every pixel observed earlier
     episodes     list of Episode, the stored form
+
+    With ``config.heading`` (the SE(2) task, ``mapping.se2``) the batch is
+    instead
+
+    observations (b, T + 1, S, S) uint8, each rotated to face its heading
+    odometry     (b, T)           int64 in 0..15, egocentric move and turn
+    positions    (b, T + 1, 2)    int32, world, diagnostics only
+    headings     (b, T + 1)       int64 in 0..3, world, diagnostics only
+    query_pose   (b, Q, 3)        int32, body-frame (dy, dx) from the last
+                                  pose and the heading change
+    target       (b, Q, S, S)     uint8, rotated to face the query heading
+    episodes     list of Episode
+
+    The two layouts share no key names beyond the common ones, so a model
+    written for one cannot silently consume the other. The heading draws
+    come after everything else, so with ``heading`` off the batch is
+    byte-identical to what the Z^2 generator always produced.
     """
     c = config
     directions, displacement = random_walk(rng, batch, c.steps, c.step)
@@ -227,9 +245,20 @@ def make_batch(rng, config, bank, batch):
         positions[i] = episode.positions
         offsets[i] = episode.queries - episode.positions[-1]
         episodes.append(episode)
-    return dict(observations=observations, directions=directions,
-                positions=positions, query_offset=offsets, target=targets,
-                episodes=episodes)
+    if not c.heading:
+        return dict(observations=observations, directions=directions,
+                    positions=positions, query_offset=offsets,
+                    target=targets, episodes=episodes)
+    from mapping import se2
+    headings = rng.integers(0, 4, size=(batch, c.steps + 1))
+    query_headings = rng.integers(0, 4, size=(batch, c.queries))
+    queries = np.stack([e.queries for e in episodes])
+    return dict(observations=se2.face(observations, headings),
+                odometry=se2.encode(directions, headings),
+                positions=positions, headings=headings,
+                query_pose=se2.query_pose(queries, query_headings, positions,
+                                          headings).astype(np.int32),
+                target=se2.face(targets, query_headings), episodes=episodes)
 
 
 class EpisodeStream:
