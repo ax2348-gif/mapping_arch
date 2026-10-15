@@ -33,7 +33,7 @@ CLUSTER = dict(account='torch_pr_1024_tandon_advanced',
                workdir='/scratch/ax2348/mapping', max_concurrent=2)
 
 SBATCH = """#!/bin/bash
-#SBATCH --job-name=map-{task}-{model}
+#SBATCH --job-name=map-{task}-{model}{tag}
 #SBATCH --account={account}
 #SBATCH --partition={partition}
 #SBATCH --gres=gpu:{gpus}
@@ -47,7 +47,7 @@ SIZES=({sizes})
 LRS=({lrs})
 SIZE=${{SIZES[$(( SLURM_ARRAY_TASK_ID / ${{#LRS[@]}} ))]}}
 LR=${{LRS[$(( SLURM_ARRAY_TASK_ID % ${{#LRS[@]}} ))]}}
-LRFLAG=""; RUN=seed{seed}
+LRFLAG=""; RUN=seed{seed}{tag}
 if [ "$LR" != "default" ]; then LRFLAG="--lr $LR"; RUN=${{RUN}}_lr$LR; fi
 source {venv}/bin/activate
 cd {workdir}
@@ -71,6 +71,9 @@ def main():
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--workers', type=int, default=4)
     p.add_argument('--extra', default='', help='passed through to train.py')
+    p.add_argument('--tag', default='',
+                   help='appended to run names and the job file, e.g. '
+                        '_400k_b256, so budgets never collide')
     p.add_argument('--lr-grid', nargs='*', default=None,
                    help='learning rates to try at every rung')
     p.add_argument('--dry', action='store_true')
@@ -109,17 +112,17 @@ def main():
                 if lr != 'default':
                     cmd += ['--lr', lr]
                     run += f'_lr{lr}'
-                cmd += ['--run', run] + args.extra.split()
+                cmd += ['--run', run + args.tag] + args.extra.split()
                 print('>>', ' '.join(cmd), flush=True)
                 subprocess.run(cmd, check=True)
 
     if args.slurm:
         os.makedirs('jobs/logs', exist_ok=True)
-        path = (f'jobs/{args.model}.sbatch' if args.task == 'z2'
-                else f'jobs/{args.task}_{args.model}.sbatch')
+        path = (f'jobs/{args.model}{args.tag}.sbatch' if args.task == 'z2'
+                else f'jobs/{args.task}_{args.model}{args.tag}.sbatch')
         with open(path, 'w') as f:
             f.write(SBATCH.format(task=args.task, model=args.model,
-                                  sizes=' '.join(sizes),
+                                  tag=args.tag, sizes=' '.join(sizes),
                                   lrs=' '.join(lrs),
                                   last=len(sizes) * len(lrs) - 1,
                                   steps=args.steps, batch=args.batch,
