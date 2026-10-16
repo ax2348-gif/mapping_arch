@@ -54,6 +54,9 @@ ODOMETRY_FEATURES = TRANSLATION_FEATURES + ANGLE_FEATURES   # 50
 QUERY_FEATURES = ODOMETRY_FEATURES              # 50
 
 
+_HARMONICS = torch.tensor(HARMONICS, dtype=torch.float32)
+
+
 def _tensor(x):
     if isinstance(x, np.ndarray):
         x = torch.from_numpy(x)
@@ -74,7 +77,7 @@ def translation_features(dxdy):
 def angle_features(dtheta):
     """``(...)`` radians -> ``(..., ANGLE_FEATURES)``."""
     th = _tensor(dtheta)
-    m = torch.tensor(HARMONICS, device=th.device, dtype=th.dtype)
+    m = _HARMONICS.to(th.device, th.dtype, non_blocking=True)
     ang = th[..., None] * m
     return torch.cat([ang.cos(), ang.sin()], -1)
 
