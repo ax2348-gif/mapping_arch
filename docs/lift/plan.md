@@ -86,3 +86,31 @@ work. Iterate locally first.
 - If placement-insensitive, freeze L1-L5, the 4.5b ladder and the minimal pair into HYPOTHESIS-v2 with thresholds, then queue the granularity curriculum.
 - If placement-sensitive, hybrid5 (a PaTH-hybrid) joins the frozen slate, and P6 becomes central.
 - Then the scaled se2c runs on the cluster, following the scaling-study pattern.
+
+## Horizon: SE(3) with a camera (framing, 2026-10-16)
+
+**The objective is egocentric, streaming novel-view synthesis.**
+- The task family has always rendered the view at a query pose from history, end to end. Z², discrete SE(2) and continuous SE(2) are its rungs. The camera rung keeps the objective and inserts a projection.
+- **The user's distinction:**
+  - VGGT-type models predict geometry (cameras, depth, point maps) feed-forward. They are a partial existence proof that general transformers learn camera geometry, at scale.
+  - They do not, and presently cannot, do novel-view synthesis end to end.
+- End-to-end NVS transformers exist (SRT, LVSM; details to check against the papers). They are offline and set-based, conditioned on calibrated per-image poses, with no persistent memory under actions.
+- **Our niche:**
+  - a causal stream with odometry or actions only;
+  - a constant-state memory through partial observability;
+  - a geometric bias in that memory for efficiency.
+
+**Proposed rungs.** Each has exact analytic rendering and lifts one thing at a time:
+1. SE(2) motion with a pinhole camera over a textured ground plane: a homography; camera, no occlusion.
+2. SE(3) motion over the same plane: roll and pitch enter the homography; group lift, no occlusion. Every 3D rotation is also a product of two reflections, so the delta-rule mechanism carries over. So does the topological seam (pi_1(SO(3)) = Z2).
+3. 3D scenes with occlusion: true NVS.
+
+**Baselines for the camera rung:**
+- LVSM-style decoding over an egocentric stream: the vanilla analogue.
+- VGGT as the reference for geometry alone, and as an optional frozen visual front end.
+
+**Prerequisites:**
+- the continuous-SE(2) mechanism probe (calibration plus seam);
+- episodes-to-threshold against vanilla4c;
+- the patch-size decision;
+- the Hydra branch merged.
