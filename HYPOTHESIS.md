@@ -298,3 +298,26 @@ so a failed linear probe does not show the pose is absent. An exploratory
 follow-up, not a prediction: a bilinear readout using the model's own
 query vectors from each anchor's tokens. The pre-registered P5′(b)
 criterion failed, and that verdict stands.
+
+### 2026-10-15: P2 (SE(2) half) — beta capped at 1 fails, and its state does not rotate
+
+hybrid4_beta1 (beta = sigmoid(.) in (0, 1); otherwise hybrid4), SE(2), xs,
+per-step queries, 100k steps, seed 0:
+
+- **Result.** All-query mse 0.0491. Bins 0.0137 / 0.0451 / 0.0620 / 0.0723;
+  last-step 0.0718; shuffled 0.0918; floor 0.0986.
+- **Verdict on the frozen threshold.** At 0.0491 it is past the "failed"
+  threshold of 0.045, so P2's SE(2) half is confirmed at this budget.
+  hybrid4 reached 0.0180 under the same recipe.
+- **Still improving.** The curve was still creeping down at the end, from
+  0.0498 at 80k to 0.0491 at 100k.
+- **Untested.** P2's Z² half: Z² is on hold.
+
+The mechanism check matches. `tools/transition_probe.py` finds no
+eigenvalue pair at 90 or 180 degrees on any turn step: every significant
+eigenvalue in the right-to-left head sits at 0 degrees, on every step
+class. `tools/read_beta.py` shows the optimiser pressing against the cap.
+On the right-to-left head's turn tokens, median beta is 0.99, against a
+ceiling of 1.00. On no-turn tokens it is 0.73. So the model drives the
+write strength to the largest value it is allowed on exactly the tokens
+where hybrid4 uses beta = 2.
