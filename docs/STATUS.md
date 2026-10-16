@@ -192,3 +192,11 @@ docs/scaling_study_design.md.
     `train.py --task se2c --model hybrid4c --size s --steps 100000 --query-times uniform --eval-every 2500 --log-every 500 --save-every 5000 --motion decoupled --directions lattice --turn-n 4 --v-min 9 --v-max 9 --branch results/se2c/hybrid4c/s/bridge_n4dec_100k_qt/step45000.pt --run bridge_n4dec_100k_qt_from45k`
 - **2026-10-16, data scaling on the continuous task (user's call):** hybrid4c m, default se2c, 400k WSD, checkpoints every 25k, as a regular Torch job: 20042194 (jobs/lift/se2c_dec_hybrid4c_m_400k_wsd.sbatch, code 8837c28). Reason: a real robot's SE(2) cannot be discretised, so data and size are the levers to study, not the n-curriculum. The live session keeps iterating on the worker.
   - Also running: worker 20041129, hybrid4c s on default se2c at 100k. At 32.5k: far 0.086 (0.66 of floor), shuffled 0.132.
+- **2026-10-16, local m bridge stopped at ~22.5k** (user's call: the local GPU goes to the Hydra seams probe). Last eval at 22.5k: all 0.0061. By kind, true | shuffled:
+  | kind | true | shuffled |
+  | --- | --- | --- |
+  | fallback | 0.0018 | 0.076 |
+  | near | 0.0037 | 0.037 |
+  | mid | 0.0054 | 0.103 |
+  | far | 0.0082 | 0.157 |
+  - m passes the far bin faster than s: s's far was 0.019 at 37.5k. Last checkpoint: results/se2c/hybrid4c/m/bridge_n4dec_100k_qt/step20000.pt (local).
