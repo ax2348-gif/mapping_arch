@@ -128,7 +128,21 @@ work. Iterate locally first.
   
   High-passing removes the mean-brightness shortcut, which alone takes raw images from 0.072 to 0.046. xs failed at long range (capacity).
 - **Continuous SE(2) (se2c): untested.** The generator has no odometry-dropout option yet, which is a small addition. The geometry favours it: steps of 4.5-9 px against 15 px views keep at least 40% overlap, and the stroke texture is registrable. Natural first run: hybrid4c s or m without odometry.
-- **The user has design ideas for visual odometry,** to be elaborated before any run. Don't design it ahead of them.
+- **The user's design: ODOMETRY QUERY TOKENS (2026-10-16).**
+  - Replace each odometry INPUT token with an odometry QUERY token; the model predicts the step's pose change, supervised. There is no odometry input.
+  - Odometry queries give DENSE LOCAL supervision (learn local integration, i.e. visual odometry). The render queries enforce GLOBAL consistency and loop closure when revisits occur: learned SLAM, with the belief in activations, removing the odometry seam.
+  - **Open design points (the user's):**
+    1. local (t-1 -> t) only, or also multi-lag (t-k -> t);
+    2. target (dy, dx, cos, sin) and the loss weight against rendering;
+    3. placement where the odometry token was, visibility in the causal or prefix regime;
+    4. the query token's content (a learned constant, plus lag k);
+    5. prototype on discrete SE(2) or se2c m.
+  - **Comparison set:**
+    - odometry given: hybrid4c m se2c, 400k WSD, final 0.0045 / far 0.0074;
+    - basic VO;
+    - odometry queries.
+  - Mechanistic probe: does the rotation eigenpair still form when the delta rule must derive it from vision?
+- **Basic VO baseline running (2026-10-16):** hybrid4c m, se2c default, --odometry-dropout 1.0 (new in the se2c generator: zero vectors, unambiguous since steps move >= v_min; commit on master), 120k cosine, in Torch worker 20041129 (log worker-20041129-vo_m.out).
 
 ### The penultimate lift: a 2.5D "ocean"
 
