@@ -416,3 +416,49 @@ def test_from_an_older_run_takes_value_overrides_only(tmp_path):
     again, _ = run.rerun(str(path), ['model.size=xs'])   # relabels m's numbers: refused
     with pytest.raises(Exception, match="not rung 'xs'"):
         run.build(again)
+
+
+@pytest.mark.parametrize('argv,match', [
+    ([], 'choose a model: model=<task>/<name>, one of se2c/hybrid4c'),
+    (['model=se2c/hybrid4'], "no model 'se2c/hybrid4'.*have se2c/hybrid4c"),
+    (['model=z2/hybrid4', 'run.sed=1'], "run has no field 'sed'; its fields: name, out"),
+    (['model=z2/hybrid4', 'model.arch.width=96'], 'model.size=<rung>'),
+    (['model=z2/hybrid4', 'run.seed=1,2'], 'run.py launches one run'),
+])
+def test_composition_errors_say_what_to_do(argv, match):
+    with pytest.raises(SystemExit, match=match):
+        run.load(argv)
+
+
+def test_an_experiment_file_needs_its_header(tmp_path):
+    f = tmp_path / 'x.yaml'
+    f.write_text('run:\n  steps: 5\n')
+    with pytest.raises(SystemExit, match='# @package _global_'):
+        run.load(['model=z2/hybrid4'], exp=str(f))
+
+
+def test_print_shows_train_py_only_when_exact(monkeypatch):
+    cfg = compose('+experiment=se2c_bridge')
+    assert run.flags_equivalent(cfg, run.build(cfg)).startswith('train.py --task se2c')
+    # a setting with no flag (as a new generator setting would be)
+    monkeypatch.delitem(train.FLAG_KEYS, 'turn_n')
+    assert run.flags_equivalent(cfg, run.build(cfg)).startswith(
+        '# no exact train.py equivalent (differs: task.generator.turn_n')
+
+
+def test_flags_translation_ignores_settings_flags_cannot_express(monkeypatch):
+    """A config field with no flag (a new generator setting) appears in the
+    args record but not in the parsed flags; train.py --flags compares
+    only what the flags express, and runs."""
+    from mapping.config import Experiment
+    legacy = Experiment.legacy_args
+
+    def with_new_field(self):
+        a = legacy(self)
+        a.new_setting = 1
+        return a
+    monkeypatch.setattr(Experiment, 'legacy_args', with_new_field)
+    ran = []
+    monkeypatch.setattr(train, 'main', lambda e, config=None, sources=None: ran.append(e))
+    train.main_from_flags('--task se2c --model hybrid4c --size xs'.split())
+    assert len(ran) == 1

@@ -29,11 +29,13 @@ python run.py model=z2/vanilla model.size=l            # a rung of the model's o
 python run.py +experiment=se2c_bridge model.size=s    # a preset (conf/experiment/)
 python run.py --exp ~/notes/my_run.yaml run.seed=1    # your own experiment file
 python run.py --from results/se2c/hybrid4c/s/bridge_n4dec_100k_qt/config.yaml run.name=again schedule=wsd
-python run.py ... --print                             # resolved config + train.py flags; no run
+python run.py ... --print                             # resolved config, and the exact train.py command if any; no run
 ```
 
 - **Arguments.** Hydra overrides: `key=value`, `group=option` and
-  `+experiment=name`.
+  `+experiment=name`. A mistake (no model, an unknown model or field, an
+  architecture override, a comma sweep, an experiment file without its
+  header) is an error saying what to do, not a Hydra traceback.
 - **`run.py` and `train.py --flags`.** `run.py` uses Hydra's compose API,
   not `@hydra.main`, whose command line fails on Python 3.14 ("badly
   formed help string"). `train.py --flags` still works and runs the same

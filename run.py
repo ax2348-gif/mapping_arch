@@ -20,17 +20,62 @@ string") and which would change the working directory and logging.
 """
 import hashlib
 import os
+import re
 import shutil
 import sys
 import tempfile
 
 from hydra import compose, initialize_config_dir
+from hydra.errors import (ConfigCompositionException, InstantiationException,
+                          MissingConfigException)
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 import mapping.config  # noqa: F401  (registers the model_lr resolver)
 
 CONF = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'conf')
+
+
+def models():
+    """Every model choice, ``<task>/<name>``."""
+    import glob
+    root = os.path.join(CONF, 'model')
+    return sorted(os.path.relpath(f, root)[:-5] for f in glob.glob(os.path.join(root, '*', '*.yaml')))
+
+
+def explain(error, overrides):
+    """A message saying what to do, for Hydra composition errors a user
+    meets; None for the rest."""
+    msg = str(error)
+    if "You must specify 'model'" in msg:
+        return 'choose a model: model=<task>/<name>, one of ' + ', '.join(models())
+    m = re.search(r"Could not find 'model/([^']+)'", msg)
+    if m:
+        return (f'no model {m.group(1)!r} (conf/model/{m.group(1)}.yaml); have '
+                + ', '.join(models()))
+    m = re.search(r"Could not override '([^']+)'", msg)
+    if m:
+        key = m.group(1)
+        if key.startswith(('model.arch.', 'model.size_kwargs.')):
+            return (f'{key}: a model\'s architecture is its name at a rung of its ladder. '
+                    f'Pick a rung with model.size=<rung> (conf/ladders/<ladder>.yaml), add '
+                    f'a rung there, or register a new model (docs/config.md, "How to add")')
+        parent, _, leaf = key.rpartition('.')
+        try:
+            node = OmegaConf.select(load([o for o in overrides if _key(o) != key]), parent)
+            have = [k for k in node if k not in ('_target_', '_partial_')]
+        except Exception:
+            have = None
+        return (f'{key}: {parent or "the config"} has no field {leaf!r}'
+                + (f'; its fields: {", ".join(have)}' if have else '')
+                + '. (Hydra\'s +key=value would add one, which the strict objects then refuse.)')
+    m = re.search(r"Ambiguous value for argument '([^']+)'", msg)
+    if m:
+        return (f'{m.group(1)}: run.py launches one run. For a sweep, launch one run per '
+                f'value with a distinct run.name (e.g. "run.name=lr${{optim.lr}}"), or let '
+                f'scaling.py / tools/branch_jobs.py write the job array (docs/config.md, '
+                f'"Sweeps"). A list value is key=[a,b]')
+    return None
 
 
 def load(overrides=(), exp=None):
@@ -41,14 +86,28 @@ def load(overrides=(), exp=None):
     overrides = list(overrides)
     with tempfile.TemporaryDirectory() as extra:
         if exp is not None:
+            if not os.path.exists(exp):
+                raise SystemExit(f'--exp {exp}: no such file')
+            with open(exp) as f:
+                text = f.read()
+            if '@package _global_' not in text:
+                raise SystemExit(f'--exp {exp}: an experiment file starts with the line '
+                                 f'"# @package _global_" (its keys are whole-config '
+                                 f'paths: run.steps, task.generator...); see docs/config.md')
             os.makedirs(os.path.join(extra, 'experiment'))
-            with open(exp, 'rb') as f:
-                name = '_exp_' + hashlib.sha256(f.read()).hexdigest()[:12]
+            name = '_exp_' + hashlib.sha256(text.encode()).hexdigest()[:12]
             shutil.copy(exp, os.path.join(extra, 'experiment', name + '.yaml'))
             overrides = [f'hydra.searchpath=[file://{extra}]',
                          f'+experiment={name}'] + overrides
-        with initialize_config_dir(version_base='1.3', config_dir=CONF):
-            return compose('config', overrides=overrides)
+        try:
+            with initialize_config_dir(version_base='1.3', config_dir=CONF):
+                return compose('config', overrides=overrides)
+        except (ConfigCompositionException, MissingConfigException) as e:
+            error = e
+    message = explain(error, [o for o in overrides if not o.startswith('hydra.')])
+    if message is None:
+        raise error
+    raise SystemExit(message) from error
 
 
 def resolved(cfg):
@@ -133,6 +192,28 @@ def rerun(frm, overrides):
     return cfg, {'overrides': list(overrides), 'experiment': None}
 
 
+def flags_equivalent(cfg, experiment):
+    """The ``train.py`` command that runs exactly ``cfg``, or a note saying
+    there is none: its flags are translated back into a config, which must
+    equal ``cfg`` (a setting or choice with no flag, a new schedule say,
+    has none)."""
+    import contextlib
+    import io
+    import train
+    flags = train.flags(experiment.legacy_args())
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            again = resolved(load(train.overrides_from_flags(train.parse(flags))))
+        drift = [k for k in differences(OmegaConf.to_container(again),
+                                        OmegaConf.to_container(cfg))
+                 if k not in ('run.overwrite',)]
+    except (SystemExit, Exception) as e:
+        drift = [f'the flags do not parse ({e})']
+    if drift:
+        return '# no exact train.py equivalent (differs: ' + ', '.join(drift) + ')'
+    return 'train.py ' + ' '.join(flags)
+
+
 def parse_cli(argv):
     """(overrides, exp file, from file, print?) from run.py's arguments."""
     argv, exp, frm = list(argv), None, None
@@ -167,10 +248,13 @@ def main(argv=None):
     else:
         cfg = resolved(load(overrides, exp))
         sources = {'overrides': overrides, 'experiment': exp}
-    experiment = build(cfg)
+    try:
+        experiment = build(cfg)
+    except InstantiationException as e:
+        raise SystemExit(f'config error: {e}') from e
     if show:
         print(OmegaConf.to_yaml(cfg))
-        print('train.py ' + ' '.join(train.flags(experiment.legacy_args())))
+        print(flags_equivalent(cfg, experiment))
         return
     train.main(experiment, config=cfg, sources=sources)
 
