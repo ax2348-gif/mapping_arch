@@ -59,11 +59,11 @@ python run.py ... --print                             # resolved config, and the
 | group / node | options | object (`mapping.config`) | fields |
 | --- | --- | --- | --- |
 | `model` (required) | `<task>/<name>`, one file per registered model | `Model` | `name`, `ladder`, `size` (a rung of the ladder), `size_kwargs` (resolved from `conf/ladders/<ladder>.yaml`), `arch` (the class, `_partial_`, with fixed arguments such as hybrid45b's `placement`) |
-| `task` (chosen by the model) | `z2`, `se2d`, `se2c` | `Task` | `name`, `episode_steps`, `queries`, `query_times` |
-| `generator` (chosen by the task) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
-| `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` | `warmup` (+ `cooldown` for wsd) |
+| `task` (chosen by the model; `task=<variant>` overrides) | `z2`, `se2d`, `se2c` (each includes `_episode`) | `Task` | `name`, `episode_steps`, `queries`, `query_times` |
+| `generator` (chosen by the task; `generator=<variant>` overrides) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
+| `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` (`Schedule.lr(step, steps, peak)`) | `warmup` (+ `cooldown` for wsd) |
 | `optim` | in `config.yaml` | `AdamW` | `lr` (default: the model's, via `${model_lr:...}`), `weight_decay`, `clip`, `batch` |
-| `run` | in `config.yaml` | `Run` | `name out steps seed save_every branch device bf16 compile` |
+| `run` | in `config.yaml` | `Run` | `name out steps seed save_every branch device bf16 compile overwrite` |
 | `eval` | in `config.yaml` | `Eval` | `batches every log_every` |
 | `experiment` | `se2c_bridge`, `se2d_scaling_wsd`, or any file via `--exp` | none: it only sets the fields above | |
 
@@ -141,6 +141,147 @@ task:
 Command-line overrides apply on top of it: `--exp f.yaml model.size=l
 run.seed=1`. The file is composed under a name of its own, so a file
 named like a preset (`se2c_bridge.yaml`) is still your file.
+
+## Variants by composition
+
+A variant of a task or a generator is a small file that includes its
+base and changes some values; nothing in Python changes.
+
+```yaml
+# conf/generator/se2c_lattice.yaml: the discrete walk on the continuous renderer
+# @package task.generator
+defaults:
+  - se2c
+  - _self_
+directions: lattice
+turn_n: 4
+v_min: 9.0
+v_max: 9.0
+```
+
+```yaml
+# conf/task/se2c_long.yaml: se2c with 64-step episodes
+# @package _global_
+defaults:
+  - se2c
+  - _self_
+task:
+  episode_steps: 64
+```
+
+Select one on the command line (`generator=se2c_lattice`, `task=se2c_long`)
+or in an experiment (`- override /generator: se2c_lattice`), whatever
+the model file chose. A variant for the wrong task is an error (a se2c
+generator on a z2 task, a se2d task under a se2c model).
+
+## How to add
+
+Each recipe lists every file to touch. After any of them, run
+`python run.py <your choice> --print` and `python -m pytest
+tests/test_config.py tests/test_models.py`; the config tests check that
+every field you added is read by the trainer and changes what it trains
+on.
+
+**A model.**
+1. `mapping/models/<registry>/<name>.py`, where the registry is
+   `mapping/models/` (z2), `mapping/models/se2d/` or
+   `mapping/models/se2c/`. Copy a sibling (README.md, "Adding an
+   architecture", and CONTRACT.md say what a model owes). It defines:
+   - the model class, `__init__(self, spec, <size arguments>, <fixed
+     arguments>)`;
+   - `SIZES = ladder('<ladder>')`;
+   - `SCALING_RULE`;
+   - optionally `LR = {rung: lr}` and `NO_DECAY(name) -> bool`;
+   - `ARCH = {...}`, the fixed constructor arguments beyond the size (only
+     if it has any; e.g. hybrid45b's placement);
+   - `build(size, spec)`, returning the class at `SIZES[size]` and `ARCH`
+     (the loaders' fallback for checkpoints without `arch`);
+   - `register('<name>')(sys.modules[__name__])` at the bottom.
+2. `conf/model/<task>/<name>.yaml`. Copy a sibling: `/task`, then
+   `model.name` (the file name and the registered name), `model.ladder`,
+   a default `model.size`, `model.arch._target_` (the class) with
+   `_partial_: true`, and the same fixed arguments as `ARCH`.
+3. Its sizes: an existing ladder, or a new `conf/ladders/<ladder>.yaml`
+   (one rung per line, smallest first: `xs: {width: 64, depth: 2}`).
+
+A variant of an existing model ("hybrid4c with one change") is a new
+model: a new module (a subclass, importing the parent's pieces, as
+`vanilla4c.py` does), its own name and file. Overriding the parent's
+`arch` from the command line is refused, because the run would be
+recorded as the parent.
+
+**A rung.** One line in its ladder file. Every model on that ladder
+gets it.
+
+**A se2c generator setting.**
+1. A field in `mapping.se2c.generator.Config`, with a default that is
+   the generator's behaviour before the setting, used where the walk or
+   the queries need it.
+2. The same field in `Se2cGenerator` (`mapping/config.py`).
+3. Its value in `conf/generator/se2c.yaml`.
+
+`Se2cGenerator.config` passes it to `Config` by name. It reaches the args
+record and the tools (`task_se2c.config_from_args`) with no code; records
+from before it get the `Config` default. A `train.py` flag is optional
+(`task_se2c.add_args` and `train.FLAG_KEYS`); without one, `train.py
+--flags` runs take the config default and `--print` says no `train.py`
+command is exact.
+
+**A tile-bank generator setting (z2, se2d).** A field in `BankGenerator`
+and `conf/generator/bank.yaml`. Then pass it on: `BankGenerator.data` →
+`tasks.config_and_spec` (a new argument) → a field of `mapping.data.Config`
+and its use. For the tools, `tasks.config_from_args` reads it from the
+args record, with the old behaviour as the default.
+
+**A task (episode) setting.** A field in `Task`, its default in
+`conf/task/_episode.yaml` (every task includes it), and its use: pass it
+to both generators (`BankGenerator.data` and `Se2cGenerator.config`), or
+to the trainer (`train.main` reads `e.task`).
+
+**A schedule.**
+1. A dataclass in `mapping/config.py` subclassing `Schedule`, with its
+   fields, `name = '<name>'` and `lr(self, step, steps, peak)`.
+2. `conf/schedule/<name>.yaml` with `_target_` and the fields.
+
+`schedule=<name>` selects it; the tests pick up the file. `train.py
+--schedule` offers only cosine and wsd.
+
+**An optimiser setting.** A field in `AdamW` and `conf/config.yaml`
+(`optim:`), and its use where `train.main` builds the optimizer. If it
+must not change in a branch, leave it out of `train.BRANCH_MAY_CHANGE`.
+
+**An experiment.** A file (above); a preset if it should live in
+`conf/experiment/`.
+
+**Known limit.** A setting that matters only under another setting's
+value (a persistent-walk option that is moot with `directions=lattice`)
+is still read, so the tests cannot tell a run that ignores it. Say so in
+the field's comment.
+
+## Sweeps
+
+`run.py` launches one run; a sweep is one command per point.
+- **Distinct outputs.** A run directory is `results/<task>/<model>/<size>/<run.name>`
+  (z2: `results/<model>/...`), and a non-empty one is refused. Points that
+  differ only in a value need distinct names. An interpolated name does
+  it: `'run.name=lr${optim.lr}_s${run.seed}'` (quoted for the shell).
+- **Cluster arrays.** `python scaling.py --task <t> --model <m> --slurm
+  --sizes xs s m --lr-grid 1e-3 3e-4 --extra "<overrides>"` writes a SLURM
+  array of `run.py` commands, one per (size, lr), named
+  `seed<seed>[_lr<lr>]<tag>`. `tools/branch_jobs.py` writes cooldown
+  branches. Both check the venv's dependencies first.
+- **By hand.** A job script calls `python run.py --exp <file> model.size=$SIZE
+  "run.name=<name>_$SIZE"` from the repository root.
+
+## CPU and GPU
+
+Runs read `data/` and write `results/` relative to the working directory:
+run from the repository root (in a git worktree, link `data/` in). The
+hybrid4 family and hybrid4c run flash-linear-attention's Triton kernels,
+which need CUDA; on CPU they are refused before anything is written
+(`mapping.models.cuda_only` names the module). The other models train on
+CPU (`run.device=cpu`), and the bit-identical rerun guarantee is for CPU.
+`run.bf16` applies on CUDA only.
 
 ## Outputs and reruns
 

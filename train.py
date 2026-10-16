@@ -302,6 +302,11 @@ def main(experiment, config=None, sources=None):
     shuffle_informative = gpu_data or g.odometry_dropout < 1.0
     if not gpu_data:
         bank = args.bank = g.bank_path()
+        if not os.path.exists(bank):
+            raise SystemExit(f'{bank}: no such bank file (paths are relative to the '
+                             f'working directory, {os.getcwd()}). Run from the repository '
+                             f'root (a git worktree needs data/ linked in), or fetch it '
+                             f'(README.md, Setup)')
         config_, spec = g.data(t, r.seed)
         # everything the bank fixes, recorded beside the run's numbers
         texture = {'texture': g.texture, 'bank': bank,

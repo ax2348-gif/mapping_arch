@@ -24,7 +24,7 @@ at train.py's defaults.
 import functools
 import inspect
 import math
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, is_dataclass
 from typing import Optional
 
 from omegaconf import OmegaConf
@@ -332,7 +332,9 @@ class Experiment:
         for f in fields(s):                  # warmup, cooldown, ...
             setattr(a, f.name, getattr(s, f.name))
         a.eval_batches, a.eval_every, a.log_every = e.batches, e.every, e.log_every
-        a.episode_steps, a.queries, a.query_times = t.episode_steps, t.queries, t.query_times
+        for f in fields(t):                  # episode_steps, queries, query_times, ...
+            if f.name not in ('name', 'generator'):
+                setattr(a, f.name, getattr(t, f.name))
         g = t.generator
         for f in fields(g):
             v = getattr(g, f.name)
@@ -347,8 +349,10 @@ class Experiment:
         return a
 
 
-# the classes a config node may instantiate, for the consumed-field tests
-NODES = (Run, Eval, AdamW, Cosine, WSD, BankGenerator, Se2cGenerator, Task)
+# the classes a config node may instantiate (every Node dataclass defined
+# here), for the consumed-field tests
+NODES = tuple(c for c in list(globals().values())
+              if isinstance(c, type) and issubclass(c, Node) and is_dataclass(c))
 
 
 def field_names(cls):

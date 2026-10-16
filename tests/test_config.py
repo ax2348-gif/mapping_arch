@@ -203,14 +203,18 @@ def test_unknown_keys_are_errors(node):
 
 
 def test_ladders_are_the_old_tables():
-    """The ladders moved out of the modules are the old tables, entry for
-    entry and in order. Models registered since (not in the snapshot) have
-    no old table; every snapshot model must still be registered."""
+    """The ladders moved out of the modules keep the old tables: every old
+    rung, with its arguments, in the old order (rungs added since may sit
+    anywhere). Models registered since (not in the snapshot) have no old
+    table; every snapshot model must still be registered."""
     registered = {f'{t}/{n}': m for t in ('z2', 'se2d', 'se2c')
                   for n, m in tasks.get(t)['models'].REGISTRY.items()}
     assert set(SNAPSHOT) <= set(registered)
     for key, rows in SNAPSHOT.items():
-        assert [[k, v] for k, v in registered[key].SIZES.items()] == rows, key
+        sizes = registered[key].SIZES
+        assert all(sizes.get(k) == v for k, v in rows), key
+        old = [k for k in sizes if k in dict(rows)]
+        assert old == [k for k, _ in rows], key
 
 
 def test_model_files_name_their_ladder():

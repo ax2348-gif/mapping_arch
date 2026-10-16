@@ -1,0 +1,7 @@
+# @package _global_
+# The episode settings every task shares, with their defaults; each task
+# file (conf/task/<task>.yaml) includes this and may change them.
+task:
+  episode_steps: 32     # walk steps T (T + 1 observations)
+  queries: 8
+  query_times: last      # last: every query at step T; uniform: at a step drawn from 0..T

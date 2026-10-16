@@ -2,10 +2,9 @@
 # The se2c task contract and its episodes; the model selects it.
 defaults:
   - /generator: se2c
+  - _episode           # episode_steps, queries, query_times
+  - _self_
 
 task:
   _target_: mapping.config.Task
   name: se2c
-  episode_steps: 32     # walk steps T (T + 1 observations)
-  queries: 8
-  query_times: last      # last: every query at step T; uniform: at a step drawn from 0..T
