@@ -195,5 +195,14 @@ work. Iterate locally first.
   3. Time units for the evolving sea: what one walk step equals, and the dynamics' pace relative to motion.
   4. Is the remaining mid-distance speckle acceptable, or should the shading be band-limited too? The noise within ~8 px of the horizon is mostly the 32 px resolution limit.
   5. The agent's own choices, awaiting confirmation: pitch and field of view, sky and haze values, the regularity dial's frequency ranges, the dynamics' timescale.
+- **Proposed coverage rule and trajectories for the ocean (discussion, 2026-10-16; not built):**
+  - **Coverage in 2D.** Each view's "seen" region = its flat-ground footprint trapezoid, TRUNCATED at the distance where a pixel's ground footprint reaches the resolution threshold (the user's conservative estimate: no holes on a flat surface), INTERSECTED with the cells its rendered rays actually hit.
+    - Hits are a free by-product of rendering.
+    - Inside the truncated trapezoid every cell is densely hit, so a miss there means occlusion, not a sampling hole.
+    - A query pixel is covered if its hit cell was seen at a step ≤ the query's step.
+  - **Replaces** the current exact per-point 3D re-march (mapping/ocean/visibility.py), which is correct but costly.
+  - **Trajectories: FRONTIER EXPLORATION** (the user) instead of a random walk. Move toward the boundary of the seen region, so coverage grows predictably, queries sample inside the seen region with no fallbacks, and loop closures can be scheduled.
+    - Guard against leakage through predictability: randomise frontier choice, speeds, turn profiles and start pose, and keep the shuffled-odometry check.
+    - The frontier is defined on the occlusion-aware seen raster.
 - **Parked option (user):** small zero-mean distortions of the texture would test filtering. Not now: the camera's resolution limit is already a hard enough observation function.
 - **The patch-size and sample-efficiency decisions** carry over, since token counts only grow from here.
