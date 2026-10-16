@@ -47,7 +47,8 @@ def main():
     render_grid(model, batches, spec.view, out, rows=a.rows, seed=a.seed,
                 title=title, prepare=tasks.get(task)['task'].prepare,
                 takes_time='query_time' in inspect.signature(
-                    model.forward).parameters)
+                    model.forward).parameters,
+                kinds=getattr(tasks.get(task)['task'], 'query_kinds', None))
     print(f'{args["model"]}/{args["size"]}: wrote {out}')
 
 

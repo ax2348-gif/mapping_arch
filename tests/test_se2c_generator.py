@@ -176,3 +176,14 @@ def test_bank_option_runs():
     b = make_batch(c, 0, DEV, batch=4, bank=tb.load('mnist', 'test', DEV))
     assert b['observations'].shape == (4, 33, 15, 15)
     assert 0 <= b['observations'].min() and b['observations'].max() <= 1
+
+
+def test_query_kinds_split():
+    from mapping.task_se2c import query_kind, metrics_by_query
+    qp = torch.tensor([[[0., 0., 0.], [3., 4., 0.], [9., 0., 1.], [12., 9., 2.]]])
+    found = torch.tensor([[False, True, True, True]])
+    assert query_kind(qp, found).tolist() == [[0, 1, 2, 3]]
+    err = torch.tensor([1., 2., 3., 4.]).view(1, 4, 1, 1)
+    out = metrics_by_query(err, torch.zeros(1, 4, 1, 1), qp, found)
+    assert out['mse_fallback'] == 1 and out['mse_near'] == 4 and out['mse_far'] == 16
+    assert abs(out['mse_sampled'] - (4 + 9 + 16) / 3) < 1e-6 and out['frac_fallback'] == 0.25

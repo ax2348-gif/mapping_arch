@@ -184,7 +184,14 @@ held-out band included, and the test split of a bank).
 As before (`mse`, `mse_centered`, per prefix-length bins, last-step, the
 shuffled-odometry diagnostic which permutes the odometry vectors in
 time), with foreground = ink (target > 0.5), plus `mse_turnA_B`: error
-per |query heading change| bin. References on the default settings: the
+per |query heading change| bin. Also, per query kind (added 2026-10-16 at the user's request):
+`mse_fallback` (an earlier observation at a quarter turn, the sampler's
+fallback), and the sampled queries by their distance from the anchor:
+`mse_near` (< 7.5 px, a re-render of the anchor view), `mse_mid`
+(7.5-15 px) and `mse_far` (>= 15 px, beyond a window, so it needs the
+map), plus `mse_sampled` and each kind's share `frac_<kind>`. The grid
+groups its rows by the same kinds. Read progress on `mse_far`, not on
+the aggregate. References on the default settings: the
 constant floor is 0.1307 on the decoupled default (0.1311 on the old arc walk; 16 evaluation batches, seed 0); a pose-oracle that interpolates the
 observations bicubically with the TRUE poses reaches 0.0005
 (`mapping.se2c.oracle`). Proposed reading (not frozen):

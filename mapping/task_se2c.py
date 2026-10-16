@@ -74,10 +74,35 @@ def metrics(pred, target):
     }
 
 
+# query kinds (diagnostic split, added 2026-10-16 at the user's request):
+# fallback = an earlier observation turned by a quarter turn (the sampler
+# found no valid pose); sampled queries by their centre's distance from the
+# anchor, in px: inside half a window (a re-render of the anchor view), up to
+# a window, beyond a window (needs the map)
+QUERY_KINDS = ('fallback', 'near', 'mid', 'far')
+NEAR_PX, FAR_PX = 7.5, 15.0
+
+
+def query_kind(query_pose, found):
+    """``(...)`` long index into ``QUERY_KINDS``."""
+    d = query_pose[..., :2].norm(dim=-1)
+    kind = torch.where(d < NEAR_PX, 1, torch.where(d < FAR_PX, 2, 3))
+    return torch.where(found.bool(), kind, torch.zeros_like(kind))
+
+
+def query_kinds(batch):
+    """Per-query kind names for a batch, for the grid."""
+    k = query_kind(batch['query_pose'], batch['stats']['found'])
+    return [[QUERY_KINDS[int(x)] for x in row] for row in k.cpu()]
+
+
 @torch.no_grad()
-def metrics_by_query(pred, target, query_pose):
+def metrics_by_query(pred, target, query_pose, found=None):
     """``mse`` per |heading change| quarter: ``mse_turn0_45``, ...,
-    ``mse_turn135_180``."""
+    ``mse_turn135_180``; with ``found``, also per query kind:
+    ``mse_fallback``, ``mse_sampled``, ``mse_near`` (sampled, < 7.5 px from
+    the anchor), ``mse_mid`` (7.5-15 px), ``mse_far`` (>= 15 px), and each
+    kind's share ``frac_<kind>``."""
     err = (pred.float() - target).pow(2).mean((-1, -2))
     deg = query_pose[..., 2].abs() * 180 / math.pi
     out = {}
@@ -85,6 +110,13 @@ def metrics_by_query(pred, target, query_pose):
         m = (deg >= lo) & (deg < lo + 45) if lo < 135 else deg >= lo
         out[f'mse_turn{lo}_{lo + 45}'] = (err[m].mean().item() if m.any()
                                           else float('nan'))
+    if found is not None:
+        kind = query_kind(query_pose, found)
+        masks = {name: kind == i for i, name in enumerate(QUERY_KINDS)}
+        masks['sampled'] = kind > 0
+        for name, m in masks.items():
+            out[f'mse_{name}'] = err[m].mean().item() if m.any() else float('nan')
+            out[f'frac_{name}'] = m.float().mean().item()
     return out
 
 

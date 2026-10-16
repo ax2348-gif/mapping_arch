@@ -66,7 +66,7 @@ def _to_image(x):
 @torch.no_grad()
 def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
                 autocast=None, title='', prepare=prepare_z2,
-                takes_time=False):
+                takes_time=False, kinds=None):
     """Write a grid of ``rows`` sampled queries from ``batches`` to ``out``.
 
     model    the module, in eval mode on ``device``
@@ -74,14 +74,19 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
     view     window side in pixels
     title    one line naming the run; see ``run_title``
     prepare  the task's batch-to-inputs function (z2 by default)
+    kinds    optional ``kinds(batch) -> [[name per query] per episode]``;
+             the rows are then drawn in equal numbers per kind, in order of
+             first appearance in the task's list, and labelled with it
     """
     device = device or next(model.parameters()).device
     autocast = autocast or torch.autocast('cuda', enabled=False)
     was_training = model.training
     model.eval()
     gen = torch.Generator().manual_seed(0)
-    samples = []
+    samples, kind_of = [], []
     for b in batches:
+        if kinds is not None:
+            kind_of += [k for row in kinds(b) for k in row]
         obs, directions, offset, target, time = prepare(b, device)
         kw = {'query_time': time} if takes_time else {}
         with autocast:
@@ -102,13 +107,27 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
         model.train()
 
     rng = np.random.default_rng(seed)
-    picks = rng.choice(len(samples), size=min(rows, len(samples)),
-                       replace=False)
+    if kinds is None:
+        picks = rng.choice(len(samples), size=min(rows, len(samples)),
+                           replace=False)
+    else:
+        names = list(dict.fromkeys(kind_of))
+        order = [n for n in ('fallback', 'near', 'mid', 'far') if n in names] + \
+                [n for n in names if n not in ('fallback', 'near', 'mid', 'far')]
+        per = max(1, rows // len(order))
+        picks = []
+        for n in order:
+            idx = [i for i, k in enumerate(kind_of) if k == n]
+            picks += list(rng.choice(idx, size=min(per, len(idx)), replace=False))
     cell = view * SCALE
     big, small = _font(13), _font(10)
     title = title or 'untitled run'
     note = ('rows: held-out queries; label = query offset from the last '
             'window (y, x) and per-query mse')
+    if kinds is not None:
+        note = ('rows: held-out queries grouped by kind (fallback: an earlier '
+                'view at a quarter turn; near < 7.5 px, mid < 15 px, far >= 15 px '
+                'from the anchor); label = offset (y, x), heading change, mse')
     text_w = max(big.getlength(title), small.getlength(LEGEND),
                  small.getlength(note)) + 12
     width = int(max(LABEL_W + len(COLUMNS) * (cell + GAP), text_w))
@@ -133,6 +152,8 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
             label += f' turn {int(off[2])}'
         draw.text((4, y + 4), label, fill=220, font=small)
         draw.text((4, y + 20), f'mse {mse:.3f}', fill=220, font=small)
+        if kinds is not None:
+            draw.text((4, y + 36), kind_of[k], fill=255, font=big)
         for c, img in enumerate((last, tgt, prd, shf, (prd - tgt).abs())):
             canvas.paste(_to_image(img), (LABEL_W + c * (cell + GAP), y))
     canvas.save(out)

@@ -149,7 +149,7 @@ def evaluate(model, batches, device, autocast, prepare, metrics,
     ``shuffle_informative``). ``by_query(pred, target, query)`` adds a
     task's per-query breakdown (se2c: by heading change)."""
     model.eval()
-    preds, targets, times, queries = [], [], [], []
+    preds, targets, times, queries, found = [], [], [], [], []
     gen = torch.Generator().manual_seed(0)
     for b in batches:
         obs, directions, offset, target, qtime = prepare(b, device)
@@ -163,12 +163,15 @@ def evaluate(model, batches, device, autocast, prepare, metrics,
         targets.append(target)
         times.append(qtime)
         queries.append(offset)
+        if isinstance(b, dict) and 'found' in (b.get('stats') or {}):
+            found.append(b['stats']['found'])
     model.train()
     pred, target, qtime = torch.cat(preds), torch.cat(targets), torch.cat(times)
     out = metrics(pred, target)
     out.update(metrics_by_time(pred, target, qtime, steps))
     if by_query is not None:
-        out.update(by_query(pred, target, torch.cat(queries)))
+        kw = {'found': torch.cat(found)} if len(found) == len(preds) else {}
+        out.update(by_query(pred, target, torch.cat(queries), **kw))
     return out
 
 
@@ -378,7 +381,8 @@ def main():
     render_grid(raw_model, held_out[:2], spec.view,
                 os.path.join(out, 'grid.png'), device=device,
                 autocast=autocast, title=run_title(final), prepare=prepare,
-                takes_time=takes_time)
+                takes_time=takes_time,
+                kinds=getattr(task['task'], 'query_kinds', None))
     plot_run(out, final)
     print(f'done: eval mse {final["final_eval"]["mse"]:.4f} '
           f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}'
