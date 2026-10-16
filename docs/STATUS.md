@@ -80,3 +80,26 @@ docs/scaling_study_design.md.
 | applications review | https://claude.ai/artifact/WnVhdCjzUtq1VRo6mySS8A |
 | literature synthesis | https://claude.ai/artifact/MSr6KNebLT7Rttep2nnU1H |
 | user's lift notes (reference) | https://claude.ai/artifact/LUSCC1MToip91haQkC28zc |
+
+## Autonomous session: SE(2) proper (started 2026-10-16, ~6 hours, user-approved)
+
+**Plan:**
+
+1. Steer the three lift agents as they report:
+   - review the texture sheets, coverage, the proving-run grid and the probe calibration myself;
+   - launch the follow-ups each implies;
+   - keep docs/lift/ and the journal current.
+2. Once hybrid4c trains, run the granularity curriculum (n = 4, 8, 16, 32, continuous) and look at breakaway against n (L1). Then vanilla4c as the matched comparison, then the probes on what solves.
+3. Read the scaling study as it lands: threshold crossings, cooldown branches into fits, audits of near-zero checkpoints. Record results as dated amendments.
+
+**Boundaries:**
+
+- Do NOT freeze HYPOTHESIS-v2; draft it for the user's sign-off.
+- Do not cancel jobs I did not submit (the old sweep stays).
+- Never edit the user's lift notes or the frozen hypothesis text; amendments only.
+- Keep all the working rules above.
+
+**Reporting:**
+
+- one row per milestone in the journal's day-2 log;
+- a wrap-up for the user covering what worked, what didn't, and the decisions waiting.
