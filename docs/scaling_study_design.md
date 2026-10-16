@@ -101,3 +101,29 @@ widening gap), the learning-rate grid at every size, and more seeds.
 | C | branches 20028849-20028855, each gated (afterany) on its parent array |
 | D | hybrid4 20028844; vanilla4 20028846 |
 | E | hybrid4 seed 1 20028847; vanilla4 seed 1 20028848 |
+
+## Cancelled to prioritise the lift (2026-10-16, user's call)
+
+The lift's Torch jobs (worker 20038588, m bridge 20038403) sat behind our own
+older pending scaling jobs. Users here cannot reorder jobs, so every PENDING
+scaling task was cancelled. Running tasks were untouched, and array 19991387
+stays. To resubmit, from /scratch/ax2348/mapping. The job files are unchanged
+there; the lift runs from the separate tree /scratch/ax2348/mapping_lift.
+
+| was | what | resubmit |
+| --- | --- | --- |
+| 20028842_[2-3] | hybrid4 T=64, m and l | `sbatch --array=2-3%3 jobs/se2_hybrid4_400k_qt_wsd_t64.sbatch` |
+| 20028843_[2-3] | vanilla4 T=64, m and l | `sbatch --array=2-3%3 jobs/se2_vanilla4_400k_qt_wsd_t64.sbatch` |
+| 20028844_[2-3] | hybrid4 lr check, l at 1e-3 and 1e-4 | `sbatch --array=2-3%2 jobs/se2_hybrid4_125k_lrcheck.sbatch` |
+| 20028844_1 (RUNNING, stopped ~35 min in to free a GPU for the lift worker) | hybrid4 lr check, s at 1e-4 | `sbatch --array=1 jobs/se2_hybrid4_125k_lrcheck.sbatch`; its partial run dir should be cleared first |
+| 20028846_[1-3] | vanilla4 lr check: s at 1e-4; l at 1e-3 and 1e-4 | `sbatch --array=1-3%2 jobs/se2_vanilla4_125k_lrcheck.sbatch` |
+| 20028849_[0-8] | hybrid4 T=32 branches, xs s m | `sbatch --dependency=afterany:20028596_1 --array=0-5%3 jobs/cd_h4_t32_small.sbatch` (xs, s, after the s parent), and `--array=6-8%3` after the m parent (20028596_2 was also pending, below) |
+| 20028850_[0-8] | vanilla4 T=32 branches, xs s m | `sbatch --array=0-5%3 jobs/cd_v4_t32_small.sbatch` (parents done), and `sbatch --dependency=afterany:20028595_2 --array=6-8%3 jobs/cd_v4_t32_small.sbatch` |
+| 20028851_[0-5] | vanilla4 T=32 branches, l xl | `sbatch --dependency=afterany:20014708_1 jobs/cd_v4_t32_large.sbatch` |
+| 20028852_[0-2] | hybrid4 T=32 branches, l | `sbatch --dependency=afterany:20014709_0 jobs/cd_h4_t32_l.sbatch` |
+| 20028853_[0-2] | hybrid4 T=32 branches, xl | `sbatch --dependency=afterany:20028840_0 jobs/cd_h4_t32_xl.sbatch` |
+| 20028854_[0-11] | hybrid4 T=64 branches | `sbatch --dependency=afterany:<T=64 parents> jobs/cd_h4_t64.sbatch` (the m and l parents must be resubmitted first) |
+| 20028855_[0-11] | vanilla4 T=64 branches | `sbatch --dependency=afterany:<T=64 parents> jobs/cd_v4_t64.sbatch` |
+| 20028596_2 | hybrid4 T=32 m, the long run | NOT cancelled: it started a few minutes before the cancel and is running |
+
+Each branch task first checks that its checkpoint exists, so a branch whose parent did not reach it fails fast rather than running from nothing.
