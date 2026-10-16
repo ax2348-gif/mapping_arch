@@ -6,8 +6,8 @@ optionally filtered to one query kind (e.g. far only).
     python tools/compare_grid.py A.pt --kind far --out far_only.png
 
 Each row is one query: the observation at the query's step, the target, then
-per checkpoint its prediction (and, with --shuffled, its prediction with the
-episode's odometry permuted in time) and |error|, each labelled with its mse.
+per checkpoint its prediction its prediction with the episode's odometry
+permuted in time (the use-of-odometry check; --no-shuffled omits it) and |error|, each labelled with its mse.
 Rows are drawn from the evaluation set of the FIRST checkpoint's settings;
 every checkpoint must share those task settings (refused otherwise), so the
 comparison is matched. --sort dist orders rows by distance from the anchor
@@ -43,8 +43,8 @@ def main():
                    help='fallback | near | mid | far (default: all kinds)')
     p.add_argument('--rows', type=int, default=16)
     p.add_argument('--sort', default='random', choices=('random', 'dist'))
-    p.add_argument('--shuffled', action='store_true',
-                   help='also show each model with its odometry permuted in time')
+    p.add_argument('--no-shuffled', dest='shuffled', action='store_false',
+                   help='omit the column with each model\'s odometry permuted in time (shown by default)')
     p.add_argument('--batches', type=int, default=4, help='evaluation batches to draw from')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--out', required=True)
