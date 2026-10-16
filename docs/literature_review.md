@@ -45,7 +45,14 @@ TEM-t (action-dependent transitions in a transformer), Gao et al.
 hold. The operator came from state-tracking work, which frames it in
 group-theoretic but not geometric terms. And at bounded length theory
 does not rule out transformers or positive-decay cascades, so the
-evidence supports "much more efficient", not "required". The most decisive pending tests are P2 (β capped
+evidence supports "much more efficient", not "required". The claim concerns
+geometry as an internal operation of an end-to-end memory supervised only
+by the downstream objective; evidence from systems that take poses as
+input or as supervised output (LVSM, GTA, DROID-SLAM) does not bear on
+it. That internal side has prior occupants (TEM-t, with commuting
+actions; Banino et al., with pose labels; recent predictive-learning
+models), but none we found composes non-commuting ego-motion in context
+with render-only supervision. The most decisive pending tests are P2 (β capped
 at 1), P3 at depth, P1 at scale, and length generalisation, which the
 literature predicts will separate recurrent rotation from transformer
 shortcuts.
@@ -105,7 +112,7 @@ Verdict scale: **known**; **reproduces known result in a new setting**;
 | F5 | Audit: corrupting turns or moves pushes error above floor at every prefix length | Standard causal-ablation practice | Not a literature claim | A control that rules out shortcuts; it strengthens F3 but is not itself a finding to place. |
 | F6 | Trained R→L head: β = 2.00 and decay 1.0000 on every odometry token; L→R head grades β by turn; observation tokens decay | Grazzi et al. 2025 (β = 2 gives reflections); DeltaProduct Fig. 3 (two reflections make a rotation) | Plausibly new | The construction is known. We found no paper that reads learned β and decay per token type in a trained model and finds them pinned at the reflection and no-forget values. |
 | F7 | Transition probe (both seeds): per-step product in R→L head has one conjugate pair at 90.0 to 90.3 deg on quarter turns (100% of steps, abs 0.998), two eigenvalues at 180 deg on turn-arounds, all others at 0 deg; L→R head contracts (no eigenvalue above 0.5) | Chughtai et al. 2023 (networks learn group composition via irreducible representations); Nanda et al. 2023 (modular addition as rotation about a circle); Gao et al. 2021 (path integration requires a group representation; linear case is a rotation Lie group); Cueva et al. 2020 (head-direction circuits emerge in RNNs) | Plausibly new | Prior learned-representation results either supervise the group operation directly (Chughtai, Nanda) or build the matrix form into the model (Gao). Here a generic delta-rule head, trained only on pixel rendering, learned the faithful 2-D real irrep of Z4 in its transition matrices. Limits: shows use, not necessity; not a linear probe of relative pose. |
-| F8 | With all odometry removed and a 3 px step on high-passed natural texture, hybrid4 does visual odometry | Wang et al. 2017 (DeepVO); Teed and Deng 2021 (DROID-SLAM); Teed, Lipson and Deng (DPVO); Henriques and Vedaldi 2018 (MapNet registers frames by correlation over a rotation stack) | Reproduces known result in a new setting | Learned frame-to-frame registration is well established. Doing registration and composition in one small in-context model, under the contract's no-external-geometry rule, is a new combination but not a new capability. |
+| F8 | With all odometry removed and a 3 px step on high-passed natural texture, hybrid4 does visual odometry | DeepVO (2017); DROID-SLAM (2021); DPVO; MapNet (2018); UpSRT (2022); Gornet and Thomson 2024 | Capability known; plausibly new in this form | Prior systems establish that registration and relative-pose estimation are learnable, mostly with pose supervision (DeepVO, DROID-SLAM, DPVO, MapNet) or explicit geometric modules (DROID-SLAM's bundle adjustment, MapNet's rotation stack). UpSRT shows pose-free registration under render-only loss, but over an unordered set. None of these composes a motion history in a latent memory with render-only supervision; see the junction in section 4. |
 | P1 | Vanilla transformers fail SE(2) up to about 100M params, 400k steps | Liu et al. 2023 (constant-depth shortcuts for solvable groups, learned in practice for D8); Merrill and Sabharwal 2023 (TC⁰ bound does not exclude solvable groups); Sajjadi et al. 2022 and Jin et al. 2024 (geometry-light transformers do novel view synthesis); our own Z² amendment | At risk | Theory and practice both say a transformer can represent this. Vanilla already solved Z² once given 300k steps. If P1 holds, it would be plausibly new; the literature leans against it. |
 | P2 | hybrid4 with β capped at 1 fails SE(2) but solves Z² | Grazzi et al. 2025 (Prop. 1: [0, 1] products are not orthogonal); DeltaProduct (β ≤ 1 gives real eigenvalues for two factors) | Known in theory; testing would reproduce it in a new setting | The single-layer prediction is a theorem at arbitrary length. At T = 32 with attention and MLPs around it, a cascade route exists, so failure is likely but not guaranteed. |
 | P3 | hybrid3 (scalar decay, SwiGLU) fails SE(2) at every rung to xxl | Liu et al. 2023 (Krohn-Rhodes cascades); Grazzi et al. 2025 App. D (two reflection layers do mod-m addition); DeltaProduct (S3 with n_h = 1 needs 3 layers) | At risk | A depth-2 cascade of positive-decay sums can in principle solve bounded-length SE(2) (section 2). Whether training finds it is open. |
@@ -196,6 +203,53 @@ equivariant. An earlier draft of this review misread it that way.
   capacity is used as the motion group's representation. None of the
   papers above combines these.
 
+### Where the geometry lives: the junction
+
+Prior systems that "learn geometry" fall on two sides of a junction, and
+only one side bears on this study.
+
+- **(a) Geometry as an output or an input.** Pose or depth is the
+  supervised target, or poses are given in a common frame, and the map,
+  renderer or pose graph downstream is an explicit system.
+- **(b) Geometry as an internal operation.** A latent memory must
+  compose the motion itself, supervised only by the downstream objective
+  (rendered or predicted observations), with only relative motion, or
+  nothing, as input.
+
+This study is (b) in miniature: only rendered pixels supervise, odometry
+is relative (or absent in the visual-odometry setting), there are no pose
+labels and no external renderer, and each episode is a new map, so the
+composition must happen in activations, not weights.
+
+| System | Geometry enters as | Supervised by | Who composes the motion |
+| --- | --- | --- | --- |
+| DeepVO (Wang et al. 2017) | Output | MSE to ground-truth pose | Not composed in memory; pose is the target |
+| DROID-SLAM (Teed and Deng 2021); DPVO (Teed et al.) | Output, via an explicit dense bundle-adjustment layer (DROID-SLAM) | Ground-truth pose and flow losses (DROID-SLAM); ground-truth trajectories (DPVO) | Explicit optimisation |
+| MapNet (Henriques and Vedaldi 2018) | Internal but hand-built: rotation stack, allocentric grid | Ground-truth position and orientation | Explicit module |
+| Banino et al. 2018; Cueva and Wei 2018 | Internal: an RNN integrates velocities (Banino: translational and angular, so non-commuting) | Place- and head-direction-cell targets, i.e. pose labels | The network, under pose supervision |
+| GQN (Eslami et al. 2018); SRT (Sajjadi et al. 2022); LVSM | Input: each image comes with its viewpoint or camera pose | Rendered pixels only | Not needed: poses are given. GQN sums per-view codes without order, so (our reading) viewpoints share one frame |
+| UpSRT (Sajjadi et al. 2022) | No input poses; target views still specified by a ray pose (frame not checked) | Rendered pixels only | Registration over an unordered set, not composition of a motion history |
+| GTA; PRoPE; WorldMem, Wu et al., Context as Memory | Input: poses, or an explicit 3D or pose-indexed memory | Pixels (world models) or task loss | Outside the network |
+| TEM (2020); TEM-t (Whittington et al. 2022) | Internal: learned action-indexed transitions | Next observation only | The network, in context, in new environments; but actions are allocentric (North, East, ...), so the group commutes |
+| Gornet and Thomson 2024 | Internal: images only, self-attention over up to about ten past frames | Next image only | The network; we found no test on unseen environments, so the map may live in weights |
+| Levenstein et al. 2024 (preprint) | Internal: egocentric 7 x 7 view plus action | Next egocentric observation | The network; head-direction input matters. We did not verify the action set or whether maps are per episode |
+| This study | Internal: relative odometry (Z4 ⋉ Z²) or none | Rendered pixels only | The network, in context, new map each episode |
+
+**What this changes.** Evidence from side (a), such as LVSM's
+state-of-the-art view synthesis with minimal 3D bias, shows that
+networks can consume geometry that is supplied or supervised. It does not
+show they can compose it internally, which is what the hypothesis-class
+claim is about. When poses are given, the composition was done outside
+the network, as with marlenv's dead-reckoned RoPE. Side (b) has prior
+occupants, mostly in neuro-AI predictive learning, and Banino et al.
+compose non-commuting ego-motion internally but with pose labels. As far
+as we checked, none combines in-context composition of non-commuting
+ego-motion over a fresh map each episode, render-only supervision, and a
+controlled comparison of sequence-operator transition classes. How
+practice at scale sits on this junction is the subject of the separate
+applications review, `docs/applications_review.md` (in progress), and is
+not repeated here.
+
 ### Caveats
 
 - **(a) Provenance.** The negative-eigenvalue delta rule came from
@@ -214,13 +268,13 @@ equivariant. An earlier draft of this review misread it that way.
   (Liu et al.) or a two-layer positive-decay cascade (section 2). So
   current evidence supports "much more efficient", not "required".
   P1 and P3 decide between "efficient" and "possible".
-- **(c) Scale evidence is mixed.** Brehmer et al. find built-in
-  symmetry helps at every compute budget tested on rigid-body
-  interactions, though augmentation closes the data-efficiency gap.
-  Gruver et al. (2023) find larger vision models become more equivariant
-  regardless of architecture. LVSM reaches state-of-the-art view
-  synthesis with minimal 3D bias, with poses given. None tests composition
-  from relative odometry.
+- **(c) Scale evidence is mixed, and mostly from side (a).** Brehmer et
+  al. find built-in symmetry helps at every compute budget tested on
+  rigid-body interactions, though augmentation closes the data-efficiency
+  gap. Gruver et al. (2023) find larger vision models become more
+  equivariant regardless of architecture. LVSM reaches state-of-the-art
+  view synthesis with minimal 3D bias, but with poses given, so it is
+  side (a) evidence and does not test internal composition.
 - **(d) Discrete group, exact symbols.** Z4 with 16 odometry symbols
   allows an exact rotation per symbol. Continuous headings and noisy
   odometry need a continuous, approximately orthogonal map. Nothing yet
@@ -389,6 +443,17 @@ the official proceedings page given.
 
 **Path integration, grid cells and learned group representations**
 
+- Eslami et al. Neural scene representation and rendering. Science
+  360(6394), 1204-1210, 2018. https://doi.org/10.1126/science.aar6170
+- Gornet, Thomson. Automated construction of cognitive maps with visual
+  predictive coding. Nature Machine Intelligence 6, 820-833, 2024.
+  https://doi.org/10.1038/s42256-024-00863-1 (preprint:
+  https://arxiv.org/abs/2308.10913)
+- Levenstein, Efremov, Henha Eyono, Peyrache, Richards. Sequential
+  predictive learning is a unifying theory for hippocampal
+  representation and replay. bioRxiv preprint, 2024.
+  https://doi.org/10.1101/2024.04.28.591528
+
 - Banino, Barry et al. Vector-based navigation using grid-like
   representations in artificial agents. Nature 557, 429-433, 2018.
   https://doi.org/10.1038/s41586-018-0102-6
@@ -476,5 +541,10 @@ the official proceedings page given.
   pose-indexed or geometry-grounded memory, which is external geometry
   in this study's terms.
 - Left out because not verified: claims about AlphaFold 3 dropping
-  equivariance, Genie 3, and the later Neuron (2023) version of Sorscher
-  et al.
+  equivariance, Genie 3, the later Neuron (2023) version of Sorscher
+  et al., and a 2020 bioRxiv preprint on egocentric-to-allocentric
+  predictive learning (doi 10.1101/2020.11.11.378141) whose author list
+  we could not confirm.
+- Gornet and Thomson's journal volume and pages, and Levenstein et al.'s
+  action set, come from search summaries; bioRxiv blocked direct
+  retrieval. Titles, authors and dois were checked.
