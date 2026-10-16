@@ -246,7 +246,7 @@ docs/scaling_study_design.md.
   - hybrid4c and vanilla4c l at 200k;
   - hybrid4c and vanilla4c s at 400k (the m runs' data budget).
   - Plus vanilla4c m 400k (20043639), running.
-- **Small-model policy (user):** Torch kills low-utilisation jobs (hybrid4 xs seed 1, 20028847_0, was killed at 360k; its 350k checkpoint survives). Roll small jobs together; spend Torch on bigger models.
+- **Small-model policy (user):** Torch kills low-utilisation jobs (hybrid4 s seed 1, 20028847_0 [corrected from "xs" by the provenance audit], was killed at 360k; its 350k checkpoint survives). Roll small jobs together; spend Torch on bigger models.
 - **Hydra branch:** all 13 seams fixed (8 commits). 454 tests pass, re-run independently. The cluster venv needs `pip install -r requirements.txt` before use.
 - **2026-10-16, experiments queued by the user (discrete SE(2), xs, through Hydra on branch exp/time-recurrence off refactor/hydra):**
   1. **Symmetry, running (agent):**
@@ -340,3 +340,7 @@ docs/scaling_study_design.md.
   - seal stage 1; the user's decisions are applied (dropout range check, a visible compare_grid warning, the jobs layout).
   
   Review doc: docs/hydra_merge_review.md.
+- **2026-10-16, provenance audit and design done** (f82fdd0, ffc06db, 5d21fac). experiments/registry.yaml, experiments/audit/, docs/provenance_design.md.
+  - 159 real runs (~125 GPU-h), 13 major experiments; build recommended over adopt.
+  - Awaiting the user's decisions (design §13).
+  - Session-scratchpad report data and run logs archived to results/session_archive_2026-10-16/ (untracked, 160 MB; see its README).
