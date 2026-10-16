@@ -150,3 +150,4 @@ docs/scaling_study_design.md.
   - Held-out turn band = control band, so no held-out failure.
   - L3's calibration and seam questions move to the transition probe on hybrid4c in the real se2c task.
   - Code and runs stay in experiments/lift_blind_probe/ (uncommitted run outputs are not tracked).
+- **2026-10-16, capacity test of the bridge on Torch** (user's call): hybrid4c s 20038399 and m 20038403. Same bridge settings, latest code (split metrics), checkpoints every 5k. Reason: the xs bridge's far-query bin crawls (0.84 of floor at 50k) while fallbacks at 36 px are rendered correctly. The user suspects visual capacity at xs.
