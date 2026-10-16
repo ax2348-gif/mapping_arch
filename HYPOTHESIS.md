@@ -191,3 +191,9 @@ Z² completely (last-step queries, xs, lr 3e-4 unless noted):
   looks hopeless at 20k and solves by 300k, so a "vanilla fails SE(2)"
   finding needs a budget at least comparable, and the 400k bound in P1
   is the minimum, not a generous one.
+
+### 2026-10-15: date correction
+
+Dates written as 2026-10-16 in this file, in the header and the two
+amendment headings above, should read 2026-10-15. The tag
+`hypothesis-v1` and the commit timestamps are authoritative.
