@@ -27,6 +27,26 @@ Several views share one time step, for example several cameras or agents, each s
 - So the cycle scan respects a property the rotation mechanism already has, beyond restoring symmetry.
 - Caution: exact rotations are orthogonal transitions. Looping to a fixed point does not converge, because the geometric series needs spectral radius < 1. Go once around.
 
+## The cheap route with existing primitives (the main question)
+
+The asymmetry has two separate sources, and existing FLA primitives remove each one.
+
+1. **Reads mid-step.** A causal scan lets view i read the state after views 1..i only.
+   - **Fix:** after the step's n register WRITE tokens, emit n READ copies with β = 0, so they write nothing. Every view then reads the same end-of-step state.
+   - **Cost:** 2n tokens per step instead of n. The kernels need no change (β is per token).
+   - **Bidirectional scans:** mirror the read copies on both sides of the writes.
+2. **Non-commuting writes.** Delta writes interact through -Sk, so order matters even with end-of-step reads.
+   - **Exact:** make within-step writes ADDITIVE. Plain linear attention adds Σ v_i k_iᵀ, and a sum is order-free. Use FLA simple_gla/GLA with decay 1 within a step and decay applied at step boundaries. Each view keeps its own rank-one term, so nothing is pooled.
+   - **Exact but constrained:** orthogonal keys, which make delta writes commute, but this tends to reintroduce slot labels.
+   - **Approximate, free:** shuffle view order every step during training.
+
+**Combined:**
+- additive linear-attention layers with reads after writes: exact S_n equivariance for any n, at linear cost;
+- delta-rule layers (β ∈ (0, 2)) carry the reflection transition, from the odometry token, once per step, so within-step order never enters;
+- the hybrid already alternates operator layers.
+
+The cycle scans above remain the EXACT construction when views must interact through the delta rule itself.
+
 ## Open (for the user)
 
 - How face-scan outputs are aggregated per register: mean, or a learned symmetric pooling.
