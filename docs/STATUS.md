@@ -291,3 +291,13 @@ docs/scaling_study_design.md.
     - H2 (free queries vs per-frame outputs is the distinction): better supported than the first round said;
     - H3 (bidirectionality matters, avoided out of causal bias): holds; bidirectional policies use only 2-6 frames.
   - A second, narrow round plus a published artifact are in progress with the same agent. The revised doc will be self-contained.
+- **2026-10-16, causality REVISED: no cost at s.** Causal hybrid4 s matches bidirectional hybrid4 s at every matched step:
+  | step | causal | bidirectional |
+  | --- | --- | --- |
+  | 60k, all | 0.0230 | 0.0225 |
+  | 60k, last step | 0.0456 | 0.0483 |
+  | 100k, all (causal) | 0.0160 | running |
+  | 100k, last step (causal) | 0.0347 | running |
+  - Causal s is solved by ~80k.
+  - The xs failure is a capacity-edge cost, not a barrier.
+  - Causality page updated (https://claude.ai/artifact/WP6anaPetTzFXYfMefbkeG). The literature review's framing of "our causal gap" must be read with this.
