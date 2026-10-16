@@ -1,0 +1,368 @@
+# Curated registry of MAJOR experiments (experiments/audit/README.md has the method).
+# Generated 2026-10-16 from experiments/audit/runs.csv, then curated. Run ids are
+# <host>:<task>/<model>/<size>/<run> as in runs.csv (task se2 is written se2d).
+# commit: an exact sha only where one was recorded at launch; "inferred:<sha>" otherwise;
+# no run anywhere records whether its tree was dirty.
+# Scoring (brief): MAJOR if hypothesis (H) or downstream dependency (P), or documented (D) and > ~1 GPU-h.
+
+experiments:
+  - id: se2d-hybrid-lineage
+    title: "hybrid -> hybrid4 lineage on discrete SE(2), xs, and the hybrid4 seed replication"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: true, gpu_hours: 1.1}
+    hypothesis: "HYPOTHESIS.md frozen evidence table; amendment 2026-10-16 \"seed replication\" (P4)"
+    reports:
+      - "hybrid4 results report (https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti)"
+      - "research journal (https://claude.ai/artifact/24DMrX4JZkcwD4DGthpLYG)"
+      - "HYPOTHESIS.md"
+    downstream: "hybrid4 xs seed0/seed1 final.pt are the checkpoints every probe amendment reads (read_beta, transition_probe, probe_p5, audit_se2); hybrid4 xs seed0 is the reference for all xs ablations"
+    config_source: "legacy train.py args in final.json"
+    commits: {"inferred:7c1f827": 2, "inferred:77ce224": 1, "inferred:2ffe082": 1, "inferred:0ebd7df": 1, "inferred:bb2aceb": 1, "inferred:f8e5271": 1}
+    run_status: {completed: 7}
+    note: "Frozen text gives model-file commits 27e112f, 2ffe082, 210442b, bb2aceb; the harness commit per run is inferred."
+    runs:
+      - {id: "erid-2:se2d/hybrid/m/seed0_20k", path: "/home/adrianna/code/mapping/results/se2/hybrid/m/seed0_20k", commit: "inferred:7c1f827", status: "completed"}
+      - {id: "erid-2:se2d/hybrid/s/seed0_20k", path: "/home/adrianna/code/mapping/results/se2/hybrid/s/seed0_20k", commit: "inferred:77ce224", status: "completed"}
+      - {id: "erid-2:se2d/hybrid/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/se2/hybrid/xs/seed0_20k", commit: "inferred:7c1f827", status: "completed"}
+      - {id: "erid-2:se2d/hybrid2/xs/seed0_20k_qt", path: "/home/adrianna/code/mapping/results/se2/hybrid2/xs/seed0_20k_qt", commit: "inferred:2ffe082", status: "completed"}
+      - {id: "erid-2:se2d/hybrid3/xs/seed0_100k_qt", path: "/home/adrianna/code/mapping/results/se2/hybrid3/xs/seed0_100k_qt", commit: "inferred:0ebd7df", status: "completed"}
+      - {id: "erid-2:se2d/hybrid4/xs/seed0_100k_qt", path: "/home/adrianna/code/mapping/results/se2/hybrid4/xs/seed0_100k_qt", commit: "inferred:bb2aceb", status: "completed"}
+      - {id: "erid-2:se2d/hybrid4/xs/seed1_100k_qt", path: "/home/adrianna/code/mapping/results/se2/hybrid4/xs/seed1_100k_qt", commit: "inferred:f8e5271", status: "completed"}
+  - id: se2d-hybrid4-ablations
+    title: "hybrid4 mixer ablations at xs: GELU MLP, beta capped at 1, no conv, complex-diagonal"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: true, gpu_hours: 0.9}
+    hypothesis: "P2 (beta1); amendments \"seed replication and SwiGLU ablation\", \"P2 SE(2) half\", \"no-convolution and complex-diagonal\""
+    reports:
+      - "hybrid4 results report (https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti)"
+      - "research journal (https://claude.ai/artifact/24DMrX4JZkcwD4DGthpLYG)"
+      - "HYPOTHESIS.md"
+    downstream: "beta1 and cdiag checkpoints read by transition_probe / read_beta in the amendments"
+    config_source: "legacy train.py args"
+    commits: {"inferred:4ee9124": 1, "inferred:44148df": 1, "inferred:cef6406": 1, "inferred:24bfa98": 1}
+    run_status: {completed: 4}
+    runs:
+      - {id: "erid-2:se2d/hybrid4_beta1/xs/seed0_100k_qt", path: "/home/adrianna/code/mapping/results/se2/hybrid4_beta1/xs/seed0_100k_qt", commit: "inferred:4ee9124", status: "completed"}
+      - {id: "erid-2:se2d/hybrid4_cdiag/xs/seed0_100k_qt", path: "/home/adrianna/code/mapping/results/se2/hybrid4_cdiag/xs/seed0_100k_qt", commit: "inferred:44148df", status: "completed"}
+      - {id: "erid-2:se2d/hybrid4_gelu/xs/seed0_100k_qt", path: "/home/adrianna/code/mapping/results/se2/hybrid4_gelu/xs/seed0_100k_qt", commit: "inferred:cef6406", status: "completed"}
+      - {id: "erid-2:se2d/hybrid4_noconv/xs/seed0_100k_qt", path: "/home/adrianna/code/mapping/results/se2/hybrid4_noconv/xs/seed0_100k_qt", commit: "inferred:24bfa98", status: "completed"}
+  - id: se2d-hybrid-original-sweep
+    title: "original `hybrid` on discrete SE(2): 40k lr ladder xs..xxl (19991387), 100k / b256 / 400k cosine / 400k WSD"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: true, gpu_hours: 25.9}
+    hypothesis: "amendment 2026-10-16 \"vanilla solves Z2 with more steps\" (hybrid on SE(2) stays near 0.070 at 400k, cosine and WSD)"
+    reports:
+      - "hybrid4 results report (https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti)"
+      - "research journal (https://claude.ai/artifact/24DMrX4JZkcwD4DGthpLYG)"
+      - "docs/STATUS.md"
+    downstream: "none known"
+    config_source: "legacy train.py args; job scripts jobs/legacy/se2_hybrid*.sbatch"
+    commits: {"inferred:7c1f827": 18, "inferred:77ce224": 6, "inferred:6630e45": 2}
+    run_status: {completed: 24, stopped: 2}
+    runs:
+      - {id: "torch:se2d/hybrid/l/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/se2/hybrid/l/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991387_9"}
+      - {id: "torch:se2d/hybrid/l/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/l/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_11"}
+      - {id: "torch:se2d/hybrid/l/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/l/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_10"}
+      - {id: "torch:se2d/hybrid/m/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/se2/hybrid/m/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991387_6"}
+      - {id: "torch:se2d/hybrid/m/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/m/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_8"}
+      - {id: "torch:se2d/hybrid/m/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/m/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_7"}
+      - {id: "torch:se2d/hybrid/s/seed0_100k", path: "/scratch/ax2348/mapping/results/se2/hybrid/s/seed0_100k", commit: "inferred:77ce224", status: "completed", job: "19992524_1"}
+      - {id: "torch:se2d/hybrid/s/seed0_100k_b256", path: "/scratch/ax2348/mapping/results/se2/hybrid/s/seed0_100k_b256", commit: "inferred:77ce224", status: "completed", job: "19992526_1"}
+      - {id: "torch:se2d/hybrid/s/seed0_400k", path: "/scratch/ax2348/mapping/results/se2/hybrid/s/seed0_400k", commit: "inferred:77ce224", status: "stopped (CANCELLED)", job: "19992525_1"}
+      - {id: "torch:se2d/hybrid/s/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/se2/hybrid/s/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991387_3"}
+      - {id: "torch:se2d/hybrid/s/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/s/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_5"}
+      - {id: "torch:se2d/hybrid/s/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/s/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_4"}
+      - {id: "torch:se2d/hybrid/s/seed0_wsd400k", path: "/scratch/ax2348/mapping/results/se2/hybrid/s/seed0_wsd400k", commit: "inferred:6630e45", status: "stopped (CANCELLED)", job: "19992815_1"}
+      - {id: "torch:se2d/hybrid/xl/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/se2/hybrid/xl/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991387_12"}
+      - {id: "torch:se2d/hybrid/xl/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/xl/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_14"}
+      - {id: "torch:se2d/hybrid/xl/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/xl/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_13"}
+      - {id: "torch:se2d/hybrid/xs/seed0_100k", path: "/scratch/ax2348/mapping/results/se2/hybrid/xs/seed0_100k", commit: "inferred:77ce224", status: "completed", job: "19992524_0"}
+      - {id: "torch:se2d/hybrid/xs/seed0_100k_b256", path: "/scratch/ax2348/mapping/results/se2/hybrid/xs/seed0_100k_b256", commit: "inferred:77ce224", status: "completed", job: "19992526_0"}
+      - {id: "torch:se2d/hybrid/xs/seed0_400k", path: "/scratch/ax2348/mapping/results/se2/hybrid/xs/seed0_400k", commit: "inferred:77ce224", status: "completed", job: "19992525_0"}
+      - {id: "torch:se2d/hybrid/xs/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/se2/hybrid/xs/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991387_0"}
+      - {id: "torch:se2d/hybrid/xs/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/xs/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_2"}
+      - {id: "torch:se2d/hybrid/xs/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/xs/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_1"}
+      - {id: "torch:se2d/hybrid/xs/seed0_wsd400k", path: "/scratch/ax2348/mapping/results/se2/hybrid/xs/seed0_wsd400k", commit: "inferred:6630e45", status: "completed", job: "19992815_0"}
+      - {id: "torch:se2d/hybrid/xxl/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/se2/hybrid/xxl/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991387_15"}
+      - {id: "torch:se2d/hybrid/xxl/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/xxl/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_17"}
+      - {id: "torch:se2d/hybrid/xxl/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid/xxl/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991387_16"}
+  - id: se2d-visual-odometry
+    title: "visual odometry on Imagenette (xs local; s, m 200k high-pass on Torch)"
+    status: major
+    score: {documented: true, hypothesis: false, downstream: true, gpu_hours: 6.0}
+    hypothesis: "none (not in HYPOTHESIS.md)"
+    reports:
+      - "research journal (https://claude.ai/artifact/24DMrX4JZkcwD4DGthpLYG) (cites results/se2/hybrid4/{s,m}/seed0_200k_qt_vo_hp)"
+      - "docs/STATUS.md"
+    downstream: "baseline for the odometry-query presets on exp/odq (se2c, pending)"
+    config_source: "legacy train.py args"
+    commits: {"inferred:e5f4901": 4, "inferred:19a52d4": 1, "inferred:0db5aaf": 1, "inferred:a5dde84": 1}
+    run_status: {completed: 7}
+    runs:
+      - {id: "erid-2:se2d/hybrid4/xs/seed0_100k_qt_odo_imagenette_hp", path: "/home/adrianna/code/mapping/results/se2/hybrid4/xs/seed0_100k_qt_odo_imagenette_hp", commit: "inferred:19a52d4", status: "completed"}
+      - {id: "erid-2:se2d/hybrid4/xs/seed0_100k_qt_vo_imagenette", path: "/home/adrianna/code/mapping/results/se2/hybrid4/xs/seed0_100k_qt_vo_imagenette", commit: "inferred:0db5aaf", status: "completed"}
+      - {id: "erid-2:se2d/hybrid4/xs/seed0_100k_qt_vo_imagenette_hp", path: "/home/adrianna/code/mapping/results/se2/hybrid4/xs/seed0_100k_qt_vo_imagenette_hp", commit: "inferred:a5dde84", status: "completed"}
+      - {id: "torch:se2d/hybrid4/m/seed0_200k_qt_odo_hp", path: "/scratch/ax2348/mapping/results/se2/hybrid4/m/seed0_200k_qt_odo_hp", commit: "inferred:e5f4901", status: "completed", job: "20012147_1"}
+      - {id: "torch:se2d/hybrid4/m/seed0_200k_qt_vo_hp", path: "/scratch/ax2348/mapping/results/se2/hybrid4/m/seed0_200k_qt_vo_hp", commit: "inferred:e5f4901", status: "completed", job: "20012146_1"}
+      - {id: "torch:se2d/hybrid4/s/seed0_200k_qt_odo_hp", path: "/scratch/ax2348/mapping/results/se2/hybrid4/s/seed0_200k_qt_odo_hp", commit: "inferred:e5f4901", status: "completed", job: "20012147_0"}
+      - {id: "torch:se2d/hybrid4/s/seed0_200k_qt_vo_hp", path: "/scratch/ax2348/mapping/results/se2/hybrid4/s/seed0_200k_qt_vo_hp", commit: "inferred:e5f4901", status: "completed", job: "20012146_0"}
+  - id: se2d-scaling-study
+    title: "se2d scaling study: hybrid4 vs vanilla4, xs..xl, T=32 and T=64, 400k WSD, lr check, second seed (blocks A, B, D, E)"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: true, gpu_hours: 44.2}
+    hypothesis: "docs/scaling_study_design.md S1-S4 (registered); HYPOTHESIS amendment 2026-10-16 \"vanilla4 solves SE(2) at scale (P1 effectively falsified)\"; draft amendment in the se2d report (not applied)"
+    reports:
+      - "se2d scaling report (https://claude.ai/artifact/KGG23hvdWGZ7pDpiPQ7qbc)"
+      - "research journal (https://claude.ai/artifact/24DMrX4JZkcwD4DGthpLYG)"
+      - "docs/scaling_study_design.md"
+    downstream: "bidirectional seed-0 runs (all sizes), seed-1 s and T=64 s are the H1c / H1d reference cells; checkpoints every 50k were the parents of the (cancelled) block-C cooldown branches; audits of hybrid4 l, vanilla4 xl, hybrid4 s T=64"
+    config_source: "legacy train.py args; jobs/legacy/se2_{hybrid4,vanilla4}_*.sbatch"
+    commits: {"inferred:a412327": 12, "inferred:3909b38": 6, "inferred:1aa7cfe": 3}
+    run_status: {completed: 19, stopped: 2}
+    note: "Report figures were built from a pull at 07:50 into the repo results/ (mirrors, several now stale: see runs.csv local_mirror)."
+    runs:
+      - {id: "torch:se2d/hybrid4/l/seed0_400k_qt_wsd", path: "/scratch/ax2348/mapping/results/se2/hybrid4/l/seed0_400k_qt_wsd", commit: "inferred:1aa7cfe", status: "completed", job: "20014709_0"}
+      - {id: "torch:se2d/hybrid4/m/seed0_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/hybrid4/m/seed0_400k_qt_wsd_small", commit: "inferred:3909b38", status: "completed", job: "20028596_2"}
+      - {id: "torch:se2d/hybrid4/m/seed1_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/hybrid4/m/seed1_400k_qt_wsd_small", commit: "inferred:a412327", status: "completed", job: "20028847_1"}
+      - {id: "torch:se2d/hybrid4/s/seed0_125k_lrcheck_lr1e-3", path: "/scratch/ax2348/mapping/results/se2/hybrid4/s/seed0_125k_lrcheck_lr1e-3", commit: "inferred:a412327", status: "completed", job: "20028844_0"}
+      - {id: "torch:se2d/hybrid4/s/seed0_125k_lrcheck_lr1e-4", path: "/scratch/ax2348/mapping/results/se2/hybrid4/s/seed0_125k_lrcheck_lr1e-4", commit: "inferred:a412327", status: "stopped (CANCELLED)", job: "20028844_1"}
+      - {id: "torch:se2d/hybrid4/s/seed0_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/hybrid4/s/seed0_400k_qt_wsd_small", commit: "inferred:3909b38", status: "completed", job: "20028596_1"}
+      - {id: "torch:se2d/hybrid4/s/seed0_400k_qt_wsd_t64", path: "/scratch/ax2348/mapping/results/se2/hybrid4/s/seed0_400k_qt_wsd_t64", commit: "inferred:a412327", status: "completed", job: "20028842_1"}
+      - {id: "torch:se2d/hybrid4/s/seed1_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/hybrid4/s/seed1_400k_qt_wsd_small", commit: "inferred:a412327", status: "stopped (CANCELLED)", job: "20028847_0"}
+      - {id: "torch:se2d/hybrid4/xl/seed0_400k_qt_wsd", path: "/scratch/ax2348/mapping/results/se2/hybrid4/xl/seed0_400k_qt_wsd", commit: "inferred:a412327", status: "completed", job: "20028840_0"}
+      - {id: "torch:se2d/hybrid4/xs/seed0_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/hybrid4/xs/seed0_400k_qt_wsd_small", commit: "inferred:3909b38", status: "completed", job: "20028596_0"}
+      - {id: "torch:se2d/hybrid4/xs/seed0_400k_qt_wsd_t64", path: "/scratch/ax2348/mapping/results/se2/hybrid4/xs/seed0_400k_qt_wsd_t64", commit: "inferred:a412327", status: "completed", job: "20028842_0"}
+      - {id: "torch:se2d/vanilla4/l/seed0_400k_qt_wsd", path: "/scratch/ax2348/mapping/results/se2/vanilla4/l/seed0_400k_qt_wsd", commit: "inferred:1aa7cfe", status: "completed", job: "20014708_0"}
+      - {id: "torch:se2d/vanilla4/m/seed0_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/vanilla4/m/seed0_400k_qt_wsd_small", commit: "inferred:3909b38", status: "completed", job: "20028595_2"}
+      - {id: "torch:se2d/vanilla4/m/seed1_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/vanilla4/m/seed1_400k_qt_wsd_small", commit: "inferred:a412327", status: "completed", job: "20028848_1"}
+      - {id: "torch:se2d/vanilla4/s/seed0_125k_lrcheck_lr1e-3", path: "/scratch/ax2348/mapping/results/se2/vanilla4/s/seed0_125k_lrcheck_lr1e-3", commit: "inferred:a412327", status: "completed", job: "20028846_0"}
+      - {id: "torch:se2d/vanilla4/s/seed0_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/vanilla4/s/seed0_400k_qt_wsd_small", commit: "inferred:3909b38", status: "completed", job: "20028595_1"}
+      - {id: "torch:se2d/vanilla4/s/seed0_400k_qt_wsd_t64", path: "/scratch/ax2348/mapping/results/se2/vanilla4/s/seed0_400k_qt_wsd_t64", commit: "inferred:a412327", status: "completed", job: "20028843_1"}
+      - {id: "torch:se2d/vanilla4/s/seed1_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/vanilla4/s/seed1_400k_qt_wsd_small", commit: "inferred:a412327", status: "completed", job: "20028848_0"}
+      - {id: "torch:se2d/vanilla4/xl/seed0_400k_qt_wsd", path: "/scratch/ax2348/mapping/results/se2/vanilla4/xl/seed0_400k_qt_wsd", commit: "inferred:1aa7cfe", status: "completed", job: "20014708_1"}
+      - {id: "torch:se2d/vanilla4/xs/seed0_400k_qt_wsd_small", path: "/scratch/ax2348/mapping/results/se2/vanilla4/xs/seed0_400k_qt_wsd_small", commit: "inferred:3909b38", status: "completed", job: "20028595_0"}
+      - {id: "torch:se2d/vanilla4/xs/seed0_400k_qt_wsd_t64", path: "/scratch/ax2348/mapping/results/se2/vanilla4/xs/seed0_400k_qt_wsd_t64", commit: "inferred:a412327", status: "completed", job: "20028843_0"}
+  - id: se2d-causal-pilot
+    title: "causal vs bidirectional hybrid4 / vanilla4 pilot, xs and s, 100k cosine (exp/causal, local)"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: true, gpu_hours: 1.5}
+    hypothesis: "H1c \"Seen before registration\" and \"Excluded by design: xs\" cite these runs"
+    reports:
+      - "causality page (https://claude.ai/artifact/WP6anaPetTzFXYfMefbkeG)"
+      - "docs/STATUS.md"
+      - "HYPOTHESIS.md (H1c)"
+    downstream: "motivated the H1c registration"
+    config_source: "Hydra config.yaml + overrides.yaml"
+    commits: {"inferred:50341e4": 4}
+    run_status: {completed: 4}
+    runs:
+      - {id: "erid-2:se2d/hybrid4/s/seed0_100k_qt", path: "/home/adrianna/code/mapping-hydra/results/se2d/hybrid4/s/seed0_100k_qt", commit: "inferred:50341e4", status: "completed"}
+      - {id: "erid-2:se2d/hybrid4_causal/s/seed0_100k_qt", path: "/home/adrianna/code/mapping-hydra/results/se2d/hybrid4_causal/s/seed0_100k_qt", commit: "inferred:50341e4", status: "completed"}
+      - {id: "erid-2:se2d/hybrid4_causal/xs/seed0_100k_qt", path: "/home/adrianna/code/mapping-hydra/results/se2d/hybrid4_causal/xs/seed0_100k_qt", commit: "inferred:50341e4", status: "completed"}
+      - {id: "erid-2:se2d/vanilla4_causal/xs/seed0_100k_qt", path: "/home/adrianna/code/mapping-hydra/results/se2d/vanilla4_causal/xs/seed0_100k_qt", commit: "inferred:50341e4", status: "completed"}
+  - id: se2d-h1c-causal-grid
+    title: "H1c: causal penalty grid, hybrid4 / vanilla4 x causal / bidirectional x s, m, l x seeds 0-2, 400k WSD"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: true, gpu_hours: 6.5}
+    hypothesis: "HYPOTHESIS.md H1c (signed off 2026-10-16)"
+    reports:
+      - "HYPOTHESIS.md"
+      - "docs/STATUS.md"
+    downstream: "its bidirectional seed-0 references are se2d-scaling-study runs (legacy, inferred commits)"
+    config_source: "Hydra +experiment=se2d_scaling_wsd; jobs/lift/h1c_grid.sbatch + h1c_tasks.txt"
+    commits: {"50341e4": 8, "inferred:23973e0": 1}
+    run_status: {running: 8, completed: 1}
+    note: "20072852_[3-22] still pending: their runs do not exist yet. Commit 50341e4 recorded and the Torch tree verified identical to it today."
+    runs:
+      - {id: "erid-2:se2d/vanilla4_causal/s/seed0_400k_qt_wsd", path: "/home/adrianna/code/mapping-hydra/results/se2d/vanilla4_causal/s/seed0_400k_qt_wsd", commit: "inferred:23973e0", status: "completed"}
+      - {id: "torch:se2d/hybrid4/s/seed2_400k_qt_wsd", path: "/scratch/ax2348/mapping_hydra/results/se2d/hybrid4/s/seed2_400k_qt_wsd", commit: "50341e4", status: "running", job: "20072852_2"}
+      - {id: "torch:se2d/hybrid4_causal/s/seed0_400k_qt_wsd", path: "/scratch/ax2348/mapping_hydra/results/se2d/hybrid4_causal/s/seed0_400k_qt_wsd", commit: "50341e4", status: "running", job: "20070043_0"}
+      - {id: "torch:se2d/hybrid4_causal/s/seed1_400k_qt_wsd", path: "/scratch/ax2348/mapping_hydra/results/se2d/hybrid4_causal/s/seed1_400k_qt_wsd", commit: "50341e4", status: "running", job: "20072852_0"}
+      - {id: "torch:se2d/hybrid4_causal/s/seed2_400k_qt_wsd", path: "/scratch/ax2348/mapping_hydra/results/se2d/hybrid4_causal/s/seed2_400k_qt_wsd", commit: "50341e4", status: "running", job: "20072852_0"}
+      - {id: "torch:se2d/vanilla4/s/seed2_400k_qt_wsd", path: "/scratch/ax2348/mapping_hydra/results/se2d/vanilla4/s/seed2_400k_qt_wsd", commit: "50341e4", status: "running", job: "20072852_2"}
+      - {id: "torch:se2d/vanilla4_causal/l/seed0_400k_qt_wsd", path: "/scratch/ax2348/mapping_hydra/results/se2d/vanilla4_causal/l/seed0_400k_qt_wsd", commit: "50341e4", status: "running", job: "20070043_1"}
+      - {id: "torch:se2d/vanilla4_causal/s/seed1_400k_qt_wsd", path: "/scratch/ax2348/mapping_hydra/results/se2d/vanilla4_causal/s/seed1_400k_qt_wsd", commit: "50341e4", status: "running", job: "20072852_1"}
+      - {id: "torch:se2d/vanilla4_causal/s/seed2_400k_qt_wsd", path: "/scratch/ax2348/mapping_hydra/results/se2d/vanilla4_causal/s/seed2_400k_qt_wsd", commit: "50341e4", status: "running", job: "20072852_1"}
+  - id: se2d-h1d-walk-length
+    title: "H1d: causal penalty vs walk length T in {16, 128} at s"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: true, gpu_hours: 0.7}
+    hypothesis: "HYPOTHESIS.md H1d (registered)"
+    reports:
+      - "HYPOTHESIS.md"
+      - "docs/STATUS.md"
+    downstream: "T=32 and T=64 cells come from the scaling study and H1c"
+    config_source: "Hydra; jobs/lift/h1d_grid.sbatch + h1d_tasks.txt"
+    commits: {"50341e4": 2}
+    run_status: {running: 2}
+    note: "20076519_[1-5] pending."
+    runs:
+      - {id: "torch:se2d/hybrid4/s/seed0_400k_qt_wsd_t16", path: "/scratch/ax2348/mapping_hydra/results/se2d/hybrid4/s/seed0_400k_qt_wsd_t16", commit: "50341e4", status: "running", job: "20076519_0"}
+      - {id: "torch:se2d/hybrid4_causal/s/seed0_400k_qt_wsd_t16", path: "/scratch/ax2348/mapping_hydra/results/se2d/hybrid4_causal/s/seed0_400k_qt_wsd_t16", commit: "50341e4", status: "running", job: "20076519_0"}
+  - id: se2c-bridge
+    title: "se2c bridge (lattice n=4 decoupled walk): hybrid4c xs, s, m, 100k cosine"
+    status: major
+    score: {documented: true, hypothesis: false, downstream: true, gpu_hours: 3.0}
+    hypothesis: "none in HYPOTHESIS.md (lift plan, docs/lift/plan.md)"
+    reports:
+      - "se2c report (https://claude.ai/artifact/ESg1N6jA1gfchgFsxcwzxd)"
+      - "docs/STATUS.md"
+    downstream: "s step45000.pt is the documented resume point (STATUS gives the --branch command)"
+    config_source: "legacy train.py args (se2c flags)"
+    commits: {"inferred:06cf83f": 1, "inferred:35a7cd3": 1, "inferred:8837c28": 1, "8837c28": 1}
+    run_status: {stopped: 3, completed: 1}
+    note: "TWO different m runs share results/se2c/hybrid4c/m/bridge_n4dec_100k_qt (local 22.5k and Torch 20039511 65k)."
+    runs:
+      - {id: "erid-2:se2c/hybrid4c/m/bridge_n4dec_100k_qt#local", path: "/home/adrianna/code/mapping/results/se2c/hybrid4c/m/bridge_n4dec_100k_qt", commit: "inferred:06cf83f", status: "stopped"}
+      - {id: "erid-2:se2c/hybrid4c/xs/bridge_n4dec_100k_qt", path: "/home/adrianna/code/mapping/results/se2c/hybrid4c/xs/bridge_n4dec_100k_qt", commit: "inferred:35a7cd3", status: "completed"}
+      - {id: "torch:se2c/hybrid4c/m/bridge_n4dec_100k_qt", path: "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/m/bridge_n4dec_100k_qt", commit: "inferred:8837c28", status: "stopped (CANCELLED)", job: "20039511"}
+      - {id: "torch:se2c/hybrid4c/s/bridge_n4dec_100k_qt", path: "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/s/bridge_n4dec_100k_qt", commit: "8837c28", status: "stopped (FAILED)", job: "20038588"}
+  - id: se2c-matched-dec
+    title: "se2c default task: hybrid4c vs vanilla4c at s, m, l (100k cosine, 400k / 200k WSD)"
+    status: major
+    score: {documented: true, hypothesis: false, downstream: true, gpu_hours: 22.3}
+    hypothesis: "none in HYPOTHESIS.md (lift plan L-series)"
+    reports:
+      - "se2c report (https://claude.ai/artifact/ESg1N6jA1gfchgFsxcwzxd) (built from a scratchpad pull, writeup/torch, 12:33)"
+      - "docs/STATUS.md"
+    downstream: "checkpoints every 25k as cooldown-branch parents"
+    config_source: "legacy train.py args; jobs/lift/se2c_dec_*.sbatch, worker.sbatch"
+    commits: {"8837c28": 8, "inferred:8837c28": 1}
+    run_status: {completed: 8, stopped: 1}
+    runs:
+      - {id: "torch:se2c/hybrid4c/l/dec_200k_wsd", path: "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/l/dec_200k_wsd", commit: "8837c28", status: "completed", job: "20046841_0"}
+      - {id: "torch:se2c/hybrid4c/m/dec_400k_wsd", path: "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/m/dec_400k_wsd", commit: "8837c28", status: "stopped (CANCELLED)", job: "20042194"}
+      - {id: "torch:se2c/hybrid4c/m/dec_400k_wsd_worker", path: "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/m/dec_400k_wsd_worker", commit: "inferred:8837c28", status: "completed", job: "20041129"}
+      - {id: "torch:se2c/hybrid4c/s/dec_100k_qt", path: "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/s/dec_100k_qt", commit: "8837c28", status: "completed", job: "20041129"}
+      - {id: "torch:se2c/hybrid4c/s/dec_400k_wsd", path: "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/s/dec_400k_wsd", commit: "8837c28", status: "completed", job: "20046841_2"}
+      - {id: "torch:se2c/vanilla4c/l/dec_200k_wsd", path: "/scratch/ax2348/mapping_lift/results/se2c/vanilla4c/l/dec_200k_wsd", commit: "8837c28", status: "completed", job: "20046841_1"}
+      - {id: "torch:se2c/vanilla4c/m/dec_400k_wsd", path: "/scratch/ax2348/mapping_lift/results/se2c/vanilla4c/m/dec_400k_wsd", commit: "8837c28", status: "completed", job: "20043639"}
+      - {id: "torch:se2c/vanilla4c/s/dec_100k_qt", path: "/scratch/ax2348/mapping_lift/results/se2c/vanilla4c/s/dec_100k_qt", commit: "8837c28", status: "completed", job: "20043638"}
+      - {id: "torch:se2c/vanilla4c/s/dec_400k_wsd", path: "/scratch/ax2348/mapping_lift/results/se2c/vanilla4c/s/dec_400k_wsd", commit: "8837c28", status: "completed", job: "20046841_3"}
+  - id: z2-lr-grid
+    title: "Z2 40k lr grid: hybrid, vanilla, vanilla2, lstm at xs..l"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: false, gpu_hours: 6.7}
+    hypothesis: "frozen evidence (vanilla/vanilla2/LSTM near 0.07 at 20k on Z2); amendment \"vanilla solves Z2 with more steps\""
+    reports:
+      - "Z2 scaling report (https://claude.ai/artifact/8mjpJKB9LUMMKipyHtkRNK)"
+      - "hybrid4 results report (https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti)"
+    downstream: "none"
+    config_source: "legacy train.py args; jobs/legacy/{hybrid,vanilla,vanilla2,lstm}.sbatch"
+    commits: {"inferred:7c1f827": 36}
+    run_status: {completed: 36}
+    runs:
+      - {id: "torch:z2/hybrid/m/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/hybrid/m/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991390_6"}
+      - {id: "torch:z2/hybrid/s/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/hybrid/s/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991390_3"}
+      - {id: "torch:z2/hybrid/s/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/hybrid/s/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991390_5"}
+      - {id: "torch:z2/hybrid/s/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/hybrid/s/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991390_4"}
+      - {id: "torch:z2/hybrid/xs/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/hybrid/xs/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991390_0"}
+      - {id: "torch:z2/hybrid/xs/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/hybrid/xs/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991390_2"}
+      - {id: "torch:z2/hybrid/xs/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/hybrid/xs/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991390_1"}
+      - {id: "torch:z2/lstm/m/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/lstm/m/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991399_6"}
+      - {id: "torch:z2/lstm/m/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/lstm/m/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991399_8"}
+      - {id: "torch:z2/lstm/m/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/lstm/m/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991399_7"}
+      - {id: "torch:z2/lstm/s/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/lstm/s/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991399_3"}
+      - {id: "torch:z2/lstm/s/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/lstm/s/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991399_5"}
+      - {id: "torch:z2/lstm/s/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/lstm/s/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991399_4"}
+      - {id: "torch:z2/lstm/xs/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/lstm/xs/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991399_0"}
+      - {id: "torch:z2/lstm/xs/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/lstm/xs/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991399_2"}
+      - {id: "torch:z2/lstm/xs/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/lstm/xs/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991399_1"}
+      - {id: "torch:z2/vanilla/l/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/vanilla/l/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991393_9"}
+      - {id: "torch:z2/vanilla/l/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/vanilla/l/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991393_10"}
+      - {id: "torch:z2/vanilla/m/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/vanilla/m/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991393_6"}
+      - {id: "torch:z2/vanilla/m/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/vanilla/m/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991393_8"}
+      - {id: "torch:z2/vanilla/m/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/vanilla/m/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991393_7"}
+      - {id: "torch:z2/vanilla/s/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/vanilla/s/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991393_3"}
+      - {id: "torch:z2/vanilla/s/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/vanilla/s/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991393_5"}
+      - {id: "torch:z2/vanilla/s/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/vanilla/s/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991393_4"}
+      - {id: "torch:z2/vanilla/xs/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/vanilla/xs/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991393_0"}
+      - {id: "torch:z2/vanilla/xs/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/vanilla/xs/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991393_2"}
+      - {id: "torch:z2/vanilla/xs/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/vanilla/xs/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991393_1"}
+      - {id: "torch:z2/vanilla2/m/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/vanilla2/m/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991398_6"}
+      - {id: "torch:z2/vanilla2/m/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/vanilla2/m/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991398_8"}
+      - {id: "torch:z2/vanilla2/m/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/vanilla2/m/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991398_7"}
+      - {id: "torch:z2/vanilla2/s/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/vanilla2/s/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991398_3"}
+      - {id: "torch:z2/vanilla2/s/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/vanilla2/s/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991398_5"}
+      - {id: "torch:z2/vanilla2/s/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/vanilla2/s/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991398_4"}
+      - {id: "torch:z2/vanilla2/xs/seed0_lr1e-3", path: "/scratch/ax2348/mapping/results/vanilla2/xs/seed0_lr1e-3", commit: "inferred:7c1f827", status: "completed", job: "19991398_0"}
+      - {id: "torch:z2/vanilla2/xs/seed0_lr1e-4", path: "/scratch/ax2348/mapping/results/vanilla2/xs/seed0_lr1e-4", commit: "inferred:7c1f827", status: "completed", job: "19991398_2"}
+      - {id: "torch:z2/vanilla2/xs/seed0_lr3e-4", path: "/scratch/ax2348/mapping/results/vanilla2/xs/seed0_lr3e-4", commit: "inferred:7c1f827", status: "completed", job: "19991398_1"}
+  - id: z2-vanilla-long-and-depth
+    title: "Z2 vanilla 300k (xs, m) and depth ladder d4..d32"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: false, gpu_hours: 3.6}
+    hypothesis: "amendment \"vanilla solves Z2 with more steps\" (its table)"
+    reports:
+      - "Z2 scaling report (https://claude.ai/artifact/8mjpJKB9LUMMKipyHtkRNK)"
+      - "hybrid4 results report (https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti)"
+    downstream: "none"
+    config_source: "legacy train.py args; jobs/legacy/vanilla_long.sbatch, vanilla_depth.sbatch"
+    commits: {"inferred:7c1f827": 6}
+    run_status: {completed: 6}
+    runs:
+      - {id: "torch:z2/vanilla/m/seed0_300k", path: "/scratch/ax2348/mapping/results/vanilla/m/seed0_300k", commit: "inferred:7c1f827", status: "completed", job: "19991397_1"}
+      - {id: "torch:z2/vanilla/xs/seed0_300k", path: "/scratch/ax2348/mapping/results/vanilla/xs/seed0_300k", commit: "inferred:7c1f827", status: "completed", job: "19991397_0"}
+      - {id: "torch:z2/vanilla_depth/d16/seed0", path: "/scratch/ax2348/mapping/results/vanilla_depth/d16/seed0", commit: "inferred:7c1f827", status: "completed", job: "19991395_2"}
+      - {id: "torch:z2/vanilla_depth/d32/seed0", path: "/scratch/ax2348/mapping/results/vanilla_depth/d32/seed0", commit: "inferred:7c1f827", status: "completed", job: "19991395_3"}
+      - {id: "torch:z2/vanilla_depth/d4/seed0", path: "/scratch/ax2348/mapping/results/vanilla_depth/d4/seed0", commit: "inferred:7c1f827", status: "completed", job: "19991395_0"}
+      - {id: "torch:z2/vanilla_depth/d8/seed0", path: "/scratch/ax2348/mapping/results/vanilla_depth/d8/seed0", commit: "inferred:7c1f827", status: "completed", job: "19991395_1"}
+  - id: z2-day1-local
+    title: "day-1 local Z2 runs (hybrid, hybrid2, vanilla, vanilla2, lstm, mlp at xs)"
+    status: major
+    score: {documented: true, hypothesis: true, downstream: false, gpu_hours: 0.4}
+    hypothesis: "frozen evidence: scalar-decay hybrid solves Z2 at xs (0.0150 at 20k; 0.0115 per-step)"
+    reports:
+      - "Z2 scaling report (https://claude.ai/artifact/8mjpJKB9LUMMKipyHtkRNK)"
+      - "hybrid4 results report (https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti)"
+    downstream: "none"
+    config_source: "legacy args for most; the earliest (8k, 500-step) runs predate the run-name field"
+    commits: {"inferred:d0744b9": 4, "unknown": 4, "inferred:eb7d880": 2, "inferred:27e112f": 1, "inferred:6fcbd99": 1}
+    run_status: {completed: 12}
+    runs:
+      - {id: "erid-2:z2/hybrid/xs/seed0", path: "/home/adrianna/code/mapping/results/hybrid/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
+      - {id: "erid-2:z2/hybrid/xs/seed0_20k_qt_placed", path: "/home/adrianna/code/mapping/results/hybrid/xs/seed0_20k_qt_placed", commit: "inferred:27e112f", status: "completed"}
+      - {id: "erid-2:z2/hybrid/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/hybrid/xs/seed0_8k", commit: "unknown", status: "completed"}
+      - {id: "erid-2:z2/hybrid2/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/hybrid2/xs/seed0_20k", commit: "inferred:eb7d880", status: "completed"}
+      - {id: "erid-2:z2/hybrid2/xs/seed0_20k_qt", path: "/home/adrianna/code/mapping/results/hybrid2/xs/seed0_20k_qt", commit: "inferred:eb7d880", status: "completed"}
+      - {id: "erid-2:z2/lstm/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/lstm/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
+      - {id: "erid-2:z2/lstm/xs/seed0_20k_nodecay_hh", path: "/home/adrianna/code/mapping/results/lstm/xs/seed0_20k_nodecay_hh", commit: "inferred:6fcbd99", status: "completed"}
+      - {id: "erid-2:z2/lstm/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/lstm/xs/seed0_8k", commit: "unknown", status: "completed"}
+      - {id: "erid-2:z2/vanilla/xs/seed0", path: "/home/adrianna/code/mapping/results/vanilla/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
+      - {id: "erid-2:z2/vanilla/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/vanilla/xs/seed0_8k", commit: "unknown", status: "completed"}
+      - {id: "erid-2:z2/vanilla2/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/vanilla2/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
+      - {id: "erid-2:z2/vanilla2/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/vanilla2/xs/seed0_8k", commit: "unknown", status: "completed"}
+
+# Pending: registered and submitted, no run directory exists yet.
+pending:
+  - {id: se2c-odometry-queries, job: "20084102_[0-2]", tree: /scratch/ax2348/mapping_odq, commit: a353d1e, branch: exp/odq, note: "commit exists only on exp/odq in ~/code/mapping-hydra, not in ~/code/mapping; presets se2c_odq_after, se2c_odq_before, se2c_vo_dropout"}
+  - {id: se2d-h1c-causal-grid, job: "20072852_[3-22]", note: "17 more H1c tasks"}
+  - {id: se2d-h1d-walk-length, job: "20076519_[1-5]", note: "T=16 vanilla pair and the four T=128 runs"}
+
+# Borderline: for the user to decide (documented but cheap, or similar). Not counted as major.
+borderline:
+  - id: se2d-prefreeze-ablations
+    title: "pre-freeze ablations: conv muP init, conv-width race (paused at 78k), hybrid4.5b and its last-layer variant at s"
+    why: "documented only as a line in STATUS; promised docs/lift/prefreeze_ablations.md does not exist; 1.2 GPU-h; no hypothesis"
+    gpu_hours: 1.1
+    runs: ["erid-2:se2d/hybrid45b/s/seed0_50k_qt", "erid-2:se2d/hybrid45b_last/s/seed0_50k_qt", "erid-2:se2d/hybrid4_convrace/xs/seed0_100k_qt", "erid-2:se2d/hybrid4_muconv/xs/seed0_100k_qt"]
+  - id: se2d-time-recurrence
+    title: "hybrid4_time / hybrid4_time_full at xs (exp/time-recurrence)"
+    why: "documented (STATUS, docs/time_recurrence.md, se2c report) but 0.4 GPU-h and no registered hypothesis"
+    gpu_hours: 0.4
+    runs: ["erid-2:se2d/hybrid4_time/xs/seed0_100k_qt", "erid-2:se2d/hybrid4_time_full/xs/seed0_100k_qt"]
+  - id: lift-blind-probe
+    title: "L3 blind probe (GDN / beta-capped / attention / cdiag), shelved"
+    why: "documented (STATUS), 0.5 GPU-h, shelved; own training entry point"
+    gpu_hours: 0.5
+    runs: ["erid-2:blind_probe/attn_n0", "erid-2:blind_probe/cdiag_n0", "erid-2:blind_probe/gdn_b1_n0", "erid-2:blind_probe/gdn_n0"]
+  - id: se2c-proving-run
+    title: "hybrid4c xs 25k proving run"
+    why: "documented (STATUS, journal), 0.15 GPU-h; superseded by the bridge"
+    gpu_hours: 0.1
+    runs: ["erid-2:se2c/hybrid4c/xs/seed0_25k_qt"]
+  - id: se2c-vo-worker
+    title: "first basic-VO run on se2c m (died at 13k when the worker was cancelled)"
+    why: "documented (STATUS) as a failure; 0.2 GPU-h; to be replaced by the exp/odq baseline"
+    gpu_hours: 0.2
+    runs: ["torch:se2c/hybrid4c/m/vo_120k_qt"]
