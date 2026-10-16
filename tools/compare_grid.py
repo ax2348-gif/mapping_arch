@@ -91,36 +91,62 @@ def main():
     else:
         pick = np.random.default_rng(a.seed).choice(len(rows), size=min(a.rows, len(rows)), replace=False)
 
-    # columns: obs, target, then per model: pred [, shuffled], |error|
-    per = 3 if a.shuffled else 2
-    cols = ['obs at t', 'target'] + [f'{lab} {c}' for lab in labels
-                                     for c in (('pred', 'shuffled', '|err|') if a.shuffled else ('pred', '|err|'))]
+    # Layout: [label | obs | target] then one GROUP per model: prediction,
+    # odometry shuffled (default), |error|. Groups are separated by a wider gap
+    # and headed by the model's name; each cell carries its mse underneath; the
+    # lower mse on each row is drawn in bold white, the others in grey.
     cell = 15 * SCALE
-    label_w, header = 170, 64
-    width = label_w + len(cols) * (cell + GAP)
-    canvas = Image.new('L', (width, header + len(pick) * (cell + GAP) + 8), 40)
+    sub = (('prediction', 'odometry shuffled', '|error|') if a.shuffled
+           else ('prediction', '|error|'))
+    group_gap, cap = 22, 18                      # gap between groups; caption height
+    label_w, header = 200, 92
+    big, mid, small = _font(16), _font(13), _font(12)
+    base_w = 2 * (cell + GAP)
+    group_w = len(sub) * (cell + GAP)
+    width = label_w + base_w + len(labels) * (group_gap + group_w)
+    row_h = cell + cap + GAP
+    canvas = Image.new('L', (width, header + len(pick) * row_h + 8), 32)
     d = ImageDraw.Draw(canvas)
-    big, small = _font(13), _font(10)
-    title = ' vs '.join(labels) + (f'   kind: {a.kind}' if a.kind else '') + f'   ({len(pick)} of {len(rows)} queries, sort {a.sort})'
-    d.text((6, 4), title, fill=255, font=big)
     # mean mse per model over ALL filtered queries, not just the drawn rows
     means = [np.mean([float((r[2][m] - r[1]).pow(2).mean()) for r in rows]) for m in range(len(labels))]
-    d.text((6, 24), 'mean mse over all ' + (a.kind or 'all') + ' queries: ' +
-           '   '.join(f'{lab} {mu:.4f}' for lab, mu in zip(labels, means)), fill=220, font=small)
-    for c, name in enumerate(cols):
-        d.text((label_w + c * (cell + GAP), header - 16), name, fill=220, font=small)
+    kind_txt = a.kind or 'all'
+    d.text((8, 6), f"{' vs '.join(labels)}  —  {kind_txt} queries", fill=255, font=big)
+    d.text((8, 30), f"mean mse over all {len(rows)} {kind_txt} queries: " +
+           "   ".join(f"{lab} {mu:.4f}" for lab, mu in zip(labels, means)) +
+           f"     (rows shown: {len(pick)}, {'farthest first' if a.sort == 'dist' else 'random sample'})",
+           fill=225, font=mid)
+    x0 = label_w
+    for c, name in enumerate(('observation at t', 'target')):
+        d.text((x0 + c * (cell + GAP), header - 18), name, fill=210, font=small)
+    gx = []
+    for m, lab in enumerate(labels):
+        x = label_w + base_w + group_gap + m * (group_gap + group_w)
+        gx.append(x)
+        d.rectangle([x - 4, header - 44, x + group_w - GAP + 4, header - 24], fill=70)
+        d.text((x, header - 42), lab, fill=255, font=mid)
+        for c, name in enumerate(sub):
+            d.text((x + c * (cell + GAP), header - 18), name, fill=210, font=small)
     for r, k in enumerate(pick):
         o, tg, prs, shs, off, t, kind, dist = rows[k]
-        y = header + r * (cell + GAP)
-        d.text((4, y + 4), f't{t} q ({float(off[0]):+.1f},{float(off[1]):+.1f}) {math.degrees(float(off[2])):+.0f}deg', fill=220, font=small)
-        d.text((4, y + 18), f'{kind}, {dist:.1f} px', fill=200, font=small)
-        for m, lab in enumerate(labels):
-            d.text((4, y + 34 + 14 * m), f'{lab}: {float((prs[m] - tg).pow(2).mean()):.3f}', fill=255, font=small)
-        imgs = [o, tg]
+        y = header + r * row_h
+        errs = [float((prs[m] - tg).pow(2).mean()) for m in range(len(labels))]
+        best = int(np.argmin(errs))
+        d.text((8, y + 4), f"step {t}", fill=235, font=mid)
+        d.text((8, y + 24), f"offset ({float(off[0]):+.1f}, {float(off[1]):+.1f})", fill=210, font=small)
+        d.text((8, y + 40), f"turn {math.degrees(float(off[2])):+.0f} deg", fill=210, font=small)
+        d.text((8, y + 56), f"{kind}, {dist:.1f} px from anchor", fill=210, font=small)
+        canvas.paste(_to_image(o), (x0, y))
+        canvas.paste(_to_image(tg), (x0 + cell + GAP, y))
         for m in range(len(labels)):
-            imgs += [prs[m]] + ([shs[m]] if a.shuffled else []) + [(prs[m] - tg).abs()]
-        for c, im in enumerate(imgs):
-            canvas.paste(_to_image(im), (label_w + c * (cell + GAP), y))
+            imgs = [prs[m]] + ([shs[m]] if a.shuffled else []) + [(prs[m] - tg).abs()]
+            mses = [errs[m]] + ([float((shs[m] - tg).pow(2).mean())] if a.shuffled else []) + [None]
+            for c, (im, e) in enumerate(zip(imgs, mses)):
+                cx = gx[m] + c * (cell + GAP)
+                canvas.paste(_to_image(im), (cx, y))
+                if e is not None:
+                    win = (c == 0 and m == best)
+                    d.text((cx + 2, y + cell + 2), f"mse {e:.3f}", fill=255 if win else 150,
+                           font=mid if win else small)
     canvas.save(a.out)
     print(f'wrote {a.out}: {len(pick)} rows; mean mse ' + ', '.join(f'{l} {m:.4f}' for l, m in zip(labels, means)))
 
