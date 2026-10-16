@@ -14,6 +14,8 @@ that keep architectures honest, and the deliverables for a new model.
 pip install torch numpy pillow datasets     # torch with CUDA for training
 pip install --no-deps fla-core==0.5.2 einops # kernels (hybrid4 and later);
                                              # --no-deps keeps torch untouched
+pip install -r requirements.txt              # hydra-core, omegaconf (the config
+                                             # tree, run.py and train.py), pinned
 python scripts/get_mnist.py                 # writes data/mnist.npz once
 python -I scripts/get_imagenette.py         # optional natural-image bank:
                                             # data/imagenette64.npz

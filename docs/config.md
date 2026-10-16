@@ -44,9 +44,15 @@ python run.py ... --print                             # resolved config, and the
   - A flag that does not apply to the run is now an error rather than
     silently ignored, for example `--turn-n` on a z2 task or `--cooldown`
     without `--schedule wsd`.
-  - The cluster job files keep working.
-- **Dependencies.** The cluster venv needs `hydra-core` and `omegaconf`
-  for this tree.
+  - The cluster job files keep working. The job generators (`scaling.py`,
+    `tools/branch_jobs.py`) now write `run.py` commands, and their
+    `--extra` takes Hydra overrides (`task.query_times=uniform`), not
+    train.py flags.
+- **Dependencies.** `requirements.txt` pins `hydra-core==1.3.5` and
+  `omegaconf==2.3.1`; the cluster venv needs them (`pip install -r
+  requirements.txt` once, after `scripts/sync.sh push`). Every job file
+  `scaling.py` and `tools/branch_jobs.py` write checks the import first
+  and stops with that instruction.
 
 ## The tree
 

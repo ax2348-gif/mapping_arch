@@ -8,4 +8,10 @@ python3 -m venv "$VENV"
 source "$VENV/bin/activate"
 pip install --upgrade pip
 pip install torch numpy
+# the config tree's dependencies, pinned (requirements.txt; every job checks them)
+if [ -f /scratch/ax2348/mapping/requirements.txt ]; then
+    pip install -r /scratch/ax2348/mapping/requirements.txt
+else
+    echo "after scripts/sync.sh push: pip install -r /scratch/ax2348/mapping/requirements.txt"
+fi
 python -c "import torch; print(torch.__version__, torch.cuda.is_available())"

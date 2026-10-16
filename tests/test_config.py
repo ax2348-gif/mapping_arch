@@ -495,3 +495,44 @@ def test_a_branch_must_continue_its_parent(tmp_path):
     run.main(['model=se2c/vanilla4c', f'run.out={tmp_path}/c2', ckpt, *TINY,
               'schedule=wsd', 'run.steps=3'])          # a new schedule and length: fine
     assert os.path.exists(tmp_path / 'c2' / 'final.json')
+
+
+def _job_command(path, values):
+    """The run.py command a job file runs, its shell variables filled."""
+    import re
+    import shlex
+    text = open(path).read().replace('\\\n', ' ')
+    line = next(ln for ln in text.splitlines() if ln.startswith('python run.py'))
+    for k, v in values.items():
+        line = line.replace(k, v)
+    assert '$' not in line, line
+    return shlex.split(line)[2:]
+
+
+def test_job_generators_write_commands_that_compose(tmp_path):
+    """scaling.py and tools/branch_jobs.py write run.py commands (with the
+    dependency preflight) that compose and build."""
+    import subprocess
+    import sys
+    here = os.getcwd()
+    r = subprocess.run([sys.executable, os.path.join(here, 'scaling.py'), '--task', 'se2d',
+                        '--model', 'hybrid4', '--slurm', '--sizes', 'xs', 's', '--lr-grid', '1e-3',
+                        '--extra', 'task.query_times=uniform schedule=wsd'],
+                       cwd=tmp_path, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    job = tmp_path / 'jobs' / 'se2d_hybrid4.sbatch'
+    assert 'import hydra, omegaconf' in job.read_text()
+    argv = _job_command(job, {'$SIZE': 's', '$RUN': 'seed0_lr1e-3', '$LRFLAG': 'optim.lr=1e-3'})
+    e = run.build(run.resolved(run.load(argv)))
+    assert (e.model.size, e.optim.lr, e.schedule.name, e.run.name, e.task.generator.workers) == (
+        's', 1e-3, 'wsd', 'seed0_lr1e-3', 4)
+    out = tmp_path / 'cd.sbatch'
+    r = subprocess.run([sys.executable, os.path.join(here, 'tools', 'branch_jobs.py'),
+                        '--task', 'se2c', '--model', 'hybrid4c', '--sizes', 'xs',
+                        '--parent', 'p', '--budgets', '62500', '--out', str(out)],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    argv = _job_command(out, {'$SIZE': 'xs', '$PARENT/step$K.pt': 'results/se2c/x/step50000.pt',
+                              '$(( S / 1000 ))': '62', '$S': '62500'})
+    e = run.build(run.resolved(run.load(argv)))
+    assert (e.task.name, e.run.steps, e.run.name, e.schedule.name) == ('se2c', 62500, 'p_cd62k', 'wsd')
