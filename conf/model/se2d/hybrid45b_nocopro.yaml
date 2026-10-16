@@ -1,0 +1,14 @@
+# @package _global_
+# hybrid45b_nocopro: hybrid4.5b with coprocessor placement () (trunk blocks run before each coprocessor:...
+# Sizes: conf/model/size/ (model/size=<size>).
+defaults:
+  - /task: se2d
+  - /model/size: xs
+
+model:
+  _target_: mapping.config.Model
+  name: hybrid45b_nocopro
+  arch:
+    _target_: mapping.models.se2d.hybrid45b.Hybrid45b
+    _partial_: true
+    placement: []

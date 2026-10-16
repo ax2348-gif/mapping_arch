@@ -1,0 +1,13 @@
+# @package _global_
+# vanilla at fixed width 256, depth only: 4, 8, 16, 32 layers.
+# Sizes: conf/model/size/depth/ (model/size=depth/<size>).
+defaults:
+  - /task: z2
+  - /model/size: depth/d4
+
+model:
+  _target_: mapping.config.Model
+  name: vanilla_depth
+  arch:
+    _target_: mapping.models.vanilla.VanillaTransformer
+    _partial_: true

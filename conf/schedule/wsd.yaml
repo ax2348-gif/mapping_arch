@@ -1,0 +1,6 @@
+# @package schedule
+# Warmup-stable-decay: hold the peak rate, decay linearly to zero over the
+# last `cooldown` fraction of run.steps (docs/scaling_study_design.md).
+_target_: mapping.config.WSD
+warmup: 100
+cooldown: 0.2

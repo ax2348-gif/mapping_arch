@@ -1,0 +1,13 @@
+# @package _global_
+# hybrid4, SE(2) port: hybrid3.5 with the scan on the fused kernel.
+# Sizes: conf/model/size/ (model/size=<size>).
+defaults:
+  - /task: se2d
+  - /model/size: xs
+
+model:
+  _target_: mapping.config.Model
+  name: hybrid4
+  arch:
+    _target_: mapping.models.se2d.hybrid4.Hybrid4
+    _partial_: true

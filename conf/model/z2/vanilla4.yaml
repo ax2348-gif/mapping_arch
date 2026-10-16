@@ -1,0 +1,13 @@
+# @package _global_
+# vanilla4: hybrid4 with every token mixer as softmax attention.
+# Sizes: conf/model/size/ (model/size=<size>).
+defaults:
+  - /task: z2
+  - /model/size: xs
+
+model:
+  _target_: mapping.config.Model
+  name: vanilla4
+  arch:
+    _target_: mapping.models.vanilla4.Vanilla4
+    _partial_: true

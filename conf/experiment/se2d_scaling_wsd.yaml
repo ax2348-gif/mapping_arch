@@ -1,0 +1,20 @@
+# @package _global_
+# The scaling study's long run (docs/scaling_study_design.md): 400k steps of
+# warmup-stable-decay, checkpoints every 50k for the cooldown branches.
+# Same as jobs/se2_<model>_400k_qt_wsd.sbatch (written when the task was se2).
+#   python run.py +experiment=se2d_scaling_wsd model=se2d/vanilla4 model/size=l
+defaults:
+  - override /model: se2d/hybrid4
+  - override /schedule: wsd
+
+run:
+  name: seed0_400k_qt_wsd
+  steps: 400000
+  save_every: 50000
+eval:
+  every: 10000
+  log_every: 2000
+task:
+  query_times: uniform
+  generator:
+    workers: 14

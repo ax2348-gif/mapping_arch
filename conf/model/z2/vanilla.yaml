@@ -1,0 +1,13 @@
+# @package _global_
+# The arm under interrogation: a 2026-default general-purpose transformer.
+# Sizes: conf/model/size/vanilla/ (model/size=vanilla/<size>).
+defaults:
+  - /task: z2
+  - /model/size: vanilla/xs
+
+model:
+  _target_: mapping.config.Model
+  name: vanilla
+  arch:
+    _target_: mapping.models.vanilla.VanillaTransformer
+    _partial_: true

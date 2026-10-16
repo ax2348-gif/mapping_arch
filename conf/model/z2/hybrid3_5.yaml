@@ -1,0 +1,13 @@
+# @package _global_
+# hybrid3.5: hybrid3 with Gated DeltaNet in place of gated linear attention, scan written by hand in PyTorch.
+# Sizes: conf/model/size/ (model/size=<size>).
+defaults:
+  - /task: z2
+  - /model/size: xs
+
+model:
+  _target_: mapping.config.Model
+  name: hybrid3_5
+  arch:
+    _target_: mapping.models.hybrid3_5.Hybrid35
+    _partial_: true

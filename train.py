@@ -45,7 +45,10 @@ from mapping.task_se2c import add_args as add_se2c_args
 DEFAULT_LR = 3e-4
 
 
-def parse():
+def build_parser():
+    """train.py's flags: every setting, its type, choices and default.
+    ``mapping.config.Experiment.legacy_args`` fills the same namespace from
+    the Hydra config tree."""
     p = argparse.ArgumentParser()
     p.add_argument('--task', default='z2', choices=sorted(tasks.ALL),
                    help='which contract: z2 (CONTRACT.md), se2d '
@@ -108,7 +111,107 @@ def parse():
                         'replaced by a reserved "unknown" symbol (generator '
                         'setting, not a new task); 1.0 hides all odometry')
     add_se2c_args(p)
-    return p.parse_args()
+    return p
+
+
+def parse(argv=None):
+    return build_parser().parse_args(argv)
+
+
+def flags(args):
+    """The train.py flags that differ from the defaults, for ``args``."""
+    out = []
+    for action in build_parser()._actions:
+        if not action.option_strings or action.dest == 'help':
+            continue
+        v = getattr(args, action.dest)
+        if v == action.default:
+            continue
+        flag = action.option_strings[0]
+        if action.nargs == 0:
+            out.append(flag)
+        else:
+            out += [flag] + [str(x) for x in (v if isinstance(v, list) else [v])]
+    return out
+
+
+# train.py flag -> (generator it belongs to, or None for every task; the
+# config key). The flags path composes the same config tree as run.py.
+FLAG_KEYS = {
+    'run': (None, 'run.name'), 'out': (None, 'run.out'),
+    'steps': (None, 'run.steps'), 'seed': (None, 'run.seed'),
+    'save_every': (None, 'run.save_every'), 'branch': (None, 'run.branch'),
+    'device': (None, 'run.device'), 'compile': (None, 'run.compile'),
+    'no_bf16': (None, 'run.bf16'),
+    'batch': (None, 'optim.batch'), 'lr': (None, 'optim.lr'),
+    'weight_decay': (None, 'optim.weight_decay'), 'clip': (None, 'optim.clip'),
+    'warmup': (None, 'schedule.warmup'), 'cooldown': ('wsd', 'schedule.cooldown'),
+    'eval_batches': (None, 'eval.batches'), 'eval_every': (None, 'eval.every'),
+    'log_every': (None, 'eval.log_every'),
+    'episode_steps': (None, 'task.episode_steps'), 'queries': (None, 'task.queries'),
+    'query_times': (None, 'task.query_times'),
+    'texture': ('bank', 'task.generator.texture'), 'bank': ('bank', 'task.generator.bank'),
+    'step_px': ('bank', 'task.generator.step_px'),
+    'odometry_dropout': ('bank', 'task.generator.odometry_dropout'),
+    'workers': ('bank', 'task.generator.workers'),
+    'se2c_texture': ('se2c', 'task.generator.texture'),
+    'turn_n': ('se2c', 'task.generator.turn_n'), 'motion': ('se2c', 'task.generator.motion'),
+    'directions': ('se2c', 'task.generator.directions'),
+    'v_min': ('se2c', 'task.generator.v_min'), 'v_max': ('se2c', 'task.generator.v_max'),
+    'omega_max': ('se2c', 'task.generator.omega_max'),
+    'holdout': ('se2c', 'task.generator.holdout'),
+    'holdout_mode': ('se2c', 'task.generator.holdout_mode'),
+    'query_coverage': ('se2c', 'task.generator.query_coverage'),
+}
+
+
+def _value(v):
+    """A Python value as a Hydra override value."""
+    if v is None:
+        return 'null'
+    if isinstance(v, bool):
+        return 'true' if v else 'false'
+    if isinstance(v, float):
+        return repr(v)
+    if isinstance(v, (list, tuple)):
+        return '[' + ','.join(_value(x) for x in v) + ']'
+    if isinstance(v, str):
+        return "'" + v.replace('\\', '\\\\').replace("'", "\\'") + "'"
+    return str(v)
+
+
+def overrides_from_flags(args):
+    """Hydra overrides equivalent to parsed train.py flags: the model
+    (which selects the task), its size on the model's ladder, and every
+    flag that differs from its default. A non-default flag for a generator
+    or schedule the run does not use is an error (train.py used to ignore
+    it silently)."""
+    import os
+    import yaml
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'conf',
+                        'model', args.task, args.model + '.yaml')
+    if not os.path.exists(path):
+        raise SystemExit(f'no config for model {args.model!r} on task {args.task!r} ({path})')
+    with open(path) as f:
+        default_size = next(d['/model/size'] for d in yaml.safe_load(f)['defaults']
+                            if isinstance(d, dict) and '/model/size' in d)
+    ladder = default_size.rsplit('/', 1)[0] + '/' if '/' in default_size else ''
+    generator = 'se2c' if tasks.get(args.task).get('gpu_data') else 'bank'
+    out = [f'model={args.task}/{args.model}', f'model/size={ladder}{args.size}']
+    if args.schedule != 'cosine':
+        out.append(f'schedule={args.schedule}')
+    defaults = {a.dest: a.default for a in build_parser()._actions}
+    for dest, (needs, key) in FLAG_KEYS.items():
+        v = getattr(args, dest)
+        if v == defaults[dest]:
+            continue
+        if needs not in (None, generator, args.schedule):
+            raise SystemExit(f'--{dest.replace("_", "-")} does not apply to this run '
+                             f'(task {args.task}, schedule {args.schedule})')
+        if dest == 'no_bf16':
+            v = not v
+        out.append(f'{key}={_value(v)}')
+    return out
 
 
 def lr_at(step, args):
@@ -175,8 +278,12 @@ def evaluate(model, batches, device, autocast, prepare, metrics,
     return out
 
 
-def main():
-    args = parse()
+def main(args=None, config=None):
+    """Train one run. ``args``: the settings (``parse``, or
+    ``mapping.config.Experiment.legacy_args``); ``config``: the resolved
+    config tree, written to the run directory as ``config.yaml`` (rerun
+    with ``python run.py --from <run>/config.yaml``)."""
+    args = parse() if args is None else args
     torch.manual_seed(args.seed)
     device = torch.device(args.device)
     task = tasks.get(args.task)
@@ -186,6 +293,9 @@ def main():
     run = args.run or f'seed{args.seed}'
     out = args.out or os.path.join(task['root'], args.model, args.size, run)
     os.makedirs(out, exist_ok=True)
+    if config is not None:
+        from omegaconf import OmegaConf
+        OmegaConf.save(config, os.path.join(out, 'config.yaml'))
 
     gpu_data = task.get('gpu_data', False)   # se2c: generated on the GPU
     by_query = getattr(task['task'], 'metrics_by_query', None)
@@ -399,5 +509,21 @@ def main():
           f'floor {floor["mse"]:.4f}); wrote {out}')
 
 
+def main_from_flags(argv=None):
+    """``train.py --flags``: the same run, through the config tree."""
+    import run as entry
+    parsed = parse(argv)
+    cfg = entry.resolved(entry.load(overrides_from_flags(parsed)))
+    args = entry.build(cfg).legacy_args()
+    if parsed.lr is None:      # main() would take the model's default; the config already did
+        from mapping.config import model_lr
+        parsed.lr = model_lr(parsed.task, parsed.model, parsed.size)
+    if vars(args) != vars(parsed):           # the translation is exact, or no run
+        diff = {k: (vars(parsed)[k], vars(args).get(k)) for k in vars(parsed)
+                if vars(parsed)[k] != vars(args).get(k)}
+        raise SystemExit(f'config translation differs from the flags: {diff}')
+    main(args, config=cfg)
+
+
 if __name__ == '__main__':
-    main()
+    main_from_flags()

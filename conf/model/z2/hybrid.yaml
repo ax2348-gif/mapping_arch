@@ -1,0 +1,13 @@
+# @package _global_
+# Hybrid transformer: blocks alternate gated linear attention with softmax attention, in the style of recent...
+# Sizes: conf/model/size/ (model/size=<size>).
+defaults:
+  - /task: z2
+  - /model/size: xs
+
+model:
+  _target_: mapping.config.Model
+  name: hybrid
+  arch:
+    _target_: mapping.models.hybrid.Hybrid
+    _partial_: true

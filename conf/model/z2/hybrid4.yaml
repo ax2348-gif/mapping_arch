@@ -1,0 +1,13 @@
+# @package _global_
+# hybrid4: hybrid3.5 with the scan on the fused kernel.
+# Sizes: conf/model/size/ (model/size=<size>).
+defaults:
+  - /task: z2
+  - /model/size: xs
+
+model:
+  _target_: mapping.config.Model
+  name: hybrid4
+  arch:
+    _target_: mapping.models.hybrid4.Hybrid4
+    _partial_: true

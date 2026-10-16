@@ -1,0 +1,13 @@
+# @package _global_
+# hybrid4_cdiag, SE(2) port: ablation of hybrid4 with a complex-diagonal transition.
+# Sizes: conf/model/size/ (model/size=<size>).
+defaults:
+  - /task: se2d
+  - /model/size: xs
+
+model:
+  _target_: mapping.config.Model
+  name: hybrid4_cdiag
+  arch:
+    _target_: mapping.models.se2d.hybrid4_cdiag.Hybrid4Cdiag
+    _partial_: true
