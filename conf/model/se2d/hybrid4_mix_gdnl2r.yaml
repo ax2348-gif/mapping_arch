@@ -13,5 +13,3 @@ model:
     _partial_: true
     delta: l2r
     attn: bidir
-    top: 0
-    top_op: native

@@ -13,5 +13,3 @@ model:
     _partial_: true
     delta: both
     attn: causal
-    top: 0
-    top_op: native

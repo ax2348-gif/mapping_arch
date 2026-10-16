@@ -128,4 +128,5 @@ def test_variants_are_registered_with_their_fields():
         mod = T['models'].get(name)
         assert mod.ARCH == arch
         m = named(name, 'xs' if 'mix' in name else 's')
-        assert (m.delta, m.attn, m.top, m.top_op) == tuple(arch[k] for k in ('delta', 'attn', 'top', 'top_op'))
+        full = {'top': 0, 'top_op': 'native', **arch}
+        assert (m.delta, m.attn, m.top, m.top_op) == tuple(full[k] for k in ('delta', 'attn', 'top', 'top_op'))

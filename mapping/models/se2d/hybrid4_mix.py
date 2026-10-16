@@ -9,7 +9,8 @@ Fields (``Hybrid4Mix(spec, width, delta, attn, top, top_op)``):
   left: anti-causal; a diagnostic).
 - ``attn``: the TRUNK's attention, ``'bidir'`` (hybrid4) or ``'causal'``
   (masked over the sorted token order).
-- ``top``: the number k of FINAL layers that are fully bidirectional
+- ``top``: the number k of FINAL layers that are fully bidirectional,
+  clipped to the layer count (top=3 at xs, 2 layers, is every layer)
   (delta rule ``'both'``, attention ``'bidir'``); the layers below are the
   trunk. Layers are hybrid4's blocks in order (xs: [GDN, attn]; s: [GDN,
   attn, GDN, attn]); k counts blocks from the top.
@@ -67,7 +68,8 @@ class Hybrid4Mix(Hybrid4):
         super().__init__(spec, width)
         assert delta in DELTA and attn in ATTN and top_op in TOP_OP
         n = len(self.blocks)
-        assert 0 <= top <= n, f'top={top} but the model has {n} layers'
+        assert top >= 0, f'top={top}'
+        top = min(top, n)
         self.delta, self.attn, self.top, self.top_op = delta, attn, top, top_op
         heads = width // HEAD_DIM
         mult = BASE_WIDTH / width
@@ -104,9 +106,10 @@ class Hybrid4Mix(Hybrid4):
 # --- registered variants: one model name per fixed setting of the fields ---
 VARIANTS = {
     # A (xs): which operator needs to be acausal, and which direction
-    'hybrid4_mix_gdnl2r': dict(delta='l2r', attn='bidir', top=0, top_op='native'),
-    'hybrid4_mix_attncausal': dict(delta='both', attn='causal', top=0, top_op='native'),
-    'hybrid4_mix_gdnr2l': dict(delta='r2l', attn='bidir', top=0, top_op='native'),
+    # (top and top_op take their defaults, 0 and 'native': no bidirectional top)
+    'hybrid4_mix_gdnl2r': dict(delta='l2r', attn='bidir'),
+    'hybrid4_mix_attncausal': dict(delta='both', attn='causal'),
+    'hybrid4_mix_gdnr2l': dict(delta='r2l', attn='bidir'),
     # B (s): causal trunk, last k layers bidirectional
     'hybrid4_causal_top1': dict(delta='l2r', attn='causal', top=1, top_op='native'),
     'hybrid4_causal_top2': dict(delta='l2r', attn='causal', top=2, top_op='native'),
