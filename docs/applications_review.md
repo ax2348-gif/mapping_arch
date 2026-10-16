@@ -57,7 +57,9 @@ poses.
 The toy task in this study is C4 in miniature. Only rendered pixels
 supervise, odometry is relative (or absent), and there are no pose
 labels and no renderer. The question for each junction is whether a C4
-solution exists at scale, and if not, what replaced it.
+solution exists at scale, and if not, what replaced it. Section 4
+audits whether each system listed as C4 is end to end in the gradient
+sense.
 
 ### 2.2 Junction table
 
@@ -248,7 +250,7 @@ ranks first.
 
 ## 4. Gradient audit of the "end-to-end" systems
 
-The user's definition: the input end is the egocentric observation
+The definition used here: the input end is the egocentric observation
 sequence plus the action history; the output end is the next decision,
 plan or (for world models) predicted frame. Each system is classed by
 its method section:
@@ -429,6 +431,8 @@ loss of consistency.
 | Robot policy | Dual-Stream Memory | Gated DeltaNet compresses history to one token | Not stated | arXiv 2610.13262 |
 | Robot policy | RoboTTT (GR00T N1.7) | TTT fast weights; Gated DeltaNet as baseline | Not stated for the baseline | arXiv 2607.15275 |
 | Robot policy | LRAM | xLSTM, sLSTM non-diagonal recurrence | Not rotation-specific | arXiv 2410.22391 |
+| RL policy (not embodied) | FFM | Complex diagonal decay | Yes, per channel | arXiv 2310.04128 |
+| RL policy (not embodied) | Complex-valued memories | Unitary RNNs from Householder reflections and 2×2 rotations | Yes | arXiv 2609.38598 |
 | World model | Po et al. 2025 | Mamba block-wise scan plus local attention | No (Mamba decays are positive; not discussed in the paper) | arXiv 2505.20171 |
 | 3D | TTT3R | Delta-rule view of CUT3R's state update, sigmoid rate | No | arXiv 2509.26645 |
 | Position encoding | GTA, PRoPE | Pose group element inside attention | Rotates, but poses are given | arXiv 2310.10375; 2507.10496 |
@@ -439,7 +443,7 @@ Points that matter for this study:
 
 - **The default in the main library is off.** flash-linear-attention's
   Gated DeltaNet layer has `allow_neg_eigval: bool = False`. Anyone who
-  uses it as a drop-in, as RoboTTT and most robotics papers do, gets the
+  uses it as a drop-in, as RoboTTT does, gets the
   non-rotating version unless they flip it. RoboTTT's paper does not
   say which it used.
 - **The one direct robotics comparison is negative for Gated DeltaNet.**
@@ -469,7 +473,7 @@ motion group.
 
 | Rank | Junction to replace | Current fix | Why here | Feasibility |
 | --- | --- | --- | --- | --- |
-| 1 | World-model memory on revisits | Pose-indexed retrieval (C1) or 3D cache (C2) | Failure is documented and benchmarked; fix needs engine poses; predicted poses cost 2.2 dB; real-video poses are noisy | High. Open code, about 200M-parameter models, synthetic data |
+| 1 | World-model memory on revisits | Pose-indexed retrieval (C1) or 3D cache (C2) | Failure is documented and benchmarked; fix needs engine poses; predicted poses cost 2.2 dB; real-video poses are noisy | High. Public benchmarks (Memory Maze, LoopNav), about 200M-parameter models, synthetic data |
 | 2 | Navigation path integration without GPS+compass | Learned VO plus explicit SE(3) composition (C3) | Closest to our toy; clean necessity test; strong published baselines | High in simulation |
 | 3 | VLA memory over base motion in mobile manipulation | None (π0.5), language memory (MEM), or tracking camera plus ESDF (MoManipVLA) | Stated limitation of π0.5; delta-rule memories already exist with β ≤ 1 | Medium. Needs robot data or a new simulated task |
 | 4 | Streaming 3D reconstruction state | CUT3R / TTT3R recurrent state with drift | Drift and forgetting are measured; update is already delta-rule-like | Medium. Still C3 supervision |
@@ -477,16 +481,18 @@ motion group.
 
 **1. World-model memory.** Take the Po et al. setup (Memory Maze and
 Minecraft, about 200M parameters, block-wise scan plus local attention)
-and change only the recurrence: Mamba2, Gated DeltaNet with β in (0, 1],
+but replace its Memory Maze inputs, which include the agent's
+position, with relative actions only. Then change only the recurrence: Mamba2, Gated DeltaNet with β in (0, 1],
 Gated DeltaNet with β in (0, 2), DeltaProduct with two factors. Add
 full-context attention as an upper bound and a WorldMem-style model with
 engine poses as a C1 ceiling. Train on loops; test on LoopNav ABA and
 ABCA loops and on held-out loop lengths beyond the training horizon.
 Report return-leg PSNR and LPIPS against loop length, a linear probe of
 pose from the state, and the transition eigenvalue probe used in this
-study. A positive result is: the β-to-2 model matches the pose-given
-ceiling on revisits, the β-to-1 model does not, and the gap grows with
-loop length.
+study. Infinite-World's pose-free compressed memory is the strongest
+existing pose-free baseline. A positive result is: the β-to-2 model
+matches the pose-given ceiling on revisits, the β-to-1 model does not,
+and the gap grows with loop length.
 
 **2. Navigation without GPS+compass.** Habitat PointNav in the 2021
 challenge setting (RGB-D, actuation and sensor noise, no GPS+compass),
