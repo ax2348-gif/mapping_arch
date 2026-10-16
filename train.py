@@ -564,6 +564,14 @@ def write_sources(out, config, sources):
             os.path.join(out, 'overrides.yaml'))
 
 
+# The argparse path is sealed (docs/hydra_merge_review.md, section 5): the
+# flags are frozen (tests/test_seal.py checks them against
+# tests/legacy_flags.json). A new setting is a config field, never a flag.
+FROZEN_NOTE = ('train.py --flags is deprecated and frozen: it translates to the config '
+               'tree and runs the same thing. New settings exist only as config fields; '
+               'use run.py (docs/config.md).')
+
+
 def main_from_flags(argv=None):
     """``train.py --flags``: the same run, through the config tree."""
     import sys
@@ -573,6 +581,8 @@ def main_from_flags(argv=None):
     argv = [a for a in argv if a != '--overwrite']
     parsed = parse(argv)
     overrides = overrides_from_flags(parsed) + (['run.overwrite=true'] if overwrite else [])
+    print(FROZEN_NOTE + '\n  equivalent: python run.py ' + ' '.join(overrides),
+          file=sys.stderr, flush=True)
     cfg = entry.resolved(entry.load(overrides))
     experiment = entry.build(cfg)
     args = experiment.legacy_args()
