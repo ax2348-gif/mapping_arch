@@ -321,3 +321,36 @@ On the right-to-left head's turn tokens, median beta is 0.99, against a
 ceiling of 1.00. On no-turn tokens it is 0.73. So the model drives the
 write strength to the largest value it is allowed on exactly the tokens
 where hybrid4 uses beta = 2.
+
+### 2026-10-15: no-convolution and complex-diagonal ablations
+
+SE(2), xs, per-step queries, 100k steps, seed 0. Each run removes one
+part of hybrid4's mixer.
+
+| run | all-query mse | last-step mse | shuffled | status |
+| --- | --- | --- | --- | --- |
+| hybrid4 | 0.0180 | 0.0263 | 0.1403 | solved |
+| hybrid4_beta1 (beta capped at 1) | 0.0491 | 0.0718 | 0.0918 | failed |
+| hybrid4_noconv (no short convolution) | 0.0537 | 0.0742 | 0.0884 | failed |
+| hybrid4_cdiag (commuting complex-diagonal transition) | 0.0563 | 0.0748 | 0.0874 | failed |
+
+- **No short convolution.** It fails, consistent with the design argument
+  that the convolution supplies the second reflection. It was not probed,
+  and the convolution could matter for other reasons.
+- **Complex-diagonal.** It fails, and its learned rotations do not track
+  the turn. Over each walk step every channel pair rotates by a fixed
+  20-27 degrees regardless of the turn: a step clock, like a learned
+  RoPE. 0 of 16 pairs in either head rotate by the turn relative to
+  no-turn steps.
+- **What the complex-diagonal failure means.** The model had the capacity
+  to represent the group (z <- e^(i theta) z + move) and did not find
+  that solution within this budget. This shows a difference in
+  learnability, not in expressivity.
+- **Confounds.** The complex-diagonal model differs from hybrid4 in
+  three ways at once: its transitions commute, it has no erase step (no
+  beta), and its angle is parametrised as pi*tanh with every token
+  rotating the state, observation patches included. It does not isolate
+  commutativity.
+- **What it means for H.** In the transition classes tried here, only the
+  one that rotates through learned reflections found the rotation at this
+  budget. The capacity to rotate was necessary but not sufficient.
