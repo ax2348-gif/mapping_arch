@@ -387,9 +387,9 @@ Cluster runs, SE(2), MNIST, per-step queries, warmup-stable-decay, seed
 - **Cautions.** Single seeds. Errors near 1e-4 are unusually low and
   should be audited (tools/audit_se2.py) before being relied on.
 
-### 2026-10-16: H1c, causal hybrid4 costs only capacity, causal vanilla4 costs consistently (DRAFT, registered before the grid reports)
+### 2026-10-16: H1c, causal hybrid4 costs only capacity, causal vanilla4 costs consistently (SIGNED OFF by the user, registered before the grid reports)
 
-**Status.** DRAFT for the user's sign-off. It is registered (committed) BEFORE any run of the grid below reports. Results already seen are listed under "Seen before registration". The user's framing: if this holds, it brings back the refuted H1 in a restricted domain, causal egocentric memory, a very useful domain for engineering, since a causal belief allows KV caching and teacher forcing.
+**Status.** Signed off by the user on 2026-10-16, with the resolution guard below; thresholds are RELATIVE (ratios). It was registered (committed) BEFORE any run of the grid below reports. Results already seen are listed under "Seen before registration". The user's framing: if this holds, it brings back the refuted H1 in a restricted domain, causal egocentric memory, a very useful domain for engineering, since a causal belief allows KV caching and teacher forcing.
 
 **Claim (H1c).** On discrete SE(2) (se2d, MNIST, per-step queries):
 - making hybrid4 CAUSAL (forward-only Gated DeltaNet, causal attention, matched shapes) costs only CAPACITY: no penalty at sizes where bidirectional hybrid4 solves comfortably;
@@ -411,6 +411,7 @@ Cluster runs, SE(2), MNIST, per-step queries, warmup-stable-decay, seed
 - **hybrid4:** penalty ≤ 1.2 at s, m and l (seed mean), and no seed above 1.4.
 - **vanilla4:** penalty ≥ 1.5 at s, m and l, in at least 2 of 3 seeds per size.
 - **Supported:** both hold. **Refuted:** the hybrid4 penalty > 1.5 at any of s, m or l, or the vanilla4 penalty < 1.2 at two or more sizes. Anything else is mixed.
+- **Resolution guard (added at sign-off, before any grid result).** Ratios of tiny errors are noise. When the BIDIRECTIONAL run's final last-step error is below 0.005, the penalty is reported as the absolute difference, not a ratio. In that regime the pair counts as NO PENALTY when both runs meet "solved" (last-step ≤ 0.040), and as a penalty only if the causal run fails "solved".
 - **Amplifier, secondary:** 64-step walks at s, seed 0, both models. Prediction: the vanilla4 penalty is larger at T = 64 than at T = 32, and the hybrid4 penalty stays ≤ 1.2.
 
 **Excluded by design.** xs. Causal hybrid4 xs fails (≈0.058 against 0.018 bidirectional, 100k cosine): that IS the capacity cost.
