@@ -1,0 +1,5 @@
+# @package model
+size: d32
+arch:
+  width: 256
+  depth: 32

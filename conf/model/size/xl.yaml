@@ -1,0 +1,4 @@
+# @package model
+size: xl
+arch:
+  width: 384

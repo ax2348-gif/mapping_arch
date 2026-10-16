@@ -30,6 +30,26 @@ def register(name):
     return wrap
 
 
+def ladder(name=''):
+    """A size ladder from the config tree, ``conf/model/size/<name>/``
+    (``''``: the shared width ladder at ``conf/model/size/``), as the
+    ordered ``SIZES`` dict a model module exposes: size name -> builder
+    kwargs, smallest first. The config files are the single source of the
+    ladders; ``tests/test_config.py`` checks them against the tables the
+    modules held before the move (``tests/sizes_snapshot.json``)."""
+    import os
+    import yaml
+    d = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__)))), 'conf', 'model', 'size', name)
+    sizes = {}
+    for f in os.listdir(d):
+        if f.endswith('.yaml'):
+            with open(os.path.join(d, f)) as fh:
+                c = yaml.safe_load(fh)
+            sizes[c['size']] = dict(c['arch'])
+    return dict(sorted(sizes.items(), key=lambda kv: tuple(kv[1].values())))
+
+
 def get(name):
     if name not in REGISTRY:
         raise KeyError(f'unknown model {name!r}; have {sorted(REGISTRY)}')

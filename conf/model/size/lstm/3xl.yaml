@@ -1,0 +1,5 @@
+# @package model
+size: 3xl
+arch:
+  width: 1024
+  depth: 5

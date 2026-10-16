@@ -82,15 +82,8 @@ from mapping.models import register
 
 # width x sqrt(2) per rung (rounded to a multiple of 64); depth +1 every
 # second rung. Params ~ 14 * width^2 * depth, see SCALING_RULE.
-SIZES = {
-    'xs': dict(width=128, depth=2),
-    's': dict(width=192, depth=2),
-    'm': dict(width=256, depth=3),
-    'l': dict(width=384, depth=3),
-    'xl': dict(width=512, depth=4),
-    '2xl': dict(width=768, depth=4),
-    '3xl': dict(width=1024, depth=5),
-}
+from mapping.models import ladder  # noqa: E402
+SIZES = ladder('lstm')   # conf/model/size/lstm/*.yaml
 
 SCALING_RULE = (
     'One-parameter family indexed by rung r = 0..6: width = 128 * 2^(r/2) '

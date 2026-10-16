@@ -13,13 +13,8 @@ import torch.nn as nn
 
 from mapping.models import register
 
-SIZES = {
-    'xs': dict(width=128, depth=2),
-    's': dict(width=256, depth=2),
-    'm': dict(width=512, depth=3),
-    'l': dict(width=1024, depth=3),
-    'xl': dict(width=2048, depth=4),
-}
+from mapping.models import ladder  # noqa: E402
+SIZES = ladder('mlp')   # conf/model/size/mlp/*.yaml
 
 SCALING_RULE = ('Width doubles per rung; depth grows by one every other '
                 'rung. Parameters scale roughly with width squared.')

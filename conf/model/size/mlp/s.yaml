@@ -1,0 +1,5 @@
+# @package model
+size: s
+arch:
+  width: 256
+  depth: 2

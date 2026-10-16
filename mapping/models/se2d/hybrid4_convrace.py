@@ -308,14 +308,8 @@ CHUNK = 32            # chunk length of the parallel scan
 DECAY_TAU = 16.0      # GLA: log a = logsigmoid(z) / tau keeps a close to 1
 CONV_GAIN = 0.5       # the repo's init gain: effective std 0.5 / sqrt(fan_in)
 
-SIZES = {
-    'xs': dict(width=64),
-    's': dict(width=128),
-    'm': dict(width=192),
-    'l': dict(width=256),
-    'xl': dict(width=384),
-    'xxl': dict(width=512),
-}
+from mapping.models import ladder  # noqa: E402
+SIZES = ladder('')   # conf/model/size/*.yaml
 
 # The harness reads LR[size] when --lr is not given. It is deliberately the
 # same on every rung: per-width learning-rate scaling is done inside the
