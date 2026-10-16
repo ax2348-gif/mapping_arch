@@ -461,6 +461,7 @@ All run through Hydra (run.py) from the exp/causal branch on Torch.
 **Design.**
 - Size s, seed 0, 100k steps cosine, uniform query times: the recipe of the existing bidirectional se2c s runs.
 - New runs: hybrid4c_causal and vanilla4c_causal, matched shapes, with the odometry INPUT form and the default interleave (before_next_obs), which is correct for causal input.
+  - *Clarification, added before any H1e result:* the interleave toggle exists only on the unmerged exp/odq branch. On master, se2c's existing layout already places odometry t (the move t -> t+1) right before observation t+1, which is exactly `before_next_obs`. The runs use that layout; the meaning is unchanged.
 - References (bidirectional, same recipe): hybrid4c s 100k (all 0.0260, far 0.0447) and vanilla4c s 100k (all 0.0633, far 0.1082).
 
 **Metric.** H1c's: penalty = causal ÷ bidirectional final LAST-STEP error, with the same resolution guard; also overall and the far-query bin.
