@@ -16,6 +16,13 @@ run (about 1e-6), so it is compared within that noise.
 
     MAPPING_REF=/path/to/old/checkout python -m pytest tests/test_equivalence_runs.py
 Skipped without MAPPING_REF.
+
+The se2c cases need a reference with the se2c odometry-dropout knob
+(master 038f19c or later, before the merge of refactor/hydra): from that
+commit on, every se2c run records ``generator.odometry_dropout`` and
+``--odometry-dropout`` acts on se2c. With an older reference they are
+skipped, never compared against the wrong code. The z2 and se2d cases run
+against either.
 """
 import json
 import os
@@ -43,7 +50,24 @@ CASES = {
     'se2c': (['--task', 'se2c', '--model', 'vanilla4c', '--size', 'xs', '--device', 'cpu',
               '--turn-n', '8'],
              ['model=se2c/vanilla4c', 'run.device=cpu', 'task.generator.turn_n=8']),
+    # partial dropout: the draw itself (RNG position, zeroed rows) must match
+    'se2c_dropout': (['--task', 'se2c', '--model', 'vanilla4c', '--size', 'xs', '--device', 'cpu',
+                      '--odometry-dropout', '0.5'],
+                     ['model=se2c/vanilla4c', 'run.device=cpu',
+                      'task.generator.odometry_dropout=0.5']),
+    # visual odometry, as the Torch run results/se2c/hybrid4c/m/vo_120k_qt
+    'se2c_vo': (['--task', 'se2c', '--model', 'vanilla4c', '--size', 'xs', '--device', 'cpu',
+                 '--odometry-dropout', '1.0'],
+                ['model=se2c/vanilla4c', 'run.device=cpu', 'task.generator.odometry_dropout=1.0']),
 }
+
+
+def ref_has_se2c_dropout():
+    try:
+        src = open(os.path.join(REF, 'mapping', 'se2c', 'generator.py')).read()
+    except (OSError, TypeError):
+        return False
+    return 'odometry_dropout' in src
 GPU_CASE = (['--task', 'se2d', '--model', 'hybrid4', '--size', 'xs', '--workers', '2'],
             ['model=se2d/hybrid4', 'task.generator.workers=2'])
 TIMING = ('elapsed_s', 'steps_per_s')
@@ -132,6 +156,8 @@ TITLE_ROWS = 22      # mapping.render: the title is drawn at y = 4 in a 13 px fo
 
 @pytest.mark.parametrize('case', sorted(CASES))
 def test_cpu_runs_are_bit_identical(tmp_path, case):
+    if case.startswith('se2c') and not ref_has_se2c_dropout():
+        pytest.skip('MAPPING_REF predates the se2c odometry-dropout knob (master 038f19c)')
     dirs = three_runs(tmp_path, *CASES[case])
     old_log, old_final = records(dirs['old'])
     old_ckpt = checkpoints(dirs['old'])

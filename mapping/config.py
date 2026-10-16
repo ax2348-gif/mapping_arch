@@ -188,6 +188,7 @@ class Se2cGenerator(Generator):
     holdout: Optional[tuple]     # (lo, hi) band of |turn| in rad
     holdout_mode: str
     query_coverage: str
+    odometry_dropout: float      # P(a step's odometry -> zero vector); 1.0: visual odometry
     record = {'texture': 'se2c_texture'}
 
     def config(self, task, seed):

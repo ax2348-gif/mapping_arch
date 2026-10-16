@@ -187,3 +187,26 @@ def test_query_kinds_split():
     out = metrics_by_query(err, torch.zeros(1, 4, 1, 1), qp, found)
     assert out['mse_fallback'] == 1 and out['mse_near'] == 4 and out['mse_far'] == 16
     assert abs(out['mse_sampled'] - (4 + 9 + 16) / 3) < 1e-6 and out['frac_fallback'] == 0.25
+
+
+def test_odometry_dropout_zeroes_whole_steps_and_nothing_else():
+    """master 038f19c: each step's odometry vector is zeroed with
+    probability p; p = 0 draws nothing (the stream is unchanged), p = 1
+    zeroes every step (visual odometry); everything else in the batch is
+    the same episode."""
+    from dataclasses import replace
+    c = Config()
+    base = make_batch(c, 2, 'cpu', batch=8)
+    assert all(torch.equal(base[k], make_batch(replace(c, odometry_dropout=0.0), 2, 'cpu',
+                                               batch=8)[k]) for k in base
+               if isinstance(base[k], torch.Tensor))
+    # real steps never have a zero translation, so a zero vector is unambiguous
+    assert (base['odometry'][..., :2].norm(dim=-1) >= c.v_min - 1e-4).all()
+    vo = make_batch(replace(c, odometry_dropout=1.0), 2, 'cpu', batch=8)
+    assert (vo['odometry'] == 0).all()
+    half = make_batch(replace(c, odometry_dropout=0.5), 2, 'cpu', batch=8)
+    zero = (half['odometry'] == 0).all(-1)
+    assert 0 < zero.float().mean() < 1
+    assert torch.equal(half['odometry'][~zero], base['odometry'][~zero])
+    for k in ('observations', 'query_pose', 'target', 'poses'):
+        assert torch.equal(half[k], base[k]), k

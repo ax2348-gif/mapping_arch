@@ -157,7 +157,7 @@ FLAG_KEYS = {
     'query_times': (None, 'task.query_times'),
     'texture': ('bank', 'task.generator.texture'), 'bank': ('bank', 'task.generator.bank'),
     'step_px': ('bank', 'task.generator.step_px'),
-    'odometry_dropout': ('bank', 'task.generator.odometry_dropout'),
+    'odometry_dropout': (None, 'task.generator.odometry_dropout'),   # both generators
     'workers': ('bank', 'task.generator.workers'),
     'se2c_texture': ('se2c', 'task.generator.texture'),
     'turn_n': ('se2c', 'task.generator.turn_n'), 'motion': ('se2c', 'task.generator.motion'),
@@ -299,7 +299,7 @@ def main(experiment, config=None, sources=None):
     by_query = getattr(task['task'], 'metrics_by_query', None)
     # the shuffled-odometry diagnostic permutes the model-facing symbols;
     # with all of them replaced by "unknown" it cannot change anything
-    shuffle_informative = gpu_data or g.odometry_dropout < 1.0
+    shuffle_informative = g.odometry_dropout < 1.0
     if not gpu_data:
         bank = args.bank = g.bank_path()
         if not os.path.exists(bank):

@@ -159,7 +159,7 @@ TRACKED_RUNS = {
     'se2d wsd': ['model=se2d/vanilla4', 'task.generator.workers=0', 'schedule=wsd',
                  'task.generator.odometry_dropout=0.5'],
     'se2c': ['model=se2c/vanilla4c', 'task.generator.holdout=[0.8,1.2]',
-             'task.generator.turn_n=8'],
+             'task.generator.turn_n=8', 'task.generator.odometry_dropout=0.5'],
 }
 
 
@@ -308,6 +308,8 @@ FLAG_CASES = [
     '--model vanilla_depth --size d32 --no-bf16 --compile --device cpu',
     '--task se2c --model vanilla4c --size s --holdout 0.8 1.2 --holdout-mode only '
     '--se2c-texture mnist --motion arc --omega-max 1.5 --query-coverage global',
+    '--task se2c --model hybrid4c --size m --steps 120000 --query-times uniform '
+    '--odometry-dropout 1.0 --run vo_120k_qt',
     '--model hybrid4 --size xs --out /tmp/a\\ b --branch x=y.pt --cooldown 0.2',
 ]
 

@@ -11,3 +11,4 @@ omega_max: 3.141592653589793
 holdout: null           # [lo, hi]: a band of |turn| (rad) left out of training
 holdout_mode: exclude   # exclude | include | only
 query_coverage: causal  # causal | global (a documented deviation)
+odometry_dropout: 0.0   # P(a step's odometry -> zero vector); 1.0: visual odometry
