@@ -197,3 +197,33 @@ Z² completely (last-step queries, xs, lr 3e-4 unless noted):
 Dates written as 2026-10-16 in this file, in the header and the two
 amendment headings above, should read 2026-10-15. The tag
 `hypothesis-v1` and the commit timestamps are authoritative.
+
+### 2026-10-15: the trained delta-rule state rotates with the agent
+
+`tools/read_beta.py` and `tools/transition_probe.py` on the hybrid4 SE(2)
+xs checkpoints, seeds 0 and 1. These measure the first-layer Gated
+DeltaNet on 256 test episodes, on CPU.
+
+- **Write strength.** Training moves beta well above 1. In the
+  right-to-left head, every odometry token gets beta = 2.00, a pure
+  reflection, with decay exactly 1.0000.
+- **Per-step transition.** The homogeneous state update multiplied over
+  each walk step (the odometry token plus the following observation
+  patches, in that head's scan order) is, in the right-to-left head:
+  - no turn: every significant eigenvalue at 0 degrees;
+  - a quarter turn: exactly one conjugate pair at 90.0 to 90.3 degrees
+    on 100% of steps, with |lambda| 0.998;
+  - turning around: exactly two eigenvalues at 180 degrees on 100% of
+    steps.
+
+  The remaining ~24 significant eigenvalues stay at 0 degrees. So the
+  head maintains one two-dimensional subspace that is rotated by exactly
+  the agent's turn, and leaves the rest untouched.
+- **The other direction.** The left-to-right head contracts its state
+  over every step, with no eigenvalue above 0.5, so it acts as a
+  short-memory head, not a pose tracker.
+
+This is mechanistic support for H: the solving model represents the
+heading change as a rotation of its state. It is not P5 as written, which
+specifies a linear probe of relative pose. It does not show that the
+rotation is necessary; P2 (beta capped at 1) tests that.
