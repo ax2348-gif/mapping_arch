@@ -124,3 +124,11 @@ docs/scaling_study_design.md.
   - **Queued (one launcher, under the lock), hybrid4c xs at 100k:**
     1. `bridge_n4dec_100k_qt`: `--motion decoupled --turn-n 4 --v-min 9 --v-max 9`, the discrete task's odometry statistics with the new renderer, texture and encoding. It tests the port separately from the group.
     2. `seed0_100k_qt`: the default continuous task.
+- **2026-10-16, user decision: the decoupled walk is the se2c default** (commit aafa32f).
+  - Moves: directions change by U[-3pi/4, 3pi/4) per step, the same at every n. v ~ U[4.5, 9].
+  - Turns: i.i.d. on [-pi, pi) or the n-lattice.
+  - Odometry: the canonical relative pose, the turn wrapped to [-pi, pi).
+  - Effect: median end displacement 40 px and query offset 15 px, against 31 and 10 px for the arc walk. Floor 0.1307.
+  - The queued arc default run was cancelled before it started. Queued instead, under the lock:
+    1. `bridge_n4dec_100k_qt` (`--directions lattice --turn-n 4 --v-min 9 --v-max 9`)
+    2. `dec_100k_qt` (the new default)
