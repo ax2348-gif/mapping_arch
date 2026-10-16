@@ -67,8 +67,16 @@ train.py               train one model at one size -> a run directory
 scaling.py             ladder, sweep (local or SLURM), fit
 summarize.py           every run as a table; fits per model
 render.py              redraw a grid from any checkpoint
+mapping/models/se2/    the SE(2) task's registry (ports of the Z² models)
+mapping/se2.py         SE(2) conventions: headings, egocentric odometry
+mapping/task_se2.py    the SE(2) task as a model sees it
+mapping/tasks.py       task name -> registry, spec, batch layout, results root
+tools/                 analysis: audit, probes, registrability, benchmark
 docs/models/           one page per architecture
-results/               run directories (not in git)
+docs/                  reviews and design notes (see "Research documents")
+HYPOTHESIS.md          the frozen hypothesis and its dated amendments
+results/               run directories (not in git); se2 runs under results/se2/
+quarantine/            outputs of a stale launcher, kept out of results/
 shelved/               variants set aside, with a README on resuming
 ```
 
@@ -143,6 +151,22 @@ so per-query brightness earns nothing; a report only, the loss is plain
 MSE. `summarize.py` reads
 every `final.json` under `results/`.
 
+## Analysis tools
+
+```bash
+python tools/audit_se2.py <final.pt>          # fluke checks: isolation, fresh test
+                                              # set, trivial copies, odometry corruption
+python tools/read_beta.py <final.pt>          # learned delta-rule beta and decay by token kind
+python tools/transition_probe.py <final.pt>   # per-step state transition eigenvalues:
+                                              # does the state rotate by the turn?
+python tools/probe_p5.py <final.pt>           # P5 / P5' of HYPOTHESIS.md
+python tools/registrability.py --texture imagenette_hp --step-px 3   # VO ceiling
+python tools/bench.py --task se2 --models hybrid4 vanilla4 --sizes s m   # throughput
+```
+
+The three probe tools need a model whose first block is the Gated DeltaNet
+layer (hybrid4 and its ablations) and run on CPU.
+
 ## Scaling sweeps
 
 ```bash
@@ -161,7 +185,43 @@ SLURM array (`scripts/remote_setup.sh` builds the environment there once;
 run it as a CPU job, the login node kills pip). `--max-concurrent` sets
 how many array jobs run at once.
 
+Cluster notes:
+- **Python headers for the kernels.** The Triton kernels (hybrid4 and
+  later) compile a helper against `Python.h`, which the cluster's system
+  Python lacks. `jobs/pyhdr.sh` (run once as a CPU job) installs Python
+  3.12 headers from conda-forge (the default Anaconda channels require
+  accepting their Terms of Service) and adds `C_INCLUDE_PATH` to the
+  venv's activate script.
+- **Data.** The texture banks are not synced by `scripts/sync.sh`; rsync
+  `data/imagenette64*.npz` to the cluster by hand.
+- **CPU limit.** H200 jobs accept at most 16 CPUs per GPU.
+
 ## What results exist
 
-`python summarize.py` is the authoritative list. `docs/models/*.md` hold
-each architecture's smoke numbers at the time it was written.
+`python summarize.py` (Z²) and `python summarize.py --task se2` are the
+authoritative lists. `docs/models/*.md` hold each architecture's smoke
+numbers at the time it was written.
+
+## Research documents
+
+- `HYPOTHESIS.md`: the frozen hypothesis (tag `hypothesis-v1`), its
+  predictions P1 to P6, and every result since, as dated amendments.
+- `docs/models/hybrid4.md`: the model that solves SE(2), and how it works.
+- `docs/models/vanilla4.md` and `docs/models/hybrid4_ablations.md`: its
+  transformer counterpart and its ablations.
+- `docs/literature_review.md`: the theory review.
+- `docs/applications_review.md`: practice at scale, the gradient audit,
+  and memory agents.
+- `docs/decision_arm_design.md`: the decision arm's draft design (on hold).
+
+Published pages, private until shared:
+
+| page | link |
+| --- | --- |
+| research journal | (see the journal link in the latest session notes) |
+| hybrid4 results report | https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti |
+| Z² scaling | https://claude.ai/artifact/8mjpJKB9LUMMKipyHtkRNK |
+| primer | https://claude.ai/artifact/9jFX4Cr2761JFTCBytKPQ3 |
+| theory review | https://claude.ai/artifact/DJ4WFQ5V7ArJrDV31EQ8bN |
+| applications review | https://claude.ai/artifact/WnVhdCjzUtq1VRo6mySS8A |
+| literature synthesis | https://claude.ai/artifact/MSr6KNebLT7Rttep2nnU1H |
