@@ -174,3 +174,74 @@ interpolation, supersampled 4x4 per pixel over the pixel's rotated square
   the texture's empirical covariance) was tried and dropped: the
   tabulated covariance is not positive definite and the noise-free
   system was unstable (worse than bilinear).
+
+## Phase 2: trainer and harness (commit e68c17f)
+
+Shared files touched, each minimally:
+
+- `mapping/tasks.py`: a `GPU_TASKS = {'se2c': ...}` table beside `TASKS`
+  (not inside it: several existing tests iterate `TASKS` assuming the
+  tile-bank tasks), `ALL`, and `get()` / `config_and_spec()` aware of it.
+- `train.py`: `--task` choices from `tasks.ALL`; the se2c generator
+  flags (`mapping.task_se2c.add_args`); a `gpu_data` branch that takes
+  config, spec, the batch stream, the held-out set and run info from
+  `mapping.task_se2c.data` instead of the bank loader (the old code is
+  unchanged, only indented under `if not gpu_data`); `permute_steps` so
+  the shuffled-odometry diagnostic permutes (B, T, 3) pose vectors (for
+  (B, T) symbols it is the old gather, tested); an optional per-query
+  breakdown hook (`metrics_by_query`); `offset_max` read with getattr.
+- `render.py`: se2c held-out batches from `task_se2c.data`.
+- `mapping/render.py`: the same permutation fix; float query poses are
+  labelled in px and degrees.
+- `README.md`: layout, commands, docs entry.
+
+The z2 and se2 batch hashes and every pre-existing test pass unchanged
+(209 tests at this commit, with the blind-probe and ablation agents'
+tests). Evaluation: 16 fixed batches from the evaluation seed stream;
+with a held-out band the evaluation stream includes it. Floor on the
+default eval set: mse 0.1329, c-mse 0.1209, fg_mae 0.4715.
+
+## Phase 3: model ports
+
+`mapping/models/se2c/hybrid4c.py` and `vanilla4c.py`; mixers, blocks,
+ladder, LR and init are imported from the se2 `hybrid4` / `vanilla4`
+modules so they cannot drift. The mechanism trace (how the turn reaches
+the delta rule's key and beta, and why a continuous key must have a cut
+somewhere in theta) is in hybrid4c's docstring.
+
+Parameters (3 x 3 patches):
+
+| rung | hybrid4c | vanilla4c |
+| --- | --- | --- |
+| xs | 124,717 | 119,497 |
+| s | 870,617 | 832,393 |
+| m | 2,829,069 | 2,703,945 |
+| l | 6,788,553 | 6,496,521 |
+| xl | 22,336,473 | 21,366,153 |
+| xxl | 53,082,121 | 50,800,137 |
+
+(hybrid4 xs on se2: 119,661; the difference is the 25-entry patch and
+query tables and the 50-feature linear embeddings.)
+
+Tests (`tests/test_se2c_models.py`): shape, episode isolation, None equal
+to all-last-step, patchify layout and round trip, placement (all queries
+at the last step = the original layout; a query is contiguous, right
+after observation t's last patch, before odometry token t; two queries
+at one step keep query order), the RoPE step every token carries, and
+that the odometry enters only through the shared, 2π-periodic encoding.
+
+Throughput, batch 64, bf16, steps/s (forward, backward, AdamW). FIRST
+MEASUREMENT, taken while the blind-probe agent trained on the same GPU
+outside the lock, so these are lower bounds; remeasured below before the
+proving run:
+
+| model, rung | 3x3 fixed batch | 3x3 with generation | 5x5 fixed | 5x5 with generation |
+| --- | --- | --- | --- | --- |
+| hybrid4c xs | 39.1 | 39.9 | 82.7 | 38.1 |
+| hybrid4c s | 9.0 | 8.5 | 25.3 | 18.4 |
+| hybrid4c m | 3.6 | 3.7 | 13.8 | 9.1 |
+| vanilla4c xs | 55.8 | 31.0 | 127.3 | 44.7 |
+| vanilla4c s | 14.0 | 11.6 | 42.2 | 27.1 |
+| vanilla4c m | 5.7 | 6.1 | 18.8 | 15.0 |
+
+Generator alone: 14 ms per batch of 64.
