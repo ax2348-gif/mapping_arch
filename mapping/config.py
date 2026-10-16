@@ -85,6 +85,7 @@ class Run(Node):
     device: Optional[str]        # None: cuda if available, else cpu
     bf16: bool                   # bf16 autocast (CUDA only; ignored on CPU)
     compile: bool
+    overwrite: bool              # write into a non-empty run directory
 
 
 @dataclass(frozen=True)

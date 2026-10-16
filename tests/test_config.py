@@ -101,6 +101,11 @@ CONSUMED_CASES = (
     + [[f'+experiment={p}'] for p in PRESETS])
 
 
+# fields that are not settings of the run, so have no place in the args
+# record (it must stay what train.py --flags gives): config.yaml has them
+NOT_IN_RECORD = {'run.overwrite'}
+
+
 def trainer_inputs(e):
     """What ``train.main`` derives from the objects, through the calls it
     makes: the generator config (and spec, bank file and loader workers),
@@ -145,7 +150,8 @@ def test_every_field_is_consumed(overrides):
             continue          # refused outright, before any training: loud
         name = '.'.join(path)
         assert t != t0, f'{name} changed but what the trainer trains on did not'
-        assert vars(e.legacy_args()) != a0, f'{name} changed but the args record did not'
+        if name not in NOT_IN_RECORD:
+            assert vars(e.legacy_args()) != a0, f'{name} changed but the args record did not'
 
 
 TRACKED_RUNS = {
@@ -340,11 +346,73 @@ def test_external_experiment_file(tmp_path):
         run.build(run.resolved(run.load(['model=z2/hybrid4'], exp=str(bad))))
 
 
-def test_saved_config_reruns(tmp_path):
+TINY = ['run.device=cpu', 'run.steps=2', 'eval.every=2', 'eval.log_every=2',
+        'eval.batches=1', 'optim.batch=2']
+
+
+def test_an_experiment_file_named_like_a_preset_is_that_file(tmp_path):
+    mine = tmp_path / 'se2c_bridge.yaml'          # conf/experiment/ has one too
+    mine.write_text('# @package _global_\ndefaults:\n  - override /model: se2c/vanilla4c\n'
+                    'run:\n  name: mine\n')
+    cfg = run.resolved(run.load([], exp=str(mine)))
+    assert (cfg.model.name, cfg.run.name) == ('vanilla4c', 'mine')
+
+
+def test_a_run_directory_is_never_overwritten_silently(tmp_path):
+    out = f'run.out={tmp_path}/r'
+    run.main(['model=se2c/vanilla4c', out, *TINY])
+    before = open(tmp_path / 'r' / 'log.jsonl').read()
+    with pytest.raises(SystemExit, match='is not empty'):
+        run.main(['model=se2c/vanilla4c', out, 'run.seed=1', *TINY])
+    assert open(tmp_path / 'r' / 'log.jsonl').read() == before
+    with pytest.raises(SystemExit, match='is not empty'):     # --from, same name
+        run.main(['--from', str(tmp_path / 'r' / 'config.yaml'), 'run.seed=1'])
+    run.main(['model=se2c/vanilla4c', out, 'run.seed=1', 'run.overwrite=true', *TINY])
+    assert open(tmp_path / 'r' / 'log.jsonl').read() != before
+
+
+def test_nothing_is_written_before_the_run_is_checked(tmp_path):
+    with pytest.raises(SystemExit, match='CUDA-only'):
+        run.main(['model=se2c/hybrid4c', f'run.out={tmp_path}/r', *TINY])
+    assert not os.path.exists(tmp_path / 'r')
+
+
+def test_from_recomposes_from_the_saved_sources(tmp_path):
+    exp = tmp_path / 'mine.yaml'
+    exp.write_text('# @package _global_\ndefaults:\n  - override /model: se2d/hybrid4\n'
+                   'run:\n  name: mine\n  steps: 123\n')
+    d = tmp_path / 'r'
+    cfg = run.resolved(run.load([f'run.out={d}'], exp=str(exp)))
+    os.makedirs(d)
+    train.write_sources(str(d), cfg, {'overrides': [f'run.out={d}'], 'experiment': str(exp)})
+    again, sources = run.rerun(str(d / 'config.yaml'), [f'run.out={tmp_path}/r2'])
+    assert OmegaConf.to_container(again) == {**OmegaConf.to_container(cfg),
+                                             'run': {**cfg.run, 'out': f'{tmp_path}/r2'}}
+    # a group choice and a size: the rung's arguments and the lr follow
+    again, _ = run.rerun(str(d / 'config.yaml'), ['schedule=wsd', 'model.size=m'])
+    assert again.schedule.cooldown == 0.2 and again.model.size_kwargs == {'width': 192}
+    assert again.run.steps == 123 and again.optim.lr == model_lr('se2d', 'hybrid4', 'm')
+    # the tree changed since the run: refused, not silently another run
+    saved = OmegaConf.load(d / 'config.yaml')
+    saved.eval.batches = 99
+    OmegaConf.save(saved, d / 'config.yaml')
+    with pytest.raises(SystemExit, match='changed: eval.batches'):
+        run.rerun(str(d / 'config.yaml'), [])
+
+
+def test_from_an_older_run_takes_value_overrides_only(tmp_path):
     cfg = compose('+experiment=se2c_bridge', 'model.size=s')
+    del cfg.run['overwrite']                     # saved before the field existed
     path = tmp_path / 'config.yaml'
     OmegaConf.save(cfg, path)
-    loaded = OmegaConf.load(path)
-    assert vars(run.build(loaded).legacy_args()) == vars(run.build(cfg).legacy_args())
-    loaded.merge_with(OmegaConf.from_dotlist(['run.seed=7']))
-    assert run.build(loaded).legacy_args().seed == 7
+    again, _ = run.rerun(str(path), ['run.seed=7'])
+    assert run.build(again).legacy_args().seed == 7 and again.run.overwrite is False
+    for bad, match in (['schedule=wsd', 'a group choice cannot be recomposed'],
+                       ['model/size=s', 'not group choices'],
+                       ['run.sed=1', "no key 'run.sed'"],
+                       ['task.generator=1', 'is a config node']):
+        with pytest.raises(SystemExit, match=match):
+            run.rerun(str(path), [bad])
+    again, _ = run.rerun(str(path), ['model.size=xs'])   # relabels m's numbers: refused
+    with pytest.raises(Exception, match="not rung 'xs'"):
+        run.build(again)

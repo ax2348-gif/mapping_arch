@@ -65,3 +65,33 @@ def test_contract_forward(task, name):
             a = net(obs, odo, query).float()
             b = net(obs, odo, query, query_time=last).float()
         assert (a - b).abs().max().item() < 1e-5
+
+
+ALL_CASES = list(cases()) + [('se2c', n) for n in sorted(tasks.get('se2c')['models'].REGISTRY)]
+
+
+@pytest.mark.parametrize('task,name', ALL_CASES)
+def test_cuda_only_models_are_detected(task, name):
+    """``mapping.models.cuda_only`` names a kernel exactly for the models
+    whose forward cannot run on CPU; the trainer refuses those on CPU
+    before it writes anything."""
+    from mapping.models import cuda_only
+    t = tasks.get(task)
+    module = t['models'].get(name)
+    net = module.build(next(iter(module.SIZES)), t['task'].TaskSpec()).eval()
+    if task == 'se2c':
+        from mapping.se2c.generator import Config, make_batch
+        b = make_batch(Config(), 0, 'cpu', batch=2)
+        x = (b['observations'], b['odometry'], b['query_pose'])
+    else:
+        x = inputs(task, b=2)
+    error = None
+    try:
+        with torch.no_grad():
+            net(*x)
+    except Exception as e:                      # Triton on a CPU tensor
+        error = e
+    if cuda_only(net):
+        assert error is not None and 'Triton' in str(error), (cuda_only(net), error)
+    else:
+        assert error is None, error

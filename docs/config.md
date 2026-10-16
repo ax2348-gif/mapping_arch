@@ -28,7 +28,7 @@ python run.py model=se2d/hybrid4 model.size=m schedule=wsd run.steps=400000
 python run.py model=z2/vanilla model.size=l            # a rung of the model's own ladder
 python run.py +experiment=se2c_bridge model.size=s    # a preset (conf/experiment/)
 python run.py --exp ~/notes/my_run.yaml run.seed=1    # your own experiment file
-python run.py --from results/se2c/hybrid4c/s/bridge_n4dec_100k_qt/config.yaml run.name=again
+python run.py --from results/se2c/hybrid4c/s/bridge_n4dec_100k_qt/config.yaml run.name=again schedule=wsd
 python run.py ... --print                             # resolved config + train.py flags; no run
 ```
 
@@ -131,18 +131,38 @@ task:
 ```
 
 Command-line overrides apply on top of it: `--exp f.yaml model.size=l
-run.seed=1`.
+run.seed=1`. The file is composed under a name of its own, so a file
+named like a preset (`se2c_bridge.yaml`) is still your file.
 
 ## Outputs and reruns
 
-- **`config.yaml`.** Each run directory gets this file, the resolved
-  config (interpolations evaluated, so `optim.lr` is a number).
-- **Rerunning.** `python run.py --from <run>/config.yaml [key=value ...]`
-  reruns it. Only value overrides apply there, since group choices are
-  already resolved. A rerun's log is bit-identical to the original's on
-  CPU.
-  - Without an override of `run.name` or `run.out`, it writes to the same
-    directory as the original.
+- **What a run directory holds besides the results.** `config.yaml`, the
+  resolved config (interpolations evaluated, so `optim.lr` is a number
+  and `model.size_kwargs` the rung's arguments); `overrides.yaml`, what
+  it was composed from; and `experiment.yaml`, a copy of its experiment
+  file when it had one. Nothing is written until the data, the model and
+  the device have been checked, so a run that fails at startup leaves no
+  directory.
+- **Never overwritten.** A run directory that is not empty is refused.
+  Give the run another `run.name`, or replace it with
+  `run.overwrite=true` (`train.py --overwrite`). Files of the old run
+  that the new one does not write (a `step<k>.pt` past the new run's
+  length) stay. `run.overwrite` is not saved in `overrides.yaml`, so a
+  rerun never inherits it.
+- **Rerunning.** `python run.py --from <run>/config.yaml [overrides ...]`
+  recomposes the run from its `overrides.yaml` and `experiment.yaml` plus
+  the new overrides, so group choices (`schedule=wsd`) and sizes
+  (`model.size=s`) apply and what follows from them (the rung's
+  arguments, the model's default learning rate) follows. A rerun's log is
+  bit-identical to the original's on CPU.
+  - Recomposing the sources unchanged must give the saved config. If
+    `conf/` changed since the run (a default, a ladder, a model's `LR`),
+    the rerun is refused and the changed keys are listed: rerun from the
+    commit the run was made at, or write a new experiment.
+  - Runs saved before `overrides.yaml` existed take value overrides of
+    existing keys only, merged into their saved config.
+  - A rerun needs a new `run.name` (or `run.out`), since the original's
+    directory is not empty.
 - **The legacy `args`.** Checkpoints, `final.json` and the first record
   of `log.jsonl` keep the flat `args` dict as before, with the same keys
   and values as a `train.py --flags` run, so every tool and loader reads

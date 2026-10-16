@@ -58,6 +58,37 @@ def get(name):
     return REGISTRY[name]
 
 
+def _calls_fla(fn, seen):
+    """Whether ``fn`` calls a flash-linear-attention op, directly or
+    through functions of this package it calls."""
+    for name in fn.__code__.co_names:
+        f = fn.__globals__.get(name)
+        module = getattr(f, '__module__', None) or ''
+        if module.split('.')[0] == 'fla':
+            return True
+        if callable(f) and hasattr(f, '__code__') and module.startswith('mapping') \
+                and f not in seen:
+            seen.add(f)
+            if _calls_fla(f, seen):
+                return True
+    return False
+
+
+def cuda_only(model):
+    """Names of the submodule classes with a method that calls a
+    flash-linear-attention (``fla``) op, directly or through this
+    package's functions: Triton kernels, CUDA only (the hybrid4 family's
+    Gated DeltaNet, hybrid4_cdiag's gated linear attention). Empty for a
+    model that runs on CPU."""
+    import inspect
+    out = set()
+    for m in model.modules():
+        for _, fn in inspect.getmembers(type(m), inspect.isfunction):
+            if _calls_fla(fn, set()):
+                out.add(type(m).__name__)
+    return sorted(out)
+
+
 def count_params(module):
     return sum(p.numel() for p in module.parameters() if p.requires_grad)
 

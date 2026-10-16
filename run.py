@@ -9,13 +9,16 @@
 Arguments are Hydra overrides (``key=value``, ``group=option``,
 ``+experiment=name``). ``--exp FILE`` composes an experiment file from
 anywhere exactly like a preset in ``conf/experiment/``. ``--from FILE``
-reruns a run's saved ``config.yaml`` (fully resolved, so only value
-overrides apply, not group choices).
+reruns a run from its saved ``config.yaml``: recomposed from the sources
+saved beside it plus the new overrides (``rerun``). A run directory that
+is not empty is refused (``run.overwrite=true`` to replace it), so a
+rerun needs a new ``run.name``.
 
 The tree is composed with Hydra's compose API rather than ``@hydra.main``,
 whose command-line parser fails on Python 3.14 ("badly formed help
 string") and which would change the working directory and logging.
 """
+import hashlib
 import os
 import shutil
 import sys
@@ -32,12 +35,15 @@ CONF = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'conf')
 
 def load(overrides=(), exp=None):
     """The composed config: ``conf/config.yaml`` with ``overrides``, and
-    the experiment file ``exp`` (any path) as ``+experiment=<its name>``."""
+    the experiment file ``exp`` (any path) composed as an experiment
+    preset. It is copied under a name of its own (``_exp_<hash>``), so a
+    file named like a preset in ``conf/experiment/`` is still this file."""
     overrides = list(overrides)
     with tempfile.TemporaryDirectory() as extra:
         if exp is not None:
             os.makedirs(os.path.join(extra, 'experiment'))
-            name = os.path.splitext(os.path.basename(exp))[0]
+            with open(exp, 'rb') as f:
+                name = '_exp_' + hashlib.sha256(f.read()).hexdigest()[:12]
             shutil.copy(exp, os.path.join(extra, 'experiment', name + '.yaml'))
             overrides = [f'hydra.searchpath=[file://{extra}]',
                          f'+experiment={name}'] + overrides
@@ -53,6 +59,78 @@ def resolved(cfg):
 def build(cfg):
     """The ``mapping.config.Experiment`` a config describes."""
     return instantiate(cfg, _convert_='all')
+
+
+def _key(override):
+    return override.split('=', 1)[0].lstrip('+~')
+
+
+def merge_overrides(saved, new):
+    """``saved`` with ``new`` applied: a new override replaces a saved one
+    of the same key."""
+    keys = {_key(o) for o in new}
+    return [o for o in saved if _key(o) not in keys] + list(new)
+
+
+def differences(a, b, prefix=''):
+    """Dotted keys whose values differ between two plain dicts."""
+    out = []
+    for k in sorted(set(a) | set(b)):
+        x, y = a.get(k, '<missing>'), b.get(k, '<missing>')
+        if isinstance(x, dict) and isinstance(y, dict):
+            out += differences(x, y, f'{prefix}{k}.')
+        elif x != y:
+            out.append(f'{prefix}{k}')
+    return out
+
+
+def rerun(frm, overrides):
+    """``(config, sources)`` to rerun the run whose ``config.yaml`` is
+    ``frm``, with ``overrides`` applied.
+
+    A run saved with its sources (``overrides.yaml`` beside it, and its
+    experiment file as ``experiment.yaml``) is recomposed from them plus
+    ``overrides``, so group choices (``schedule=wsd``) and sizes
+    (``model.size=s``) apply and derived values (the rung's arguments, the
+    model's learning rate) follow. Recomposing it unchanged must give its
+    saved config: if conf/ has changed since, the rerun is refused rather
+    than silently becoming another run.
+
+    An older run (no ``overrides.yaml``) can only take value overrides of
+    existing leaves, merged into its saved config."""
+    d = os.path.dirname(os.path.abspath(frm))
+    saved = OmegaConf.to_container(OmegaConf.load(frm))
+    src = os.path.join(d, 'overrides.yaml')
+    if os.path.exists(src):
+        rec = OmegaConf.to_container(OmegaConf.load(src))
+        exp = os.path.join(d, rec['experiment']) if rec.get('experiment') else None
+        again = OmegaConf.to_container(resolved(load(rec['overrides'], exp)))
+        drift = [k for k in differences(again, saved) if k != 'run.overwrite']
+        if drift:
+            raise SystemExit(f'{frm}: composing its sources ({src}) with the current '
+                             f'conf/ no longer gives its saved config; changed: '
+                             f'{", ".join(drift)}. conf/ (or a ladder, or a model\'s '
+                             f'default lr) changed since the run. Rerun it from the '
+                             f'commit it was made at, or write a new experiment (--exp)')
+        merged = merge_overrides(rec['overrides'], overrides)
+        return resolved(load(merged, exp)), {'overrides': merged, 'experiment': exp}
+    cfg = OmegaConf.create(saved)
+    for o in overrides:
+        key = _key(o)
+        if '=' not in o or o[0] in '+~' or '/' in key:
+            raise SystemExit(f'{o}: {frm} has no overrides.yaml (it predates them), so '
+                             f'only value overrides of existing keys apply (key=value), '
+                             f'not group choices or added/removed keys')
+        if OmegaConf.select(cfg, key, default='<missing>') == '<missing>':
+            raise SystemExit(f'{o}: {frm} has no key {key!r}')
+        if OmegaConf.is_dict(OmegaConf.select(cfg, key)):
+            raise SystemExit(f'{o}: {key} is a config node, not a value. {frm} has no '
+                             f'overrides.yaml (it predates them), so a group choice '
+                             f'cannot be recomposed; only key=value on existing leaves')
+    cfg.merge_with(OmegaConf.from_dotlist(overrides))
+    if OmegaConf.select(cfg, 'run.overwrite', default=None) is None:
+        cfg.run.overwrite = False            # runs saved before the field existed
+    return cfg, {'overrides': list(overrides), 'experiment': None}
 
 
 def parse_cli(argv):
@@ -85,16 +163,16 @@ def main(argv=None):
     import train
     overrides, exp, frm, show = parse_cli(sys.argv[1:] if argv is None else argv)
     if frm is not None:
-        cfg = OmegaConf.load(frm)
-        cfg.merge_with(OmegaConf.from_dotlist(overrides))
+        cfg, sources = rerun(frm, overrides)
     else:
         cfg = resolved(load(overrides, exp))
+        sources = {'overrides': overrides, 'experiment': exp}
     experiment = build(cfg)
     if show:
         print(OmegaConf.to_yaml(cfg))
         print('train.py ' + ' '.join(train.flags(experiment.legacy_args())))
         return
-    train.main(experiment, config=cfg)
+    train.main(experiment, config=cfg, sources=sources)
 
 
 if __name__ == '__main__':

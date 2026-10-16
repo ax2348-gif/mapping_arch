@@ -37,6 +37,7 @@ run:
   device: null          # null: cuda if available, else cpu
   bf16: true
   compile: false
+  overwrite: false      # true: write into a non-empty run directory (else refused)
 
 eval:
   _target_: mapping.config.Eval

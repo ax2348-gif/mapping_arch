@@ -41,6 +41,7 @@ import mapping.tasks as tasks
 from mapping.data import TEXTURES, check_texture
 from mapping.checkpoint import save_checkpoint
 from mapping.loader import eval_set, load_banks, train_loader
+from mapping.models import cuda_only
 from mapping.plot import plot_run
 from mapping.render import render_grid, run_title
 from mapping.task import metrics_by_time
@@ -263,15 +264,21 @@ def evaluate(model, batches, device, autocast, prepare, metrics,
     return out
 
 
-def main(experiment, config=None):
+def main(experiment, config=None, sources=None):
     """Train one run. ``experiment``: the ``mapping.config.Experiment``
     (``run.build`` of a composed config); every setting is read from its
     objects. ``config``: the resolved config tree, written to the run
-    directory as ``config.yaml`` (rerun with ``python run.py --from
-    <run>/config.yaml``). The legacy ``args`` record
-    (``experiment.legacy_args()``) is written into log.jsonl, final.json
-    and the checkpoints for the tools; nothing here reads a setting from
-    it."""
+    directory as ``config.yaml``. ``sources``: what it was composed from,
+    ``{'overrides': [...], 'experiment': file or None}``, written as
+    ``overrides.yaml`` (and the file copied to ``experiment.yaml``) so
+    ``python run.py --from <run>/config.yaml`` can recompose it. The
+    legacy ``args`` record (``experiment.legacy_args()``) is written into
+    log.jsonl, final.json and the checkpoints for the tools; nothing here
+    reads a setting from it.
+
+    A run directory that is not empty is refused unless
+    ``run.overwrite``; nothing is written until the data, the model and
+    the device have been checked."""
     e = experiment
     r, t, g, o, ev, sched = e.run, e.task, e.task.generator, e.optim, e.eval, e.schedule
     args = e.legacy_args()                  # the record: output only
@@ -283,10 +290,10 @@ def main(experiment, config=None):
     constant_floor = task['task'].constant_floor
     run = r.name or f'seed{r.seed}'
     out = r.out or os.path.join(task['root'], e.model.name, e.model.size, run)
-    os.makedirs(out, exist_ok=True)
-    if config is not None:
-        from omegaconf import OmegaConf
-        OmegaConf.save(config, os.path.join(out, 'config.yaml'))
+    if not r.overwrite and os.path.isdir(out) and os.listdir(out):
+        raise SystemExit(f'{out} is not empty (an earlier run). Write elsewhere: '
+                         f'run.name=<new name> (or run.out=<dir> when the run sets '
+                         f'run.out), or replace it with run.overwrite=true')
 
     gpu_data = task.get('gpu_data', False)   # se2c: generated on the GPU
     by_query = getattr(task['task'], 'metrics_by_query', None)
@@ -345,6 +352,11 @@ def main(experiment, config=None):
         raise SystemExit(f'--branch lr mismatch: checkpoint '
                          f'{branch["args"]["lr"]}, run {lr}')
     model = e.model.build(spec).to(device)
+    kernels = cuda_only(model)
+    if device.type != 'cuda' and kernels:
+        raise SystemExit(f'{e.model.name} runs {", ".join(kernels)} on a CUDA-only '
+                         f'(Triton) kernel; it cannot train on {device}. Use a GPU '
+                         f'(run.device=cuda), or a model without it for a CPU smoke test')
     params = tasks.get(t.name)['models'].count_params(model)
     raw_model = model
     takes_time = 'query_time' in inspect.signature(model.forward).parameters
@@ -372,6 +384,10 @@ def main(experiment, config=None):
         raw_model.load_state_dict(branch['model'])
         opt.load_state_dict(branch['opt'])
         print(f'branched from {r.branch} at step {start}', flush=True)
+
+    # everything is checked: only now does the run directory get written
+    os.makedirs(out, exist_ok=True)
+    write_sources(out, config, sources)
 
     print(f'{t.name} {e.model.name}/{e.model.size} -> {out}: {params:,} params, '
           f'lr {lr:.2g}; floor mse {floor["mse"]:.4f}, '
@@ -495,11 +511,37 @@ def main(experiment, config=None):
           f'floor {floor["mse"]:.4f}); wrote {out}')
 
 
+def write_sources(out, config, sources):
+    """``config.yaml`` (the resolved config), ``overrides.yaml`` (what it
+    was composed from) and ``experiment.yaml`` (a copy of the experiment
+    file, if any) in the run directory."""
+    import shutil
+    from omegaconf import OmegaConf
+    if config is not None:
+        OmegaConf.save(config, os.path.join(out, 'config.yaml'))
+    if sources is not None:
+        exp = sources.get('experiment')
+        if exp is not None and os.path.abspath(exp) != os.path.abspath(
+                os.path.join(out, 'experiment.yaml')):
+            shutil.copy(exp, os.path.join(out, 'experiment.yaml'))
+        overrides = [o for o in sources['overrides']
+                     if o.split('=', 1)[0].lstrip('+~') != 'run.overwrite']
+        OmegaConf.save(OmegaConf.create(
+            {'overrides': overrides,
+             'experiment': 'experiment.yaml' if exp is not None else None}),
+            os.path.join(out, 'overrides.yaml'))
+
+
 def main_from_flags(argv=None):
     """``train.py --flags``: the same run, through the config tree."""
+    import sys
     import run as entry
+    argv = list(sys.argv[1:] if argv is None else argv)
+    overwrite = '--overwrite' in argv      # not a setting: not in the args record
+    argv = [a for a in argv if a != '--overwrite']
     parsed = parse(argv)
-    cfg = entry.resolved(entry.load(overrides_from_flags(parsed)))
+    overrides = overrides_from_flags(parsed) + (['run.overwrite=true'] if overwrite else [])
+    cfg = entry.resolved(entry.load(overrides))
     experiment = entry.build(cfg)
     args = experiment.legacy_args()
     if parsed.lr is None:      # main() would take the model's default; the config already did
@@ -512,7 +554,7 @@ def main_from_flags(argv=None):
     if diff:
         raise SystemExit(f'config translation differs from the flags '
                          f'(flag value, config value): {diff}')
-    main(experiment, config=cfg)
+    main(experiment, config=cfg, sources={'overrides': overrides, 'experiment': None})
 
 
 if __name__ == '__main__':
