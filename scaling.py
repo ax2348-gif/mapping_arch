@@ -130,6 +130,7 @@ def main():
         os.makedirs('results/jobs/logs', exist_ok=True)   # for a local sbatch; the cluster's is made by scripts/remote_setup.sh
         path = (f'jobs/{args.model}{args.tag}.sbatch' if args.task == 'z2'
                 else f'jobs/{args.task}_{args.model}{args.tag}.sbatch')
+        os.makedirs('jobs', exist_ok=True)
         with open(path, 'w') as f:
             f.write(SBATCH.format(task=args.task, model=args.model,
                                   tag=args.tag, sizes=' '.join(sizes),
