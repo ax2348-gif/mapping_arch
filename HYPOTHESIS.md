@@ -386,3 +386,42 @@ Cluster runs, SE(2), MNIST, per-step queries, warmup-stable-decay, seed
   size, and how far apart are the curves?
 - **Cautions.** Single seeds. Errors near 1e-4 are unusually low and
   should be audited (tools/audit_se2.py) before being relied on.
+
+### 2026-10-16: H1c, causal hybrid4 costs only capacity, causal vanilla4 costs consistently (DRAFT, registered before the grid reports)
+
+**Status.** DRAFT for the user's sign-off. It is registered (committed) BEFORE any run of the grid below reports. Results already seen are listed under "Seen before registration". The user's framing: if this holds, it brings back the refuted H1 in a restricted domain, causal egocentric memory, a very useful domain for engineering, since a causal belief allows KV caching and teacher forcing.
+
+**Claim (H1c).** On discrete SE(2) (se2d, MNIST, per-step queries):
+- making hybrid4 CAUSAL (forward-only Gated DeltaNet, causal attention, matched shapes) costs only CAPACITY: no penalty at sizes where bidirectional hybrid4 solves comfortably;
+- making vanilla4 causal costs consistently, at every size and seed.
+
+**Proposed mechanism (the user's hypothesis).**
+- Causal attention's past keys and values are frozen at their own step, so re-expressing old content in the current frame must happen at read time.
+- hybrid4's recurrence transports the stored state forward, rotating it with each odometry token, in parallel, so old content arrives already re-expressed.
+
+**Metric.**
+- The causal PENALTY = causal ÷ bidirectional FINAL LAST-STEP eval mse, the deployable measure (equal information in both models).
+- Recipe: 400k steps, warmup-stable-decay (fully decayed), batch 64, uniform query times, the muP base lr; the same seed for each pair.
+- Secondary measures:
+  - the steps-to-"solved" ratio (solved = all-query ≤ 0.030 and last-step ≤ 0.040);
+  - the penalty on long-range bins (late anchors, the t24-32 prefix bin).
+- Reported per size, as the seed mean with min-max.
+
+**Pass criteria, proposed:**
+- **hybrid4:** penalty ≤ 1.2 at s, m and l (seed mean), and no seed above 1.4.
+- **vanilla4:** penalty ≥ 1.5 at s, m and l, in at least 2 of 3 seeds per size.
+- **Supported:** both hold. **Refuted:** the hybrid4 penalty > 1.5 at any of s, m or l, or the vanilla4 penalty < 1.2 at two or more sizes. Anything else is mixed.
+- **Amplifier, secondary:** 64-step walks at s, seed 0, both models. Prediction: the vanilla4 penalty is larger at T = 64 than at T = 32, and the hybrid4 penalty stays ≤ 1.2.
+
+**Excluded by design.** xs. Causal hybrid4 xs fails (≈0.058 against 0.018 bidirectional, 100k cosine): that IS the capacity cost.
+
+**Grid.**
+- causal hybrid4 and vanilla4 at s, m and l × seeds 0, 1 and 2;
+- bidirectional references at the same cells: the seed-0 runs exist for all sizes, seed 1 for s, the rest are new;
+- the T = 64 s pair.
+
+All run through Hydra (run.py) from the exp/causal branch on Torch.
+
+**Seen before registration (not part of the test):**
+- 100k cosine, seed 0: causal hybrid4 s 0.0160 (last-step 0.0347) against bidirectional 0.0164 (0.0423).
+- 400k WSD, seed 0, mid-run at 100k: causal vanilla4 s 0.0403 (last-step 0.0608) against bidirectional 0.0247 (0.0537).
