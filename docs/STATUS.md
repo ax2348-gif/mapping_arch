@@ -272,6 +272,7 @@ docs/scaling_study_design.md.
     - it breaks teacher-forced world models (Dreamer-style), so bridging causal vs bidirectional is a research question in itself;
     - it harmonises with recent NVS work.
   - **Caveats:** one size (xs) and one seed. The vanilla4_causal control and the forward-head probe are pending.
+  - Page: https://claude.ai/artifact/WP6anaPetTzFXYfMefbkeG ("Causality and egocentric memory (provisional)")
   - **Follow-ups proposed:**
     - causal hybrid4 at s (impossible, or just costlier?);
     - a causal backbone plus one final bidirectional delta-rule layer, or chunk-bidirectional;
