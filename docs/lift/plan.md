@@ -206,6 +206,7 @@ work. Iterate locally first.
     - The frontier is defined on the occlusion-aware seen raster.
 - **Patch size and BEV queries (discussion, 2026-10-16):**
   - **Patch size** changes parameters only in the embedding and readout (about 2% at s, from 3x3 to 8x8). The tiers stay meaningful. It changes compute a lot (tokens per 32x32 view: ~114 at 3x3, 64 at 4x4, 16 at 8x8), and may raise the capacity needed to solve, since larger patches squeeze more pixels per token. Choose it with one throughput measurement plus one quality check at one size.
+  - **DECIDED (the user, 2026-10-16): BEV queries are the STARTING POINT for the ocean.** Full SE(3) camera control is awkward to sample, and the trajectory camera is already limited to an SE(2) subspace. So queries render top-down BEV patches at an SE(2) pose; ego-camera queries come later.
   - **BEV decoding (the user):** in an SE(3)-ready design it is NOT a new head. A BEV view is just another query camera (pitch 90°, orthographic or very narrow field of view), handled by the same query token and readout.
     - Ablation: ego queries only, BEV only, both. Which builds the better belief, and BEV is what a planner wants.
     - The genuinely new option is a geometry channel (height or depth) alongside albedo.
