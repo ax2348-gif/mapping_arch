@@ -207,6 +207,10 @@ work. Iterate locally first.
 - **Patch size and BEV queries (discussion, 2026-10-16):**
   - **Patch size** changes parameters only in the embedding and readout (about 2% at s, from 3x3 to 8x8). The tiers stay meaningful. It changes compute a lot (tokens per 32x32 view: ~114 at 3x3, 64 at 4x4, 16 at 8x8), and may raise the capacity needed to solve, since larger patches squeeze more pixels per token. Choose it with one throughput measurement plus one quality check at one size.
   - **DECIDED (the user, 2026-10-16): BEV queries are the STARTING POINT for the ocean.** Full SE(3) camera control is awkward to sample, and the trajectory camera is already limited to an SE(2) subspace. So queries render top-down BEV patches at an SE(2) pose; ego-camera queries come later.
+  - **DECIDED (the user, 2026-10-16): the CAMERA decoder takes the SAME form.** An SE(2) query pose, rendered as the egocentric CAMERA view at that pose (the same fixed altitude, pitch and field of view as the observations), instead of the egocentric BEV patch.
+    - So both decoders share one query interface: SE(2) pose in, view out. Only the render type differs (BEV or camera).
+    - Not full SE(3), but no longer a toy: SE(2) motion with a pitched perspective camera over 2.5D terrain is mostly what autonomous vehicles need.
+    - Full SE(3) camera control (varying altitude, pitch and roll in queries) stays out of scope.
   - **BEV decoding (the user):** in an SE(3)-ready design it is NOT a new head. A BEV view is just another query camera (pitch 90°, orthographic or very narrow field of view), handled by the same query token and readout.
     - Ablation: ego queries only, BEV only, both. Which builds the better belief, and BEV is what a planner wants.
     - The genuinely new option is a geometry channel (height or depth) alongside albedo.
