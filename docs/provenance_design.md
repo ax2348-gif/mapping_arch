@@ -907,3 +907,26 @@ from training: it never imports `mapping.train` or torch.
 13. **Build vs adopt (§0b).** I recommend BUILD. Is the DVC hybrid (`dvc exp save -I` as the snapshot primitive) worth its dependency for an established ref format?
 14. **The model-block refactor** (§12, step 7). Do it at all, or keep the per-model copies as frozen
     history?
+
+## 14. Decisions (the user, 2026-10-16)
+
+- **Build, not adopt.** Accepted, as recommended (§ build vs adopt).
+- **z2 paths: FULLY REFACTOR.** No empty-path-segment special case for z2. Every task uses the confirmed template `${run.root}/${task.name}/${model.name}/${model.size}/${run.name}`, so z2 runs move to `results/z2/...`. Migrate the existing z2 results and every reader (tools, tests, equivalence references, summarize, docs) so that nothing depends on the old layout. Read-only aliases for old paths are allowed during migration only.
+- **Snapshots exclude the ledger** (experiments/ledger/), as well as excluding it from the dirty check. The 20 MB untracked-file guard was not discussed; keep it as proposed unless revisited.
+- **No strict mode.** Hidden snapshot refs make every run exactly reproducible, so dirty trees are allowed. A run is refused only when a snapshot cannot be made.
+- **Retroactive import: MAJOR experiments only.**
+- **Borderline items:**
+  - the pre-freeze ablations: MAJOR;
+  - the time-recurrence pair: MAJOR;
+  - the blind probe: NOT major;
+  - the original `hybrid` sweep: MAJOR.
+- **The blind-probe harness** (a second training entry outside the seal) will probably never run again. It is documented in experiments/lift_blind_probe/train.py's own header, not ported, and exempt from the seal test.
+- **Off-machine backup:** not an issue. The user keeps a clone on another desktop that pulls from this machine and pushes to a private GitHub remote.
+- **Done:**
+  - the local bridge run that shared a path with Torch job 20039511 was renamed to `results/se2c/hybrid4c/m/bridge_n4dec_100k_qt_local`;
+  - the session scratchpad's report data and logs were archived to results/session_archive_2026-10-16/.
+- **Still open:**
+  - migration timing for the Torch trees (they stay while the H1c, H1d and odq jobs run);
+  - committing the audit scripts (archived in results/session_archive_2026-10-16/audit_scripts/);
+  - reports citing run ids;
+  - the model-block refactor.

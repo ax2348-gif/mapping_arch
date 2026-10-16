@@ -203,7 +203,7 @@ docs/scaling_study_design.md.
   | near | 0.0037 | 0.037 |
   | mid | 0.0054 | 0.103 |
   | far | 0.0082 | 0.157 |
-  - m passes the far bin faster than s: s's far was 0.019 at 37.5k. Last checkpoint: results/se2c/hybrid4c/m/bridge_n4dec_100k_qt/step20000.pt (local).
+  - m passes the far bin faster than s: s's far was 0.019 at 37.5k. Last checkpoint: results/se2c/hybrid4c/m/bridge_n4dec_100k_qt_local/step20000.pt (local).
 - **2026-10-16, m bridge on Torch (20039511), cancelled at ~65k (user's call).**
   - It was a resubmission the user had rejected; the submit had run before the rejection arrived. Cancelled as soon as noticed.
   - Result at 65k: all 0.0008, last-step 0.0015. By kind, true | shuffled:

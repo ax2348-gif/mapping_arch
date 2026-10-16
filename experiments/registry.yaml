@@ -211,9 +211,9 @@ experiments:
     config_source: "legacy train.py args (se2c flags)"
     commits: {"inferred:06cf83f": 1, "inferred:35a7cd3": 1, "inferred:8837c28": 1, "8837c28": 1}
     run_status: {stopped: 3, completed: 1}
-    note: "TWO different m runs share results/se2c/hybrid4c/m/bridge_n4dec_100k_qt (local 22.5k and Torch 20039511 65k)."
+    note: "Two different m runs shared results/se2c/hybrid4c/m/bridge_n4dec_100k_qt (local 22.5k, Torch 20039511 65k); the local one was renamed to bridge_n4dec_100k_qt_local on 2026-10-16."
     runs:
-      - {id: "erid-2:se2c/hybrid4c/m/bridge_n4dec_100k_qt#local", path: "/home/adrianna/code/mapping/results/se2c/hybrid4c/m/bridge_n4dec_100k_qt", commit: "inferred:06cf83f", status: "stopped"}
+      - {id: "erid-2:se2c/hybrid4c/m/bridge_n4dec_100k_qt#local", path: "/home/adrianna/code/mapping/results/se2c/hybrid4c/m/bridge_n4dec_100k_qt_local", commit: "inferred:06cf83f", status: "stopped"}
       - {id: "erid-2:se2c/hybrid4c/xs/bridge_n4dec_100k_qt", path: "/home/adrianna/code/mapping/results/se2c/hybrid4c/xs/bridge_n4dec_100k_qt", commit: "inferred:35a7cd3", status: "completed"}
       - {id: "torch:se2c/hybrid4c/m/bridge_n4dec_100k_qt", path: "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/m/bridge_n4dec_100k_qt", commit: "inferred:8837c28", status: "stopped (CANCELLED)", job: "20039511"}
       - {id: "torch:se2c/hybrid4c/s/bridge_n4dec_100k_qt", path: "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/s/bridge_n4dec_100k_qt", commit: "8837c28", status: "stopped (FAILED)", job: "20038588"}

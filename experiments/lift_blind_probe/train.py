@@ -1,4 +1,10 @@
-"""Train one blind-probe model.
+"""NOT SEALED, SHELVED (2026-10-16). This is a second training entry point
+outside the repo's seal: it does not go through run.py, writes no provenance
+or ledger record, and is exempt from the "only run.py trains" test. The blind
+probe is shelved (docs/STATUS.md) and is not expected to run again. If it
+ever is, port it to run.py first rather than running this script.
+
+Train one blind-probe model.
 
     python experiments/lift_blind_probe/train.py --kind gdn --n 0 --steps 20000 --out runs/gdn_n0
 
