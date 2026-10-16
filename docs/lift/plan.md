@@ -204,5 +204,11 @@ work. Iterate locally first.
   - **Trajectories: FRONTIER EXPLORATION** (the user) instead of a random walk. Move toward the boundary of the seen region, so coverage grows predictably, queries sample inside the seen region with no fallbacks, and loop closures can be scheduled.
     - Guard against leakage through predictability: randomise frontier choice, speeds, turn profiles and start pose, and keep the shuffled-odometry check.
     - The frontier is defined on the occlusion-aware seen raster.
+- **Patch size and BEV queries (discussion, 2026-10-16):**
+  - **Patch size** changes parameters only in the embedding and readout (about 2% at s, from 3x3 to 8x8). The tiers stay meaningful. It changes compute a lot (tokens per 32x32 view: ~114 at 3x3, 64 at 4x4, 16 at 8x8), and may raise the capacity needed to solve, since larger patches squeeze more pixels per token. Choose it with one throughput measurement plus one quality check at one size.
+  - **BEV decoding (the user):** in an SE(3)-ready design it is NOT a new head. A BEV view is just another query camera (pitch 90°, orthographic or very narrow field of view), handled by the same query token and readout.
+    - Ablation: ego queries only, BEV only, both. Which builds the better belief, and BEV is what a planner wants.
+    - The genuinely new option is a geometry channel (height or depth) alongside albedo.
+    - Implication: build the ocean's query encoding SE(3)-ready now (full pose plus camera type), even if only a few values are used at first.
 - **Parked option (user):** small zero-mean distortions of the texture would test filtering. Not now: the camera's resolution limit is already a hard enough observation function.
 - **The patch-size and sample-efficiency decisions** carry over, since token counts only grow from here.
