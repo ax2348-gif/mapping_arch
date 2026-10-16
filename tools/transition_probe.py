@@ -23,6 +23,7 @@ how the angles of the significant eigenvalues (|lambda| > 0.5) are
 distributed, and the median number of significant eigenvalues.
 """
 import sys
+BLOCK = 0  # which block holds the probed GDN (argv[2])
 
 import numpy as np
 import torch
@@ -51,6 +52,9 @@ def layer_quantities(gdn, x):
     src = open(mod.__file__).read()
     beta = (torch.sigmoid(gdn.beta(x).float()) if 'beta = torch.sigmoid' in src
             else 2 * torch.sigmoid(gdn.beta(x).float()))
+    dirs = getattr(gdn, 'scan_dirs', 'l2r' if getattr(gdn, 'causal', False) else 'both')
+    if dirs != 'both':                         # every head scans one way
+        half = h if dirs == 'l2r' else 0
     fwd, bwd = qkv[:, :, :, :half], qkv[:, :, :, half:].flip(1)
     seq = torch.cat([fwd, bwd], 3).reshape(b, l, 3 * h * d)
     if 'ABLATION: no short conv' in src:
@@ -70,15 +74,19 @@ def main(path, batches=4):
     config = tasks.config_from_args(task, spec, args)
     _, test_bank = load_banks(args['bank'], config)
     data = eval_set(config, test_bank, 64, batches, 4242)
-    gdn = model.blocks[0].mixer
-    assert type(gdn).__name__ == 'GatedDeltaNet'
+    gdn = model.blocks[BLOCK].mixer
+    assert type(gdn).__name__ in ('GatedDeltaNet', 'CausalGatedDeltaNet', 'ReverseGatedDeltaNet')
     cap = {}
 
     def hook(mod, inp):
         cap['x'] = inp[0].detach()
         raise Stop
     hk = gdn.register_forward_pre_hook(hook)
-    H = gdn.heads; half = H // 2
+    H = gdn.heads
+    dirs = getattr(gdn, 'scan_dirs', 'l2r' if getattr(gdn, 'causal', False) else 'both')
+    half = {'both': H // 2, 'l2r': H, 'r2l': 0}[dirs]
+    roles = {r: {'beta': [], 'decay': []} for r in ('obs', 'odo', 'query')}
+    perhead = {}       # (turn, head) -> [steps with an eigenpair in the band]
     angles = {(d, tn): [] for d in ('l2r', 'r2l') for tn in range(4)}
     counts = {(d, tn): [] for d in ('l2r', 'r2l') for tn in range(4)}
     inband = {(d, tn): [] for d in ('l2r', 'r2l') for tn in range(4)}
@@ -100,7 +108,14 @@ def main(path, batches=4):
         for i in range(B):
             qlab = [('q', int(qt[i, j])) for j in range(nq) for _ in range(9)]
             seq = [(layout + qlab)[o] for o in order[i]]
-            for d, heads, lab in (('l2r', range(half), seq), ('r2l', range(half, H), seq[::-1])):
+            role = {'o': 'obs', 'd': 'odo', 'q': 'query'}
+            for p_, lab_ in enumerate(seq):                  # beta, decay by token role (l2r order)
+                if half in (0, H):                       # one direction: scan index of p_
+                    j_ = p_ if half == H else L - 1 - p_
+                    roles[role[lab_[0]]]['beta'].append(beta[i, j_])
+                    roles[role[lab_[0]]]['decay'].append(np.exp(g[i, j_]))
+            dirs = (('l2r', range(half), seq), ('r2l', range(half, H), seq[::-1]))
+            for d, heads, lab in [x for x in dirs if len(x[1])]:
                 dpos = [p for p, x in enumerate(lab) if x[0] == 'd']
                 for p in dpos:
                     s = lab[p][1]
@@ -127,10 +142,22 @@ def main(path, batches=4):
                             a = np.degrees(np.abs(np.angle(ev)))
                             m = (np.abs(a - band) < 15) & (np.abs(ev) > 0.5)
                             inband[(d, turn)].append((m.sum(), a[m].tolist(), np.abs(ev[m]).tolist()))
+                            perhead.setdefault((turn, hh), []).append(bool(m.sum()))
     hk.remove()
     names = ['none', 'right (90)', 'around (180)', 'left (90)']
     print(path)
-    for d in ('l2r', 'r2l'):
+    if half in (0, H):
+        print(f'  all heads scan {"left to right" if half == H else "right to left"}; '
+              'per head, median beta | decay by token role:')
+        for r, v in roles.items():
+            if v['beta']:
+                bb, dd = np.median(np.array(v['beta']), 0), np.median(np.array(v['decay']), 0)
+                print(f'    {r:6s} ' + '  '.join(f'h{j}: {bb[j]:.2f} | {dd[j]:.3f}' for j in range(H)))
+    print('  per head: fraction of turn steps with an eigenpair in the expected band (|lambda| > 0.5)')
+    for tn in (1, 2, 3):
+        print(f'    {names[tn]:14s} ' + '  '.join(
+            f'h{hh}: {100 * np.mean(perhead[(tn, hh)]):5.1f}%' for hh in range(H) if (tn, hh) in perhead))
+    for d in [x for x, n in (('l2r', half), ('r2l', H - half)) if n]:
         print(f'  {"left-to-right" if d == "l2r" else "right-to-left"} head(s): angles of eigenvalues with |lambda| > 0.5, per step')
         print(f'    {"turn":14s} {"steps":>6s} {"sig. eigs":>9s}   {"near 0":>7s} {"near 90":>7s} {"near 180":>8s} {"other":>6s}')
         for tn in range(4):
@@ -153,4 +180,5 @@ def main(path, batches=4):
 
 
 if __name__ == '__main__':
+    BLOCK = int(sys.argv[2]) if len(sys.argv) > 2 else 0     # which GDN block
     main(sys.argv[1])

@@ -1,0 +1,21 @@
+# @package _global_
+# Can a fully causal model learn discrete SE(2)? xs, the reference recipe of
+# results/se2/hybrid4/xs/seed0_100k_qt (100k, cosine, uniform query times,
+# MNIST, seed 0), checkpoints every 5k.
+#   python run.py +experiment=se2d_causal                              # hybrid4_causal
+#   python run.py +experiment=se2d_causal model=se2d/vanilla4_causal   # control
+defaults:
+  - override /model: se2d/hybrid4_causal
+
+model:
+  size: xs
+run:
+  name: seed0_100k_qt
+  steps: 100000
+  seed: 0
+  save_every: 5000
+eval:
+  every: 5000
+  log_every: 1000
+task:
+  query_times: uniform
