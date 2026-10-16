@@ -165,3 +165,29 @@ New evidence, SE(2), xs, per-step queries, 100k steps, standard recipe:
   with H: the rotation-capable operator is necessary at this budget, and
   the gated MLP sets how fast it is used. It does not test P2, which
   caps beta at 1.
+
+### 2026-10-16: vanilla solves Z² with more steps (cluster results)
+
+The frozen evidence section reports vanilla, vanilla2 and the LSTM
+"drifted near 0.07 at 20k on Z² at xs". With more steps, vanilla solves
+Z² completely (last-step queries, xs, lr 3e-4 unless noted):
+
+| run | params | 20k | 40k | 300k |
+| --- | --- | --- | --- | --- |
+| vanilla xs | 0.9M | 0.0692 | 0.0110 | 0.0007 |
+| vanilla m | 4.9M | | 0.0061 (lr 1e-4) | 0.0003 |
+| vanilla, width 256, depth 32 | 25.8M | | 0.0025 | |
+| vanilla2 s | 1.6M | | 0.0120 | |
+| hybrid xs | 0.1M | 0.0150 | 0.0036 | |
+
+- **The Z² gap is speed, not capability.** The hybrid reaches each level
+  in fewer steps and parameters, but vanilla gets there. Depth helps
+  strongly at a fixed step budget: 0.027 at depth 4 against 0.0025 at
+  depth 32, at 40k.
+- **H is unaffected, since it concerns SE(2).** The original hybrid on
+  SE(2) with last-step queries stays near 0.070 at 400k steps under both
+  cosine and warmup-stable-decay schedules.
+- **P1 must be judged at a budget large enough.** Vanilla's Z² curve
+  looks hopeless at 20k and solves by 300k, so a "vanilla fails SE(2)"
+  finding needs a budget at least comparable, and the 400k bound in P1
+  is the minimum, not a generous one.
