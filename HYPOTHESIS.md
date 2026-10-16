@@ -144,4 +144,24 @@ the tag.
 
 ## Amendments
 
-(none yet)
+### 2026-10-16: seed replication and the SwiGLU ablation
+
+New evidence, SE(2), xs, per-step queries, 100k steps, standard recipe:
+
+| run | all-query mse | last-step mse | shuffled | status |
+| --- | --- | --- | --- | --- |
+| hybrid4, seed 0 | 0.0180 | 0.0263 | 0.1403 | solved |
+| hybrid4, seed 1 | 0.0180 | 0.0225 | 0.1361 | solved |
+| hybrid4_gelu (delta rule, GELU MLP), seed 0 | 0.0416 | 0.0693 | 0.1024 | neither solved nor failed |
+| hybrid3 (SwiGLU, scalar-decay recurrence), seed 0 | 0.0549 | 0.0731 | 0.0892 | failed |
+
+- **P4 is met: 2 of 2 seeds solve.** The trajectories agree to within
+  0.0013 at every 20k checkpoint. Seed 1 is evaluated on its own eval set
+  (eval seed = training seed; floor 0.0969), so the agreement is also
+  across test sets. A third seed cannot change the outcome.
+- **The delta rule works alone, but slowly.** Removing SwiGLU leaves a
+  model that keeps improving across every prefix bin through 100k steps.
+  Removing the delta rule (hybrid3) flattens by 40k. This is consistent
+  with H: the rotation-capable operator is necessary at this budget, and
+  the gated MLP sets how fast it is used. It does not test P2, which
+  caps beta at 1.
