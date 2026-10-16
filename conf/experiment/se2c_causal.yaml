@@ -1,0 +1,24 @@
+# @package _global_
+# H1e (HYPOTHESIS.md): causal against bidirectional on continuous SE(2), s.
+# The recipe of the bidirectional references (Torch,
+# mapping_lift/results/se2c/{hybrid4c,vanilla4c}/s/dec_100k_qt): se2c
+# default (decoupled persistent walk, continuous turns, v 4.5..9), 100k
+# steps cosine, batch 64, uniform query times, seed 0, eval every 2500,
+# log every 500, checkpoints every 5k.
+#   python run.py +experiment=se2c_causal                                # hybrid4c_causal
+#   python run.py +experiment=se2c_causal model=se2c/vanilla4c_causal    # vanilla4c_causal
+defaults:
+  - override /model: se2c/hybrid4c_causal
+
+model:
+  size: s
+run:
+  name: dec_100k_qt
+  steps: 100000
+  seed: 0
+  save_every: 5000
+eval:
+  every: 2500
+  log_every: 500
+task:
+  query_times: uniform

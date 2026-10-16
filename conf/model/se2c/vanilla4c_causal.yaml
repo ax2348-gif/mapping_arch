@@ -1,0 +1,13 @@
+# @package _global_
+# vanilla4c_causal: vanilla4c with every operator causal in token order (H1e;
+# mapping/models/se2c/vanilla4c_causal.py).
+defaults:
+  - /task: se2c
+
+model:
+  name: vanilla4c_causal
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.se2c.vanilla4c_causal.Vanilla4cCausal
+    _partial_: true
