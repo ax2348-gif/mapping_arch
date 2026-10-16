@@ -291,24 +291,24 @@ tested tasks that do not need ego-motion composition.
   - MemoryVLA peaks at 16 entries (71.9) and falls at 64 (67.7).
   - LANav's transformer does not improve with longer training context,
     while its delta-rule backbones do.
-
-  We found no published attention analysis showing that these models
+- **No attention analysis, several explanations.** We found no
+  published attention analysis showing that these models
   attend only to recent frames. The explanations given vary: attention
   dilution (NaVIDA), training bias from long sequences (StreamVLN),
   spurious correlations (Torne et al., MemER, RoboTTT) and positional
   range (WorldTrace, Po et al.). Our reading: when a memory cannot
   re-express old observations in the current frame, old frames are
   hard to use, and a model that falls back on recent frames would
-  produce exactly this pattern. So recency bias is evidence that is
-  consistent with a capability limit, not evidence against one.
+  produce exactly this pattern. So recency bias is consistent
+  with a capability limit, not evidence against one.
 - **Counter-cases where long memory is used.** Wijmans et al. (LSTM,
   given pose: memory matters up to about 1,000 steps), SPOC (context 10
   to 100 raises average SR from 27.8 to 49.9), Uni-NaVid (VLN SR 9.6
   with the current frame only, 48.7 with full memory), and Torne et
-  al. with past-token prediction. In the first, pose was given; in the
-  others, the tasks are short or ego-motion is mild. These fit the same
-  reading.
-- **User-reported evidence (unpublished).** The user reports that in
+  al. with past-token prediction. In Wijmans et al. pose was given. The
+  others compared no rotation-capable memory, so they show that long
+  memory can help, not which operator it needs.
+- **Unpublished evidence from the study's author.** The author reports that in
   their Habitat ObjectNav experiments with multi-turn RL and full
   context in a KV cache, ablations showed the model used only the most
   recent observations. They report the same trend when ablating the
@@ -316,7 +316,7 @@ tested tasks that do not need ego-motion composition.
   confirmed that LightNav-0 exists, with paper, code and weights. It
   keeps an RGB history in context, compressed on a forgetting curve,
   with no pose input. Its paper contains no history or memory ablation,
-  so the LightNav-0 result is the user's own and is not published.
+  so the LightNav-0 result is the author's own and is not published.
 
 **What follows for the test design.** Any test of the thesis must
 remove the operator-independent risks before comparing operators. Use
@@ -871,8 +871,8 @@ not used as evidence above.
   method beyond what section 4 reports; AGaLiTe and RLBenchNet methods;
   whether Active Neural SLAM blocks gradients between modules; whether
   AGaLiTe's oscillatory terms depend on the input.
-- The user's own ObjectNav KV-cache ablation and their LightNav-0
-  memory ablation are user-reported and unpublished.
+- The study author's ObjectNav KV-cache ablation and LightNav-0 memory
+  ablation are unpublished and reported here as personal communication.
 - In the gradient audit: whether pretrained encoders are frozen in SPOC,
   NaVid, Uni-NaVid, NavFoM, GameNGen, Matrix-Game 2.0 and Po et al.;
   whether StreamVLN prunes during training; MemoryVLA's gradient path
