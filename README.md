@@ -233,6 +233,7 @@ Published pages, private until shared:
 | hybrid4 results report | https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti |
 | Z² scaling | https://claude.ai/artifact/8mjpJKB9LUMMKipyHtkRNK |
 | se2d scaling report (preliminary, 2026-10-16) | https://claude.ai/artifact/KGG23hvdWGZ7pDpiPQ7qbc |
+| se2c report, continuous SE(2) (preliminary, 2026-10-16) | https://claude.ai/artifact/ESg1N6jA1gfchgFsxcwzxd |
 | primer | https://claude.ai/artifact/9jFX4Cr2761JFTCBytKPQ3 |
 | theory review | https://claude.ai/artifact/DJ4WFQ5V7ArJrDV31EQ8bN |
 | applications review | https://claude.ai/artifact/WnVhdCjzUtq1VRo6mySS8A |

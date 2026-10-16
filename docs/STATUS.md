@@ -76,6 +76,7 @@ docs/scaling_study_design.md.
 | primer | https://claude.ai/artifact/9jFX4Cr2761JFTCBytKPQ3 |
 | Z² scaling | https://claude.ai/artifact/8mjpJKB9LUMMKipyHtkRNK |
 | se2d scaling report (preliminary, 2026-10-16) | https://claude.ai/artifact/KGG23hvdWGZ7pDpiPQ7qbc |
+| se2c report, continuous SE(2) (preliminary, 2026-10-16) | https://claude.ai/artifact/ESg1N6jA1gfchgFsxcwzxd |
 | theory review | https://claude.ai/artifact/DJ4WFQ5V7ArJrDV31EQ8bN |
 | applications review | https://claude.ai/artifact/WnVhdCjzUtq1VRo6mySS8A |
 | literature synthesis | https://claude.ai/artifact/MSr6KNebLT7Rttep2nnU1H |
@@ -277,3 +278,7 @@ docs/scaling_study_design.md.
     - causal hybrid4 at s (impossible, or just costlier?);
     - a causal backbone plus one final bidirectional delta-rule layer, or chunk-bidirectional;
     - where the rotation forms.
+- **2026-10-16, se2c report (preliminary) published:** https://claude.ai/artifact/ESg1N6jA1gfchgFsxcwzxd. Built from results pulled at 12:33.
+  - s, 400k WSD, both decayed: hybrid4c 0.0078 all / 0.012 far against vanilla4c 0.0224 / 0.039. hybrid4c renders queries 75-90 px away that vanilla4c renders grey.
+  - Stable-phase step ratios to the same far error: 2.9-5.8x (s), 2.4-5.2x (m), 2.0-2.7x (l); 1.2-4x in GPU hours.
+  - Pending: the decayed hybrid4c m and l endpoints. vanilla4c m and l are decayed at 0.0093 and 0.0047.
