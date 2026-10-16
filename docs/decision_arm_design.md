@@ -1,7 +1,7 @@
 # Design note: memory-based decision making in discrete SE(2)
 
-Status: DRAFT for sign-off. Nothing here is frozen or built yet. Open
-questions are marked **[decide]**.
+Status: ON HOLD (2026-10-15). DRAFT for sign-off. Nothing here is frozen or
+built yet. Open questions are marked **[decide]**.
 
 ## Question
 
@@ -120,6 +120,36 @@ at most 10%), and the budget.
   sweep the auxiliary weight **[decide: fixed weight, or a small sweep]**.
 - **Scale.** Start at xs, where hybrid4 already solves the mapper. Larger
   rungs on the cluster once the kernel issue is fixed.
+
+## External test at scale: LANav
+
+LANav (arXiv 2607.18794, 2026) swaps only the memory backbone of an
+ObjectNav agent on HM3D-OVON: SigLIP encoder, DAgger then PPO, depth and
+width fixed. Average success rate:
+
+| backbone | avg SR |
+| --- | --- |
+| GRU | 26.7 |
+| Transformer | 30.1 |
+| Linear transformer | 31.3 |
+| DeltaNet | 33.9 |
+| Gated DeltaNet | 34.6 |
+| WSLA | 36.4 |
+
+- **Delta rules beat attention at scale.** The transformer did not
+  benefit from longer training context; the linear-attention backbones
+  did.
+- **Its delta rules use beta = sigmoid, in (0, 1).** That is the setting
+  our ablation shows cannot rotate, so it is the hybrid4_beta1 condition
+  at scale.
+- **The test is cheap.** Flipping beta to (0, 2) in that setup, with
+  everything else fixed, is a one-flag change on a standard benchmark.
+
+It is the natural scaled follow-up to this arm, ideally after the
+controlled stage 1. Source and verification: docs/applications_review.md.
+The user's own unpublished evidence is reported as personal
+communication there: full-context ObjectNav agents and LightNav-0 using
+only recent frames under memory ablation.
 
 ## Engineering estimate
 
