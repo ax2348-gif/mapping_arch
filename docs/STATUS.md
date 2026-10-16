@@ -27,7 +27,7 @@ prose node 579ba254-c943).
 
 | Agent | Scope | Writes to |
 | --- | --- | --- |
-| Lift environment and ports | se2c task, texture, coverage, encoding, hybrid4c / vanilla4c, proving run | mapping/se2c/, mapping/task_se2c.py, mapping/models/se2c/, CONTRACT_SE2C.md, docs/lift/build_log.md, minimal hooks in train.py, render.py, tasks.py |
+| Lift environment and ports (DONE 2026-10-16, report in docs/lift/build_log.md) | se2c task, texture, coverage, encoding, hybrid4c / vanilla4c, proving run | mapping/se2c/, mapping/task_se2c.py, mapping/models/se2c/, CONTRACT_SE2C.md, docs/lift/build_log.md, minimal hooks in train.py, render.py, tasks.py |
 | Blind probe | L3: eigenangle calibration | experiments/lift_blind_probe/ |
 | Pre-freeze ablations | conv muP init, hybrid4.5b and minimal pair, placement, 1 vs 2 coprocessors, conv-width race | mapping/models/se2/ (new files), HYPOTHESIS.md amendments, docs/lift/prefreeze_ablations.md, cluster jobs |
 
@@ -105,3 +105,22 @@ docs/scaling_study_design.md.
 
 - one row per milestone in the journal's day-2 log;
 - a wrap-up for the user covering what worked, what didn't, and the decisions waiting.
+
+**Session log**
+
+- **2026-10-16, lift build done** (commits d8b0da7, f4d73d8, e68c17f, 97a8229, ed4eb63; 209 tests pass).
+  - I reviewed texture.png, episode.png and the proving grid by eye. The stroke texture reads at a glance, and success and failure are obvious per row.
+  - Proving run, hybrid4c xs at 25k: 0.0655 (shuffled 0.0715, floor 0.131). Not yet solved; the discrete xs needed ~90k.
+  - **Open for the user (flagged, not filled):**
+    1. With the default omega in U[-pi, pi) the walk is diffusive: it stays in a ~40 px blob, and queries sit a median 10.8 px from the anchor (episode.png shows it). A persistent walk needs either a smaller omega_max plus heading-aligned query proposals, which changes the query distribution, or `--motion decoupled`. Your call; the default is unchanged.
+    2. MSE on sharp strokes does not grade near misses: a 2 px / 10 deg error already scores at the floor. A blur-tolerant diagnostic metric would be my addition to the contract; not added.
+    3. The near band-pass texture spectrum deviates from the suggested ~1/f (the lift agent's choice, documented).
+  - **Registered before results: a seam.** The lift agent predicts that a continuous-angle hybrid4c cannot rotate exactly at every theta. I checked the argument.
+    - Suppose a step's transition is a product of reflections, I - 2kk^T, whose keys vary continuously with theta.
+    - That product is the image of a continuous path in Pin(d).
+    - The full-turn loop in SO(2), a subgroup of SO(d), is the nontrivial element of pi1(SO(d)) = Z2, so it does not lift to a closed loop in Pin(d).
+    - So some theta must break the pure-reflection form: beta != 2 or decay < 1, which contracts.
+    - Prediction: there is an angle band, probably near +-pi, with larger error and a contracting transition there. The n-lattice settings escape this, since no continuity is needed.
+  - **Queued (one launcher, under the lock), hybrid4c xs at 100k:**
+    1. `bridge_n4dec_100k_qt`: `--motion decoupled --turn-n 4 --v-min 9 --v-max 9`, the discrete task's odometry statistics with the new renderer, texture and encoding. It tests the port separately from the group.
+    2. `seed0_100k_qt`: the default continuous task.
