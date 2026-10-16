@@ -9,3 +9,4 @@ data/imagenette64.npz
 data/imagenette_raw/
 *.egg-info/
 jobs/
+quarantine/
