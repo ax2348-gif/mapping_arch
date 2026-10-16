@@ -177,3 +177,16 @@ docs/scaling_study_design.md.
   - a resolved config.yaml per run, rerun with `--from`;
   - legacy flat `args` kept as an output;
   - bitwise behaviour tests.
+- **2026-10-16, s bridge stopped at ~47.5k (user's call: the default-task run has higher information gain).**
+  - Last eval, 47.5k: all 0.0086, last-step 0.0178. By kind, true | shuffled:
+    | kind | true | shuffled |
+    | --- | --- | --- |
+    | fallback | 0.0028 | 0.084 |
+    | near | 0.0055 | 0.046 |
+    | mid | 0.0086 | 0.118 |
+    | far | 0.0111 | 0.17 |
+  - Every grid row at 45k is correct by eye, far included (docs: results/se2c/hybrid4c/s/bridge_n4dec_100k_qt/grid_step45000_kinds.png, local).
+  - **My error:** a `pkill -f` pattern inside worker 20038588 also matched the batch script, so the worker ended and its GPU was released.
+  - New worker 20041129 has the default-task s run (`dec_100k_qt`) as its first task.
+  - Resume the bridge later, same cosine schedule, from the 45k checkpoint (on the cluster):
+    `train.py --task se2c --model hybrid4c --size s --steps 100000 --query-times uniform --eval-every 2500 --log-every 500 --save-every 5000 --motion decoupled --directions lattice --turn-n 4 --v-min 9 --v-max 9 --branch results/se2c/hybrid4c/s/bridge_n4dec_100k_qt/step45000.pt --run bridge_n4dec_100k_qt_from45k`
