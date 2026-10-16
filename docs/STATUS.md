@@ -151,3 +151,19 @@ docs/scaling_study_design.md.
   - L3's calibration and seam questions move to the transition probe on hybrid4c in the real se2c task.
   - Code and runs stay in experiments/lift_blind_probe/ (uncommitted run outputs are not tracked).
 - **2026-10-16, capacity test of the bridge on Torch** (user's call): hybrid4c s 20038399 and m 20038403. Same bridge settings, latest code (split metrics), checkpoints every 5k. Reason: the xs bridge's far-query bin crawls (0.84 of floor at 50k) while fallbacks at 36 px are rendered correctly. The user suspects visual capacity at xs.
+- **2026-10-16, bridge hybrid4c xs, 100k steps (local): NOT solved.**
+  - Eval mse overall 0.0706: floor 0.1317, shuffled 0.1027.
+  - By kind, error/floor:
+    | kind | error/floor | note |
+    | --- | --- | --- |
+    | fallback | 0.12 | shuffled 0.51 |
+    | near | 0.16 | |
+    | mid | 0.32 | |
+    | far (>= 15 px, 58% of queries) | **0.79** | |
+  - Grid (docs/lift/sheets/bridge_hybrid4c_xs_100k_grid.png):
+    - fallback views 36-38 px away are crisp, and wrong with shuffled odometry;
+    - near-anchor queries are right;
+    - far novel views go from grey to a coarse light/dark layout, never strokes.
+  - Reading: pose composition works; assembling a novel view from stored content is the bottleneck at xs. The user suspects visual capacity: the continuous texture plus 3x tokens per view is too much for xs.
+  - Next: the s bridge on the Torch worker (20038588), and m (20038403).
+  - To make room, every pending scaling task was cancelled and one running lr check (20028844_1) was stopped. All are recorded in docs/scaling_study_design.md.
