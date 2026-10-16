@@ -1,0 +1,14 @@
+# @package _global_
+# hybrid4c_time_full: hybrid4c with its delta-rule layers restricted to the time axis
+# (mapping/models/se2c/hybrid4c_time.py); last layer hybrid4c's full GDN.
+defaults:
+  - /task: se2c
+
+model:
+  name: hybrid4c_time_full
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.se2c.hybrid4c_time.Hybrid4cTime
+    _partial_: true
+    last: gdn
