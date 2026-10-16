@@ -151,4 +151,9 @@ work. Iterate locally first.
   - **Camera:** field of view, pitch, altitude, resolution and patch size. Token cost grows with resolution.
   - **Horizon and sky:** whether views see the horizon.
   - **Texture and relief:** the parameters, picked from the sheets and videos.
+- **Decided (user):**
+  - the height field is tunable independently of the texture, including a wave-regularity dial;
+  - an optional time-evolving surface h(x, y, t) is prepared for a held-out 4D scenario;
+  - the TEXTURE IS FIXED IN THE WORLD (it never advects with the surface), as close enough to the real world.
+- **Parked option (user):** small zero-mean distortions of the texture would test filtering. Not now: the camera's resolution limit is already a hard enough observation function.
 - **The patch-size and sample-efficiency decisions** carry over, since token counts only grow from here.
