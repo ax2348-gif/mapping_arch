@@ -67,9 +67,9 @@ train.py               train one model at one size -> a run directory
 scaling.py             ladder, sweep (local or SLURM), fit
 summarize.py           every run as a table; fits per model
 render.py              redraw a grid from any checkpoint
-mapping/models/se2/    the SE(2) task's registry (ports of the Z² models)
-mapping/se2.py         SE(2) conventions: headings, egocentric odometry
-mapping/task_se2.py    the SE(2) task as a model sees it
+mapping/models/se2d/    the SE(2) task's registry (ports of the Z² models)
+mapping/se2d.py         SE(2) conventions: headings, egocentric odometry
+mapping/task_se2d.py    the SE(2) task as a model sees it
 mapping/se2c/          continuous SE(2) (se2c): geometry, procedural texture,
                        coverage, GPU generator, oracle, shared pose encoding
 mapping/task_se2c.py   the se2c task as a model sees it; its harness data path
@@ -79,7 +79,10 @@ tools/                 analysis: audit, probes, registrability, benchmark
 docs/models/           one page per architecture
 docs/                  reviews and design notes (see "Research documents")
 HYPOTHESIS.md          the frozen hypothesis and its dated amendments
-results/               run directories (not in git); se2 runs under results/se2/
+results/               run directories (not in git); se2d runs under results/se2d/
+                       (the discrete SE(2) task was called se2 until 2026-10-16; its
+                       older runs stay under results/se2/, and every loader and
+                       `summarize.py --task se2` still reads them)
 quarantine/            outputs of a stale launcher, kept out of results/
 shelved/               variants set aside, with a README on resuming
 ```
@@ -126,14 +129,14 @@ python train.py --model vanilla --size m --steps 20000          # one run
 python train.py --model vanilla --size m --steps 20000 --lr 1e-3 --run seed0_lr1e-3
 python render.py results/vanilla/m/seed0/final.pt --rows 24     # redraw
 # generator settings (same tasks, CONTRACT.md "Generator settings"):
-python train.py --task se2 --model hybrid4 --size xs --query-times uniform \
+python train.py --task se2d --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --run seed0_vo  # visual odometry
 python tools/registrability.py --step-px 1 2 3     # ceiling for that run
-python train.py --task se2 --model hybrid4 --size xs --query-times uniform \
+python train.py --task se2d --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --texture imagenette \
     --run seed0_vo_imagenette                      # VO on natural images
 python tools/registrability.py --texture imagenette --step-px 1 2 3
-python train.py --task se2 --model hybrid4 --size xs --query-times uniform \
+python train.py --task se2d --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --texture imagenette_hp \
     --run seed0_vo_imagenette_hp                   # VO, brightness removed
 python tools/registrability.py --texture imagenette_hp --step-px 3
@@ -163,14 +166,14 @@ every `final.json` under `results/`.
 ## Analysis tools
 
 ```bash
-python tools/audit_se2.py <final.pt>          # fluke checks: isolation, fresh test
+python tools/audit_se2d.py <final.pt>          # fluke checks: isolation, fresh test
                                               # set, trivial copies, odometry corruption
 python tools/read_beta.py <final.pt>          # learned delta-rule beta and decay by token kind
 python tools/transition_probe.py <final.pt>   # per-step state transition eigenvalues:
                                               # does the state rotate by the turn?
 python tools/probe_p5.py <final.pt>           # P5 / P5' of HYPOTHESIS.md
 python tools/registrability.py --texture imagenette_hp --step-px 3   # VO ceiling
-python tools/bench.py --task se2 --models hybrid4 vanilla4 --sizes s m   # throughput
+python tools/bench.py --task se2d --models hybrid4 vanilla4 --sizes s m   # throughput
 ```
 
 The three probe tools need a model whose first block is the Gated DeltaNet
@@ -207,7 +210,7 @@ Cluster notes:
 
 ## What results exist
 
-`python summarize.py` (Z²) and `python summarize.py --task se2` are the
+`python summarize.py` (Z²) and `python summarize.py --task se2d` are the
 authoritative lists. `docs/models/*.md` hold each architecture's smoke
 numbers at the time it was written.
 

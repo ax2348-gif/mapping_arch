@@ -1,8 +1,8 @@
 """Write a SLURM array of warmup-stable-decay cooldown branches.
 
-    python tools/branch_jobs.py --task se2 --model hybrid4 --sizes xs s m \
+    python tools/branch_jobs.py --task se2d --model hybrid4 --sizes xs s m \
         --parent seed0_400k_qt_wsd_small --budgets 62500 125000 250000 \
-        --extra "--query-times uniform" --out jobs/se2_hybrid4_small_cd.sbatch
+        --extra "--query-times uniform" --out jobs/se2d_hybrid4_small_cd.sbatch
 
 A long warmup-stable-decay run that saved ``step<k>.pt`` every 50k steps
 gives a cheap loss point at any shorter budget S: branch from the
@@ -42,7 +42,7 @@ python train.py --task {task} --model {model} --size $SIZE --steps $S \\
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--task', default='se2')
+    p.add_argument('--task', default='se2d')
     p.add_argument('--model', required=True)
     p.add_argument('--sizes', nargs='+', required=True)
     p.add_argument('--parent', required=True, help='parent run name')
@@ -56,7 +56,7 @@ def main():
     for s in a.budgets:
         assert (s * 4) % 5 == 0 and (s * 4 // 5) % 50000 == 0, \
             f'budget {s}: branch point {s * 4 / 5} must be a saved checkpoint (multiple of 50k)'
-    root = 'se2' if a.task == 'se2' else '.'
+    root = 'se2d' if a.task == 'se2d' else '.'
     root = root if root != '.' else ''
     text = TEMPLATE.format(task=a.task, model=a.model, sizes=' '.join(a.sizes),
                            budgets=' '.join(map(str, a.budgets)),

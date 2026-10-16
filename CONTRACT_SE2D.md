@@ -19,7 +19,7 @@ world frame; it knows only how each pose relates to the previous one.
 | input | shape | meaning |
 | --- | --- | --- |
 | `obs` | `(B, 33, 9, 9)` float in [0, 1] | the observations, each facing its own heading |
-| `odometry` | `(B, 32)` long in 0..15 | relative pose from t to t+1 in the body frame of t: `4 * turn + move`, with `move` in {forward, right, back, left} and `turn` in {none, right, around, left}; `mapping.se2.decode` splits it |
+| `odometry` | `(B, 32)` long in 0..15 | relative pose from t to t+1 in the body frame of t: `4 * turn + move`, with `move` in {forward, right, back, left} and `turn` in {none, right, around, left}; `mapping.se2d.decode` splits it |
 | `query_pose` | `(B, 8, 3)` long | the target window relative to the pose at the query's step: body-frame `(dy, dx)` within ±288, and the heading change in 0..3 |
 | `query_time` | `(B, 8)` long in 0..32 | the step each query is asked at, as in `CONTRACT.md`; all 32 by default |
 
@@ -28,7 +28,7 @@ query heading**. Loss is MSE. As before, every target pixel was observed,
 queries fall at arbitrary pixel offsets, and the setting is offline with
 full attention and relative odometry only.
 
-`mapping.se2` fixes the conventions and `tests/test_se2.py` checks them;
+`mapping.se2d` fixes the conventions and `tests/test_se2d.py` checks them;
 `python -m pytest` must pass before any model is trained.
 
 ## Generator settings: step size, odometry dropout, texture
@@ -82,7 +82,7 @@ All exclusions in `CONTRACT.md` apply, read with "odometry" for
 "directions" and "query pose" for "query offset". In addition:
 
 - **No external composition of poses.** No cumulative sum of turns, no
-  rotation of moves by a computed heading, no `mapping.se2.compose` or any
+  rotation of moves by a computed heading, no `mapping.se2d.compose` or any
   re-implementation of it outside learned layers. A layer that learns a
   state which rotates is the point; a hand-written one is not.
 - **No un-rotating the observations.** The observations arrive facing
@@ -98,15 +98,15 @@ All exclusions in `CONTRACT.md` apply, read with "odometry" for
 
 - One module `mapping/models/<name>.py` as before. `forward(obs, odometry,
   query_pose, query_time=None)` returns `pred`; the query-times rules of
-  `CONTRACT.md` apply. The task spec is `mapping.task_se2.TaskSpec`
+  `CONTRACT.md` apply. The task spec is `mapping.task_se2d.TaskSpec`
   with `view`, `steps`, `odometry` (16), `turns` (4), `step_px`,
   `queries`, `offset_max`.
 - A Z² model is **not** expected to run on this task. Porting one is its
-  own contribution with its own file, named `<name>_se2`, and its own doc.
+  own contribution with its own file, named `<name>_se2d`, and its own doc.
   The port should change the interface and nothing else where possible,
   so the two curves are comparable; say in the doc exactly what changed.
-- Results live under `results/se2/<model>/<size>/<run>/`, and
-  `summarize.py --root results/se2` reads them, so the two tasks never
+- Results live under `results/se2d/<model>/<size>/<run>/`, and
+  `summarize.py --root results/se2d` reads them, so the two tasks never
   share a table or a plot by accident.
 
 ## Deliverables
@@ -120,6 +120,6 @@ fragments in it.
 
 ## Status
 
-Generator, `mapping.se2`, tests, the task spec, the trainer's `--task
-se2` switch and the hybrid port (`mapping/models/se2/hybrid.py`) exist.
+Generator, `mapping.se2d`, tests, the task spec, the trainer's `--task
+se2d` switch and the hybrid port (`mapping/models/se2d/hybrid.py`) exist.
 No other model is ported yet.

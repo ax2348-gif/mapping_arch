@@ -1,4 +1,4 @@
-"""The SE(2) task as a model sees it (``CONTRACT_SE2.md``). A model receives
+"""The SE(2) task as a model sees it (``CONTRACT_SE2D.md``). A model receives
 
     obs           (B, T + 1, S, S) float in [0, 1]   observations, each
                                                      facing its own heading

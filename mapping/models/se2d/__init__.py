@@ -1,9 +1,9 @@
-"""Registry of SE(2)-task models (``CONTRACT_SE2.md``), separate from the
+"""Registry of SE(2)-task models (``CONTRACT_SE2D.md``), separate from the
 Z^2 registry in ``mapping.models`` so a model name means one task.
 
 A module here provides ``SIZES``, ``SCALING_RULE``, optional ``LR`` and
 ``NO_DECAY``, and ``build(size, spec)`` with ``spec`` a
-``mapping.task_se2.TaskSpec``; its forward is
+``mapping.task_se2d.TaskSpec``; its forward is
 
     forward(obs, odometry, query_pose) -> pred
 
@@ -27,7 +27,7 @@ def register(name):
 
 def get(name):
     if name not in REGISTRY:
-        raise KeyError(f'unknown se2 model {name!r}; have {sorted(REGISTRY)}')
+        raise KeyError(f'unknown se2d model {name!r}; have {sorted(REGISTRY)}')
     return REGISTRY[name]
 
 

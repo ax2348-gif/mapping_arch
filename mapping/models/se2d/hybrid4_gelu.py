@@ -1,43 +1,14 @@
-"""hybrid4_muconv, SE(2) port: hybrid4 with the short convolution's init put under the muP rule.
+"""hybrid4_gelu, SE(2) port: ablation of hybrid4 without SwiGLU.
 
-A copy of ``mapping/models/se2/hybrid4.py`` with one change: the depthwise short
-convolution inside ``GatedDeltaNet`` is initialised by the same rule as every
-other matrix, effective weight ``N(0, (0.5 / sqrt(fan_in))^2)``, instead of
-PyTorch's default ``U(-1/sqrt(fan_in), 1/sqrt(fan_in))``. Weights, outputs and
-the forward pass are otherwise byte-for-byte hybrid4's.
-
-muP classification. The convolution is depthwise: each of its 3 * inner
-channels has its own K = 4 taps, so its fan_in is K, a constant, while its
-channel count grows with the width. In muP that is a vector-like parameter
-(one width-sized dimension, as an embedding, bias or norm gain): its
-initial scale and its Adam learning rate must both stay constant across
-widths. PyTorch's default already does both (std 1/sqrt(3K), base lr, no
-multiplier), so hybrid4's convolution is *width-consistent*; what it is not
-is *governed by the repo's rule*: its constant (std 0.289 at K = 4) is not
-the rule's 0.5/sqrt(K) = 0.25, and nothing ties it to the rule if the rule
-or K changes. Here the rule sets it, with multiplier 1 (a ``256 / w``
-multiplier, as on the hidden matrices, would be wrong: fan_in does not grow
-with w). Output variance per channel is K * 0.25 / K = 0.25 of the input's,
-independent of K, so kernels of different widths start at the same scale
-(the property the conv-width race needs). Weight decay is unchanged
-(train.py decays every tensor with dim >= 2, the convolution included, as
-it does the embeddings).
-
-Mechanism trace. The convolution feeds q, k and v (then SiLU, then L2
-normalisation of q and k, and the per-head RMSNorm after the scan). Its
-scale therefore reaches k and q only through SiLU's curvature, and v only
-up to the RMSNorm; the init change is a 0.87x rescale of the pre-SiLU
-activations plus a uniform-to-normal change of shape. Nothing in the
-token layout, the scan, the decay or beta changes, so the second-mirror
-path (patch tokens after an odometry token see it through taps 1-3) is
-exactly hybrid4's. Predicted effect at xs: neutral.
-
-Audit: hybrid4's, unchanged.
+A copy of ``mapping/models/se2d/hybrid4.py`` with one change: every block's MLP is the
+ungated 4x GELU MLP of hybrid and hybrid2 instead of SwiGLU. Together with
+hybrid3 (hybrid4 without the delta rule) it isolates the two changes
+hybrid4 made over hybrid2: delta rule here, SwiGLU there.
 
 Parent docstring follows.
 hybrid4, SE(2) port: hybrid3.5 with the scan on the fused kernel.
 
-A copy of ``mapping/models/se2/hybrid3_5.py`` with one change: ``GatedDeltaNet.scan`` calls
+A copy of ``mapping/models/se2d/hybrid3_5.py`` with one change: ``GatedDeltaNet.scan`` calls
 ``fla.ops.gated_delta_rule.chunk_gated_delta_rule`` (flash-linear-attention
 0.5.2, Triton) instead of the sequential ``delta_scan`` loop. The layer's
 inputs are unchanged: L2-normalised q (pre-scaled, so the kernel scale is
@@ -51,7 +22,7 @@ Parent docstring follows.
 hybrid3.5, SE(2) port: hybrid3 with Gated DeltaNet in place of gated linear
 attention, scan written by hand in PyTorch.
 
-A copy of ``mapping/models/se2/hybrid3.py`` with one change: the linear-attention mixer is a
+A copy of ``mapping/models/se2d/hybrid3.py`` with one change: the linear-attention mixer is a
 bidirectional Gated DeltaNet with negative eigenvalues (``GatedDeltaNet``).
 
 Why: the parent's scan updates its state by a positive scalar decay plus
@@ -77,7 +48,7 @@ computed from the odometry outside learned layers.
 Parent docstring follows.
 hybrid3, SE(2) port: hybrid2 with SwiGLU in place of the 4x GELU MLP.
 
-A copy of ``mapping/models/se2/hybrid2.py`` with one change: every block's MLP, after both the
+A copy of ``mapping/models/se2d/hybrid2.py`` with one change: every block's MLP, after both the
 gated-linear-attention and the softmax-attention mixers, is SwiGLU with
 hidden width 8/3 w rounded up to a multiple of 32, parameter-matched to
 the parent's 4x GELU MLP. Mixers, RoPE on the step index, tied patch and
@@ -252,7 +223,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 
-from mapping.models.se2 import register  # SE2
+from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
 
@@ -260,7 +231,6 @@ HEAD_DIM = 32         # per-head key/value dim; heads = width / HEAD_DIM
 BASE_WIDTH = 256      # muP base width: the harness lr is the lr at this width
 CHUNK = 32            # chunk length of the parallel scan
 DECAY_TAU = 16.0      # GLA: log a = logsigmoid(z) / tau keeps a close to 1
-CONV_GAIN = 0.5       # the repo's init gain: effective std 0.5 / sqrt(fan_in)
 
 SIZES = {
     'xs': dict(width=64),
@@ -441,9 +411,6 @@ class GatedDeltaNet(nn.Module):
         self.v = MuLinear(width, inner, mult, std)
         self.short = nn.Conv1d(3 * inner, 3 * inner, conv, groups=3 * inner,
                                bias=False)
-        # muP rule: depthwise, fan_in = conv taps (width-independent), so
-        # multiplier 1 and effective std 0.5 / sqrt(fan_in)
-        nn.init.normal_(self.short.weight, std=CONV_GAIN / math.sqrt(conv))
         self.gate = MuLinear(width, inner, mult, std)
         self.decay = MuLinear(width, heads, mult, std)
         nn.init.constant_(self.decay.bias, 3.0)   # a ~ 0.997 at init
@@ -518,26 +485,16 @@ class Attention(nn.Module):
         return self.out(o.transpose(1, 2).reshape(b, l, w))
 
 
-def swiglu_hidden(width):
-    """8/3 width rounded up to a multiple of 32: parameter-matched to the
-    parent's 4x GELU MLP (3 * w * h ~ 8 w^2)."""
-    return 32 * math.ceil(8 * width / 3 / 32)
-
-
 class MLP(nn.Module):
-    """SwiGLU: ``down(silu(gate(x)) * up(x))``. The product of two linear
-    maps of the input lets a block compute bilinear functions of its input
-    directly, which the parent's GELU MLP can only approximate."""
+    """Ablation: the 4x GELU MLP of hybrid and hybrid2, no gating."""
 
     def __init__(self, width, mult, std, out_std):
         super().__init__()
-        hidden = swiglu_hidden(width)
-        self.gate_up = MuLinear(width, 2 * hidden, mult, std)
-        self.down = MuLinear(hidden, width, mult, out_std)
+        self.fc1 = MuLinear(width, 4 * width, mult, std)
+        self.fc2 = MuLinear(4 * width, width, mult, out_std)
 
     def forward(self, x):
-        gate, up = self.gate_up(x).chunk(2, -1)
-        return self.down(F.silu(gate) * up)
+        return self.fc2(F.gelu(self.fc1(x)))
 
 
 class Block(nn.Module):
@@ -556,7 +513,7 @@ class Block(nn.Module):
         return x + self.mlp(self.norm2(x))
 
 
-class Hybrid4Muconv(nn.Module):
+class Hybrid4Gelu(nn.Module):
     def __init__(self, spec, width):
         super().__init__()
         assert spec.view == 9, 'tokeniser assumes 9x9 views (3x3 patches)'
@@ -660,7 +617,7 @@ class Hybrid4Muconv(nn.Module):
 
 
 def build(size, spec):
-    return Hybrid4Muconv(spec, **SIZES[size])
+    return Hybrid4Gelu(spec, **SIZES[size])
 
 
-register('hybrid4_muconv')(sys.modules[__name__])
+register('hybrid4_gelu')(sys.modules[__name__])

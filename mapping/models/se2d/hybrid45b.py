@@ -83,9 +83,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mapping.models.se2 import register
-from mapping.models.se2 import hybrid4_muconv as h4
-from mapping.models.se2 import vanilla4 as v4
+from mapping.models.se2d import register
+from mapping.models.se2d import hybrid4_muconv as h4
+from mapping.models.se2d import vanilla4 as v4
 
 COPRO_WIDTH = 64     # fixed at every rung
 SIZES = v4.SIZES

@@ -2,7 +2,7 @@
 4x larger test set, the trivial-copy rate, and targeted corruption of the
 odometry (turns, moves, query heading change).
 
-    python tools/audit_se2.py results/se2/<model>/<size>/<run>/final.pt
+    python tools/audit_se2d.py results/se2d/<model>/<size>/<run>/final.pt
 """
 import sys
 import numpy as np
@@ -13,7 +13,7 @@ import mapping.tasks as tasks
 from mapping.checkpoint import load_checkpoint
 from mapping.loader import eval_set, load_banks
 from mapping.task import metrics, metrics_by_time
-from mapping import se2
+from mapping import se2d
 from mapping.data import UNKNOWN as DATA_UNKNOWN
 
 ckpt = sys.argv[1]

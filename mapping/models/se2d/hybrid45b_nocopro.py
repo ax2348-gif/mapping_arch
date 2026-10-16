@@ -8,8 +8,8 @@ asserted in tests/test_prefreeze.py).
 """
 import sys
 
-from mapping.models.se2 import register
-from mapping.models.se2 import hybrid45b as base
+from mapping.models.se2d import register
+from mapping.models.se2d import hybrid45b as base
 
 SIZES = base.SIZES
 LR = base.LR

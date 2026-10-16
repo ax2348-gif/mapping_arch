@@ -1,7 +1,7 @@
 """Is the delta-rule state transition over one walk step a rotation that
 tracks the turn?
 
-    python tools/transition_probe.py results/se2/hybrid4/xs/seed0_100k_qt/final.pt
+    python tools/transition_probe.py results/se2d/hybrid4/xs/seed0_100k_qt/final.pt
 
 For a trained SE(2) hybrid4-family checkpoint whose first block is the
 Gated DeltaNet layer, recomputes that layer's per-token keys, decays and

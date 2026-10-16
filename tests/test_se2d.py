@@ -1,7 +1,7 @@
 """The SE(2) task: conventions, composition, and batch consistency."""
 import numpy as np
 
-from mapping import se2
+from mapping import se2d
 from mapping.data import (MOVES, Config, crop_windows, load_bank,
                           make_batch, render_map)
 from mapping.loader import eval_set
@@ -11,16 +11,16 @@ def test_rotate_matches_move_indices():
     # seen from heading h, world move d is body move (d - h) % 4
     for h in range(4):
         for d in range(4):
-            assert (se2.rotate(MOVES[d], h) == MOVES[(d - h) % 4]).all()
+            assert (se2d.rotate(MOVES[d], h) == MOVES[(d - h) % 4]).all()
     v = np.array([[3, -7], [0, 2]])
     for k in range(4):
-        assert (se2.unrotate(se2.rotate(v, k), k) == v).all()
+        assert (se2d.unrotate(se2d.rotate(v, k), k) == v).all()
 
 
 def test_face_is_rot90_by_heading():
     w = np.arange(81).reshape(1, 9, 9)
     for h in range(4):
-        assert (se2.face(w, [h])[0] == np.rot90(w[0], h)).all()
+        assert (se2d.face(w, [h])[0] == np.rot90(w[0], h)).all()
 
 
 def test_face_agrees_with_rotate():
@@ -29,17 +29,17 @@ def test_face_agrees_with_rotate():
     img = np.zeros((9, 9), np.uint8)
     img[1, 6] = 1                                      # world offset (-3, +2)
     for h in range(4):
-        faced = se2.face(img[None], [h])[0]
+        faced = se2d.face(img[None], [h])[0]
         y, x = np.argwhere(faced)[0] - 4
-        assert (np.array([y, x]) == se2.rotate(np.array([-3, 2]), h)).all()
+        assert (np.array([y, x]) == se2d.rotate(np.array([-3, 2]), h)).all()
 
 
 def test_compose_recovers_poses():
     rng = np.random.default_rng(0)
     d = rng.integers(0, 4, size=(16, 32))
     h = rng.integers(0, 4, size=(16, 33))
-    odo = se2.encode(d, h)
-    disp, hh = se2.compose(odo, 9, h0=h[:, 0])
+    odo = se2d.encode(d, h)
+    disp, hh = se2d.compose(odo, 9, h0=h[:, 0])
     assert (hh == h).all()
     assert (disp == np.concatenate(
         [np.zeros((16, 1, 2), np.int64),
@@ -53,19 +53,19 @@ def test_batch_consistent():
     assert set(b) == {'observations', 'odometry', 'positions', 'headings',
                       'query_pose', 'query_time', 'target', 'episodes'}
     assert b['odometry'].min() >= 0 and b['odometry'].max() < 16
-    disp, hh = se2.compose(b['odometry'], c.step, b['headings'][:, 0])
+    disp, hh = se2d.compose(b['odometry'], c.step, b['headings'][:, 0])
     assert (hh == b['headings']).all()
     assert (b['positions'][:, 0:1] + disp == b['positions']).all()
     for i, e in enumerate(b['episodes']):
         image = render_map(bank, e.tile_grid, c.tile, e.tile_sym)
         world_obs = crop_windows(image, e.positions, c.obs)
-        assert (se2.face(world_obs, b['headings'][i]) == b['observations'][i]).all()
+        assert (se2d.face(world_obs, b['headings'][i]) == b['observations'][i]).all()
         q = b['query_pose'][i]
         t = b['query_time'][i]
-        corners = e.positions[t] + se2.unrotate(q[:, :2], b['headings'][i, t])
+        corners = e.positions[t] + se2d.unrotate(q[:, :2], b['headings'][i, t])
         assert (corners == e.queries).all()
         qh = (q[:, 2] + b['headings'][i, t]) % 4
-        assert (se2.face(crop_windows(image, e.queries, c.obs), qh)
+        assert (se2d.face(crop_windows(image, e.queries, c.obs), qh)
                 == b['target'][i]).all()
 
 
@@ -90,7 +90,7 @@ def test_query_times_uniform_both_tasks():
                         == e.queries - e.positions[e.query_times]).all()
 
 
-def test_loader_passes_se2_batches():
+def test_loader_passes_se2d_batches():
     bank, _ = load_bank('data/mnist.npz', 32, 'test', True)
     ev = eval_set(Config(heading=True), bank, 4, 1, 0)[0]
     assert ev['query_pose'].shape == (4, 8, 3) and ev['odometry'].shape == (4, 32)

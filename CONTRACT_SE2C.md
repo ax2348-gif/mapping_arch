@@ -1,7 +1,7 @@
 # Model contract for the continuous SE(2) task (`se2c`)
 
 The third rung, a **separate task** from Z² (`CONTRACT.md`) and discrete
-SE(2) (`CONTRACT_SE2.md`), with its own generator, batch layout, model
+SE(2) (`CONTRACT_SE2D.md`), with its own generator, batch layout, model
 registry (`mapping/models/se2c/`) and results tree (`results/se2c/`).
 Read both earlier contracts first: why the study exists, building as an
 ML architect, and what counts as cheating all carry over. This file says
@@ -72,7 +72,7 @@ then asked to render the 15 x 15 view at a query pose.
 
 Output `pred (B, 8, 15, 15)`, the view at each query facing its heading.
 Loss is MSE. `mapping.se2c.geometry` fixes the conventions; at quarter
-turns they are exactly `mapping.se2`'s (`tests/test_se2c_geometry.py`).
+turns they are exactly `mapping.se2d`'s (`tests/test_se2c_geometry.py`).
 
 **Coverage (the contract on queries).** Every target sample point of a
 query asked at step t lies inside the union of the footprints (rotated

@@ -1,7 +1,7 @@
 """Read the learned delta-rule write strength (beta) and decay (a) of a trained
 SE(2) hybrid4-family checkpoint, per token kind and odometry symbol.
 
-    python tools/read_beta.py results/se2/hybrid4/xs/seed0_100k_qt/final.pt
+    python tools/read_beta.py results/se2d/hybrid4/xs/seed0_100k_qt/final.pt
 
 Only works when the first block is the Gated DeltaNet layer (true for every
 rung of hybrid4 and its ablations): the forward is stopped at that layer's
@@ -31,7 +31,7 @@ class Stop(Exception):
 
 def main(path, batches=8):
     model, args, spec, task = load_checkpoint(path, 'cpu')
-    assert task == 'se2', 'SE(2) checkpoints only'
+    assert task == 'se2d', 'SE(2) checkpoints only'
     t = tasks.get(task)
     config = tasks.config_from_args(task, spec, args)
     _, test_bank = load_banks(args['bank'], config)

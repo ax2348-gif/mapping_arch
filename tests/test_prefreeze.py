@@ -9,7 +9,7 @@ import mapping.tasks as tasks
 from tests.test_models import inputs
 
 CUDA = torch.cuda.is_available()
-T = tasks.get('se2')
+T = tasks.get('se2d')
 SPEC = T['task'].TaskSpec()
 R = T['models']
 
@@ -28,7 +28,7 @@ def test_nocopro_is_vanilla4(size):
     assert list(sa) == list(sb)
     for k in sa:
         assert torch.equal(sa[k], sb[k]), k
-    obs, odo, q = inputs('se2')
+    obs, odo, q = inputs('se2d')
     qt = torch.randint(0, 33, q.shape[:2])
     with torch.no_grad():
         assert torch.equal(a(obs, odo, q, query_time=qt),
@@ -91,7 +91,7 @@ def test_placement_order(name, expected):
         blk.register_forward_hook(lambda *a, i=i: seen.append(f'b{i}'))
     for j, c in enumerate(getattr(m, 'copros', [])):
         c.register_forward_hook(lambda *a, j=j: seen.append(f'c{j}'))
-    obs, odo, q = inputs('se2', device=dev)
+    obs, odo, q = inputs('se2d', device=dev)
     with torch.no_grad():
         m(obs, odo, q, query_time=torch.randint(0, 33, q.shape[:2], device=dev))
     assert seen == expected
@@ -109,7 +109,7 @@ def test_muconv_forward_is_hybrid4():
     a = build('hybrid4', 'xs').cuda().eval()
     b = build('hybrid4_muconv', 'xs').cuda().eval()
     b.load_state_dict(a.state_dict())
-    obs, odo, q = inputs('se2', device='cuda')
+    obs, odo, q = inputs('se2d', device='cuda')
     qt = torch.randint(0, 33, q.shape[:2], device='cuda')
     with torch.no_grad():
         assert torch.equal(a(obs, odo, q, query_time=qt),
@@ -152,8 +152,8 @@ def test_convrace_mask_holds_after_a_step():
 def test_convrace_layer_reduces_to_hybrid4():
     """With a single width 4 and hybrid4's head count, the race layer is
     hybrid4_muconv's layer: same weights, identical outputs."""
-    from mapping.models.se2 import hybrid4_convrace as cr
-    from mapping.models.se2 import hybrid4_muconv as mu
+    from mapping.models.se2d import hybrid4_convrace as cr
+    from mapping.models.se2d import hybrid4_muconv as mu
     torch.manual_seed(0)
     a = mu.GatedDeltaNet(64, 2, 4.0, 0.0625, 0.03125).cuda()
     b = cr.GatedDeltaNet(64, 2, 4.0, 0.0625, 0.03125, widths=(4,)).cuda()

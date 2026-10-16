@@ -1,4 +1,4 @@
-"""vanilla4c: vanilla4 (``mapping/models/se2/vanilla4.py``) ported to the
+"""vanilla4c: vanilla4 (``mapping/models/se2d/vanilla4.py``) ported to the
 continuous SE(2) task: hybrid4c with every token mixer as softmax
 attention with RoPE on the step index, exactly as vanilla4 is hybrid4
 with every mixer as attention.
@@ -15,7 +15,7 @@ Audit: hybrid4c's items 10-13; no recurrence, no convolution.
 """
 import sys
 
-from mapping.models.se2.vanilla4 import (LR, SCALING_RULE,  # noqa: F401
+from mapping.models.se2d.vanilla4 import (LR, SCALING_RULE,  # noqa: F401
                                          SIZES, Attention, Block)
 from mapping.models.se2c import register
 from mapping.models.se2c.hybrid4c import Hybrid4c

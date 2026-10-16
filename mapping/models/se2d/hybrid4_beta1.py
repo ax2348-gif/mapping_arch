@@ -1,7 +1,30 @@
-"""hybrid3.5, SE(2) port: hybrid3 with Gated DeltaNet in place of gated linear
+"""hybrid4_beta1, SE(2) port: ablation of hybrid4 with the write strength capped at 1.
+
+A copy of ``mapping/models/se2d/hybrid4.py`` with one change: ``beta = sigmoid(.)`` in (0, 1)
+instead of ``2 * sigmoid(.)`` in (0, 2), the standard Gated DeltaNet range.
+``I - beta k k^T`` then has eigenvalues in (0, 1] and can never be a
+reflection, so products of updates cannot express the rotations the
+hypothesis says SE(2) needs. Prediction P2 in HYPOTHESIS.md: this fails on
+SE(2). At init beta is 0.5 rather than the parent's 1.
+
+Parent docstring follows.
+hybrid4, SE(2) port: hybrid3.5 with the scan on the fused kernel.
+
+A copy of ``mapping/models/se2d/hybrid3_5.py`` with one change: ``GatedDeltaNet.scan`` calls
+``fla.ops.gated_delta_rule.chunk_gated_delta_rule`` (flash-linear-attention
+0.5.2, Triton) instead of the sequential ``delta_scan`` loop. The layer's
+inputs are unchanged: L2-normalised q (pre-scaled, so the kernel scale is
+1) and k, log decay g, and beta in (0, 2) passed directly, which the
+kernel applies as given. Checked against ``delta_scan``: relative error
+2e-3 in fp32 and 7e-3 in bf16 on outputs, 2-4e-3 on every gradient, at
+the model's sequence length; about 100x faster. With the same weights,
+hybrid4 and hybrid3.5 agree to the same tolerance.
+
+Parent docstring follows.
+hybrid3.5, SE(2) port: hybrid3 with Gated DeltaNet in place of gated linear
 attention, scan written by hand in PyTorch.
 
-A copy of ``mapping/models/se2/hybrid3.py`` with one change: the linear-attention mixer is a
+A copy of ``mapping/models/se2d/hybrid3.py`` with one change: the linear-attention mixer is a
 bidirectional Gated DeltaNet with negative eigenvalues (``GatedDeltaNet``).
 
 Why: the parent's scan updates its state by a positive scalar decay plus
@@ -27,7 +50,7 @@ computed from the odometry outside learned layers.
 Parent docstring follows.
 hybrid3, SE(2) port: hybrid2 with SwiGLU in place of the 4x GELU MLP.
 
-A copy of ``mapping/models/se2/hybrid2.py`` with one change: every block's MLP, after both the
+A copy of ``mapping/models/se2d/hybrid2.py`` with one change: every block's MLP, after both the
 gated-linear-attention and the softmax-attention mixers, is SwiGLU with
 hidden width 8/3 w rounded up to a multiple of 32, parameter-matched to
 the parent's 4x GELU MLP. Mixers, RoPE on the step index, tied patch and
@@ -200,8 +223,9 @@ import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 
-from mapping.models.se2 import register  # SE2
+from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
 
@@ -398,7 +422,10 @@ class GatedDeltaNet(nn.Module):
         self.out = MuLinear(inner, width, mult, out_std)
 
     def scan(self, q, k, v, g, beta):
-        return delta_scan(q, k, v, g, beta)
+        o, _ = chunk_gated_delta_rule(q.contiguous(), k.contiguous(),
+                                      v.contiguous(), g.contiguous(),
+                                      beta.contiguous(), scale=1.0)
+        return o
 
     def forward(self, x):
         b, l, _ = x.shape
@@ -406,7 +433,7 @@ class GatedDeltaNet(nn.Module):
         qkv = torch.stack([self.q(x), self.k(x), self.v(x)], 2)  # (b,l,3,h*d)
         qkv = qkv.view(b, l, 3, h, d)
         g = (F.logsigmoid(self.decay(x).float()) / DECAY_TAU)     # (b,l,h)
-        beta = 2 * torch.sigmoid(self.beta(x).float())            # (0, 2)
+        beta = torch.sigmoid(self.beta(x).float())                # ABLATION: (0, 1)
         # put each half in its own scan order, then a causal short conv
         fwd = qkv[:, :, :, :half]
         bwd = qkv[:, :, :, half:].flip(1)
@@ -498,7 +525,7 @@ class Block(nn.Module):
         return x + self.mlp(self.norm2(x))
 
 
-class Hybrid35(nn.Module):
+class Hybrid4Beta1(nn.Module):
     def __init__(self, spec, width):
         super().__init__()
         assert spec.view == 9, 'tokeniser assumes 9x9 views (3x3 patches)'
@@ -602,7 +629,7 @@ class Hybrid35(nn.Module):
 
 
 def build(size, spec):
-    return Hybrid35(spec, **SIZES[size])
+    return Hybrid4Beta1(spec, **SIZES[size])
 
 
-register('hybrid3_5')(sys.modules[__name__])
+register('hybrid4_beta1')(sys.modules[__name__])

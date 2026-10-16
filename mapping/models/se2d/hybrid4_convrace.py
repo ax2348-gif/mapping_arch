@@ -1,16 +1,89 @@
-"""hybrid4_beta1, SE(2) port: ablation of hybrid4 with the write strength capped at 1.
+"""hybrid4_convrace, SE(2): hybrid4_muconv with per-head short-convolution widths {1, 4, 10, 11}.
 
-A copy of ``mapping/models/se2/hybrid4.py`` with one change: ``beta = sigmoid(.)`` in (0, 1)
-instead of ``2 * sigmoid(.)`` in (0, 2), the standard Gated DeltaNet range.
-``I - beta k k^T`` then has eigenvalues in (0, 1] and can never be a
-reflection, so products of updates cannot express the rotations the
-hypothesis says SE(2) needs. Prediction P2 in HYPOTHESIS.md: this fails on
-SE(2). At init beta is 0.5 rather than the parent's 1.
+The conv-geometry race of the lift notes (section 05), in one model. A copy of
+``mapping/models/se2d/hybrid4_muconv.py`` with one change to the Gated DeltaNet
+mixer: every head of hybrid4 becomes four heads, identical except for the width
+of their causal short convolution, 1, 4, 10 or 11 taps. At xs that is 8 heads
+(4 per scan direction, one per width) instead of 2; head dim 32, state 32x32
+per head, the attention layer and everything else unchanged. The heads do not
+share state, so which width's head carries the turn-locked rotation is read off
+the trained model per head (tools/probe_gdn.py), as is beta by token role.
+
+Why these widths (layout-derived, not swept). On a step with no query, the
+sequence repeats with period 10: odometry t, then the 9 patches of the next
+observation in the head's scan order.
+- 1: no neighbour mixing (each token's q, k, v from itself): the no-conv
+  control inside the race.
+- 4: hybrid4's; the odometry token reaches the next 3 patches.
+- 10: every patch of the next observation sees its odometry token.
+- 11: additionally, each odometry token sees the previous one (local
+  pre-composition of consecutive steps).
+Queries asked at step t sit between observation t and odometry t, so on such
+steps the period is longer and the widths cover less (a step has at least one
+query with probability 1 - (32/33)^8, about 22%).
+
+Implementation. One depthwise Conv1d of the largest width (11) with a fixed
+mask: a channel of a head with width k keeps only its last k taps (positions
+t-k+1..t in the head's scan order); masked taps are zero in the forward, so
+they get no gradient and stay zero. Init: the muP rule of hybrid4_muconv per
+channel, effective std 0.5/sqrt(k) on its k live taps, so every width starts
+with the same output variance. A width-k head's receptive field is asserted in
+tests/test_prefreeze.py.
+
+Mechanism trace. Inside one head nothing differs from hybrid4 except which
+tokens the convolution lets into q, k and v: k and beta are computed from the
+layer input per token (beta and the decay do not pass through the convolution,
+as in hybrid4), so the first reflection (an odometry token's) is available to
+every head, and the second reflection needs a later token in the head's scan
+order whose k depends on the turn, which only the convolution provides. The
+width-1 head therefore cannot rotate by the turn over a step through its own
+keys; the other three can. Wider kernels start with smaller weight on the
+current token (std 0.5/sqrt(k) per tap), which blurs token identity at init:
+the predicted cost is a later breakaway, not a lower ceiling.
+
+Audit: hybrid4's, unchanged; the mask is a fixed function of the head index.
+
+Parent docstring follows.
+hybrid4_muconv, SE(2) port: hybrid4 with the short convolution's init put under the muP rule.
+
+A copy of ``mapping/models/se2d/hybrid4.py`` with one change: the depthwise short
+convolution inside ``GatedDeltaNet`` is initialised by the same rule as every
+other matrix, effective weight ``N(0, (0.5 / sqrt(fan_in))^2)``, instead of
+PyTorch's default ``U(-1/sqrt(fan_in), 1/sqrt(fan_in))``. Weights, outputs and
+the forward pass are otherwise byte-for-byte hybrid4's.
+
+muP classification. The convolution is depthwise: each of its 3 * inner
+channels has its own K = 4 taps, so its fan_in is K, a constant, while its
+channel count grows with the width. In muP that is a vector-like parameter
+(one width-sized dimension, as an embedding, bias or norm gain): its
+initial scale and its Adam learning rate must both stay constant across
+widths. PyTorch's default already does both (std 1/sqrt(3K), base lr, no
+multiplier), so hybrid4's convolution is *width-consistent*; what it is not
+is *governed by the repo's rule*: its constant (std 0.289 at K = 4) is not
+the rule's 0.5/sqrt(K) = 0.25, and nothing ties it to the rule if the rule
+or K changes. Here the rule sets it, with multiplier 1 (a ``256 / w``
+multiplier, as on the hidden matrices, would be wrong: fan_in does not grow
+with w). Output variance per channel is K * 0.25 / K = 0.25 of the input's,
+independent of K, so kernels of different widths start at the same scale
+(the property the conv-width race needs). Weight decay is unchanged
+(train.py decays every tensor with dim >= 2, the convolution included, as
+it does the embeddings).
+
+Mechanism trace. The convolution feeds q, k and v (then SiLU, then L2
+normalisation of q and k, and the per-head RMSNorm after the scan). Its
+scale therefore reaches k and q only through SiLU's curvature, and v only
+up to the RMSNorm; the init change is a 0.87x rescale of the pre-SiLU
+activations plus a uniform-to-normal change of shape. Nothing in the
+token layout, the scan, the decay or beta changes, so the second-mirror
+path (patch tokens after an odometry token see it through taps 1-3) is
+exactly hybrid4's. Predicted effect at xs: neutral.
+
+Audit: hybrid4's, unchanged.
 
 Parent docstring follows.
 hybrid4, SE(2) port: hybrid3.5 with the scan on the fused kernel.
 
-A copy of ``mapping/models/se2/hybrid3_5.py`` with one change: ``GatedDeltaNet.scan`` calls
+A copy of ``mapping/models/se2d/hybrid3_5.py`` with one change: ``GatedDeltaNet.scan`` calls
 ``fla.ops.gated_delta_rule.chunk_gated_delta_rule`` (flash-linear-attention
 0.5.2, Triton) instead of the sequential ``delta_scan`` loop. The layer's
 inputs are unchanged: L2-normalised q (pre-scaled, so the kernel scale is
@@ -24,7 +97,7 @@ Parent docstring follows.
 hybrid3.5, SE(2) port: hybrid3 with Gated DeltaNet in place of gated linear
 attention, scan written by hand in PyTorch.
 
-A copy of ``mapping/models/se2/hybrid3.py`` with one change: the linear-attention mixer is a
+A copy of ``mapping/models/se2d/hybrid3.py`` with one change: the linear-attention mixer is a
 bidirectional Gated DeltaNet with negative eigenvalues (``GatedDeltaNet``).
 
 Why: the parent's scan updates its state by a positive scalar decay plus
@@ -50,7 +123,7 @@ computed from the odometry outside learned layers.
 Parent docstring follows.
 hybrid3, SE(2) port: hybrid2 with SwiGLU in place of the 4x GELU MLP.
 
-A copy of ``mapping/models/se2/hybrid2.py`` with one change: every block's MLP, after both the
+A copy of ``mapping/models/se2d/hybrid2.py`` with one change: every block's MLP, after both the
 gated-linear-attention and the softmax-attention mixers, is SwiGLU with
 hidden width 8/3 w rounded up to a multiple of 32, parameter-matched to
 the parent's 4x GELU MLP. Mixers, RoPE on the step index, tied patch and
@@ -225,7 +298,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 
-from mapping.models.se2 import register  # SE2
+from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
 
@@ -233,6 +306,7 @@ HEAD_DIM = 32         # per-head key/value dim; heads = width / HEAD_DIM
 BASE_WIDTH = 256      # muP base width: the harness lr is the lr at this width
 CHUNK = 32            # chunk length of the parallel scan
 DECAY_TAU = 16.0      # GLA: log a = logsigmoid(z) / tau keeps a close to 1
+CONV_GAIN = 0.5       # the repo's init gain: effective std 0.5 / sqrt(fan_in)
 
 SIZES = {
     'xs': dict(width=64),
@@ -250,6 +324,7 @@ SIZES = {
 LR = {size: 3e-4 for size in SIZES}
 
 SCALING_RULE = (
+    'hybrid4 with every Gated DeltaNet head replaced by four heads of conv widths 1, 4, 10, 11 (4x the GDN heads and state). '
     'One-parameter family in the width w (64, 128, 192, 256, 384, 512): '
     'heads = w/32 with head dim 32 fixed (half the heads scan left-to-right, '
     'half right-to-left); recurrent state per head 32x32 so total state is '
@@ -391,28 +466,38 @@ def delta_scan(q, k, v, g, beta):
     return torch.stack(out, 1).to(dtype)
 
 
+CONV_WIDTHS = (1, 4, 10, 11)   # per head, in each scan direction
+
+
 class GatedDeltaNet(nn.Module):
-    """Bidirectional Gated DeltaNet with negative eigenvalues: heads
-    [0, H/2) scan left-to-right, [H/2, H) right-to-left.
+    """Bidirectional Gated DeltaNet with negative eigenvalues and per-head
+    short-convolution widths: heads [0, H/2) scan left-to-right, [H/2, H)
+    right-to-left; within each direction head i has conv width
+    ``widths[i % len(widths)]``. Otherwise hybrid4_muconv's layer."""
 
-    Per head: a depthwise short convolution (width 4, causal in the head's
-    own scan direction) on q, k, v, then SiLU; q and k L2-normalised; a
-    scalar data-dependent decay ``a``; a write strength ``beta = 2 *
-    sigmoid(.)`` in (0, 2), so ``I - beta k k^T`` ranges up to a
-    reflection and products of two can rotate the state; per-head RMSNorm
-    and a SiLU output gate on the scan output, as in the parent's GLA.
-    """
-
-    def __init__(self, width, heads, mult, std, out_std, conv=4):
+    def __init__(self, width, heads, mult, std, out_std, widths=CONV_WIDTHS):
         super().__init__()
-        assert heads % 2 == 0, 'need an even number of heads (two directions)'
-        self.heads, self.d, self.conv = heads, HEAD_DIM, conv
+        assert heads % (2 * len(widths)) == 0, 'each direction needs every width'
+        self.heads, self.d, self.conv = heads, HEAD_DIM, max(widths)
+        self.widths = tuple(widths)
         inner = heads * HEAD_DIM
         self.q = MuLinear(width, inner, mult, std)
         self.k = MuLinear(width, inner, mult, std)
         self.v = MuLinear(width, inner, mult, std)
-        self.short = nn.Conv1d(3 * inner, 3 * inner, conv, groups=3 * inner,
-                               bias=False)
+        self.short = nn.Conv1d(3 * inner, 3 * inner, self.conv,
+                               groups=3 * inner, bias=False)
+        half = heads // 2
+        head_w = torch.tensor([widths[i % len(widths)] for i in range(half)] * 2)
+        self.head_widths = head_w.tolist()
+        ch_w = head_w[None, :, None].expand(3, heads, HEAD_DIM).reshape(-1)
+        taps = torch.arange(self.conv)
+        mask = (taps[None, :] >= self.conv - ch_w[:, None]).float()  # last k taps
+        self.register_buffer('conv_mask', mask[:, None, :], persistent=False)
+        # muP rule per channel: effective std 0.5 / sqrt(own width), multiplier 1
+        with torch.no_grad():
+            self.short.weight.normal_()
+            self.short.weight.mul_(CONV_GAIN / ch_w.float().sqrt()[:, None, None])
+            self.short.weight.mul_(self.conv_mask)
         self.gate = MuLinear(width, inner, mult, std)
         self.decay = MuLinear(width, heads, mult, std)
         nn.init.constant_(self.decay.bias, 3.0)   # a ~ 0.997 at init
@@ -427,25 +512,35 @@ class GatedDeltaNet(nn.Module):
                                       beta.contiguous(), scale=1.0)
         return o
 
-    def forward(self, x):
+    def scan_inputs(self, x):
+        """q (pre-scaled), k (unit), v, log decay g and beta for every token,
+        each head in its own scan order (right-to-left heads reversed): the
+        exact inputs of ``scan``. Shapes (b,l,h,d) x3, (b,l,h) x2. Used by
+        forward and by tools/probe_gdn.py."""
         b, l, _ = x.shape
         h, d, half = self.heads, self.d, self.heads // 2
         qkv = torch.stack([self.q(x), self.k(x), self.v(x)], 2)  # (b,l,3,h*d)
         qkv = qkv.view(b, l, 3, h, d)
         g = (F.logsigmoid(self.decay(x).float()) / DECAY_TAU)     # (b,l,h)
-        beta = torch.sigmoid(self.beta(x).float())                # ABLATION: (0, 1)
-        # put each half in its own scan order, then a causal short conv
+        beta = 2 * torch.sigmoid(self.beta(x).float())            # (0, 2)
         fwd = qkv[:, :, :, :half]
         bwd = qkv[:, :, :, half:].flip(1)
         seq = torch.cat([fwd, bwd], 3).reshape(b, l, 3 * h * d)
         seq = F.pad(seq.transpose(1, 2), (self.conv - 1, 0))
-        seq = F.silu(self.short(seq)).transpose(1, 2).view(b, l, 3, h, d)
+        seq = F.conv1d(seq, self.short.weight * self.conv_mask,
+                       groups=3 * h * d)
+        seq = F.silu(seq).transpose(1, 2).view(b, l, 3, h, d)
         q, k, v = seq.unbind(2)
         q = F.normalize(q.float(), dim=-1).to(v.dtype) * d ** -0.5
         k = F.normalize(k.float(), dim=-1).to(v.dtype)
         gh = torch.cat([g[:, :, :half], g[:, :, half:].flip(1)], 2)
         bh = torch.cat([beta[:, :, :half], beta[:, :, half:].flip(1)], 2)
-        o = self.scan(q, k, v, gh, bh)                            # (b,l,h,d)
+        return q, k, v, gh, bh
+
+    def forward(self, x):
+        b, l, _ = x.shape
+        h, d, half = self.heads, self.d, self.heads // 2
+        o = self.scan(*self.scan_inputs(x))                       # (b,l,h,d)
         o = torch.cat([o[:, :, :half], o[:, :, half:].flip(1)], 2)
         o = self.norm(o).to(x.dtype) * F.silu(self.gate(x)).view(b, l, h, d)
         return self.out(o.reshape(b, l, h * d))
@@ -525,7 +620,7 @@ class Block(nn.Module):
         return x + self.mlp(self.norm2(x))
 
 
-class Hybrid4Beta1(nn.Module):
+class Hybrid4Convrace(nn.Module):
     def __init__(self, spec, width):
         super().__init__()
         assert spec.view == 9, 'tokeniser assumes 9x9 views (3x3 patches)'
@@ -533,6 +628,8 @@ class Hybrid4Beta1(nn.Module):
         self.width = width
         heads = width // HEAD_DIM
         mixers = width // HEAD_DIM
+        # every hybrid4 head becomes one head per conv width
+        gdn_heads = heads * len(CONV_WIDTHS)
         mult = BASE_WIDTH / width
         std = 0.5 / math.sqrt(width)          # effective init of hidden W
         out_std = std / math.sqrt(2 * mixers)  # residual-branch outputs
@@ -546,7 +643,7 @@ class Hybrid4Beta1(nn.Module):
         self.blocks = nn.ModuleList()
         for i in range(mixers):
             if i % 2 == 0:
-                mixer = GatedDeltaNet(width, heads, mult, std, out_std)
+                mixer = GatedDeltaNet(width, gdn_heads, mult, std, out_std)
             else:
                 mixer = Attention(width, heads, mult, std, out_std)
             self.blocks.append(Block(mixer, width, mult, std, out_std))
@@ -629,7 +726,7 @@ class Hybrid4Beta1(nn.Module):
 
 
 def build(size, spec):
-    return Hybrid4Beta1(spec, **SIZES[size])
+    return Hybrid4Convrace(spec, **SIZES[size])
 
 
-register('hybrid4_beta1')(sys.modules[__name__])
+register('hybrid4_convrace')(sys.modules[__name__])

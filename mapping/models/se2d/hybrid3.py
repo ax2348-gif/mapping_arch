@@ -1,6 +1,6 @@
 """hybrid3, SE(2) port: hybrid2 with SwiGLU in place of the 4x GELU MLP.
 
-A copy of ``mapping/models/se2/hybrid2.py`` with one change: every block's MLP, after both the
+A copy of ``mapping/models/se2d/hybrid2.py`` with one change: every block's MLP, after both the
 gated-linear-attention and the softmax-attention mixers, is SwiGLU with
 hidden width 8/3 w rounded up to a multiple of 32, parameter-matched to
 the parent's 4x GELU MLP. Mixers, RoPE on the step index, tied patch and
@@ -174,7 +174,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mapping.models.se2 import register  # SE2
+from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
 

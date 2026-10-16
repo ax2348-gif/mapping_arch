@@ -12,7 +12,7 @@ Conventions, all on ``(y, x)`` pixel vectors with y down:
   3 left.
 - an observation is presented facing-up: ``np.rot90(window, h)``.
 - a world vector seen from heading ``h`` is ``rotate(v, h)``, which maps
-  ``MOVES[d]`` to ``MOVES[(d - h) % 4]`` (``test_se2.py`` checks this).
+  ``MOVES[d]`` to ``MOVES[(d - h) % 4]`` (``test_se2d.py`` checks this).
 - the odometry symbol from pose t to t+1 is ``4 * turn + move`` with
   ``move = (d_t - h_t) % 4`` (forward, right, back, left in the body
   frame) and ``turn = (h_{t+1} - h_t) % 4`` (none, right, around, left).

@@ -1,7 +1,7 @@
 """Every run under results/ as one table, and power-law fits per model.
 
     python summarize.py                 all z2 runs
-    python summarize.py --task se2      all se2 runs
+    python summarize.py --task se2d      all se2d runs
     python summarize.py --model lstm    one model
     python summarize.py --fit           best run per rung, fitted per model
 """

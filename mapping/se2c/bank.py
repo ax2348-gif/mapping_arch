@@ -11,7 +11,7 @@ pixel is the AVERAGE of that function over an ``aa x aa`` grid of points
 spread over the pixel's own (rotated) square: supersampling with a box
 filter, which antialiases the resampling. With ``aa = 1`` and a view at
 an integer centre and a quarter-turn heading, a view is exactly
-``mapping.se2.face`` of the crop (``tests/test_se2c_texture.py``).
+``mapping.se2d.face`` of the crop (``tests/test_se2c_texture.py``).
 
 The start position is uniform within one tile, so the walk's phase
 against the tile grid is uniform. The bank's test split is used for

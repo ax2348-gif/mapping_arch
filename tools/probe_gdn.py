@@ -2,7 +2,7 @@
 SE(2) checkpoint (hybrid4 family, hybrid4.5b coprocessors at any placement,
 hybrid4_convrace's per-head conv widths), from final.pt or a step<k>.pt.
 
-    python tools/probe_gdn.py results/se2/hybrid4_convrace/xs/seed0/final.pt
+    python tools/probe_gdn.py results/se2d/hybrid4_convrace/xs/seed0/final.pt
     python tools/probe_gdn.py <ckpt> --layer 1 --json out.json
 
 The layer's input is captured with a forward pre-hook (the forward stops
@@ -100,7 +100,7 @@ def quantities(gdn, x):
 
 def probe(path, layer=0, batches=4, seed=4242):
     model, args, spec, task = load_any(path)
-    assert task == 'se2', 'SE(2) checkpoints only'
+    assert task == 'se2d', 'SE(2) checkpoints only'
     t = tasks.get(task)
     config = tasks.config_from_args(task, spec, args)
     _, test_bank = load_banks(args['bank'], config)

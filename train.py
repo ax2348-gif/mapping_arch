@@ -48,8 +48,8 @@ DEFAULT_LR = 3e-4
 def parse():
     p = argparse.ArgumentParser()
     p.add_argument('--task', default='z2', choices=sorted(tasks.ALL),
-                   help='which contract: z2 (CONTRACT.md), se2 '
-                        '(CONTRACT_SE2.md) or se2c (CONTRACT_SE2C.md); picks the model registry, the '
+                   help='which contract: z2 (CONTRACT.md), se2d '
+                        '(CONTRACT_SE2D.md) or se2c (CONTRACT_SE2C.md); picks the model registry, the '
                         'batch layout and the results root')
     p.add_argument('--model', required=True)
     p.add_argument('--size', required=True)
@@ -126,7 +126,7 @@ def lr_at(step, args):
 
 def permute_steps(x, perm):
     """``x (B, T, ...)`` with each row's steps permuted by ``perm (B, T)``
-    (symbols on z2/se2, pose vectors on se2c)."""
+    (symbols on z2/se2d, pose vectors on se2c)."""
     idx = perm.view(*perm.shape, *([1] * (x.dim() - 2))).expand_as(x)
     return torch.gather(x, 1, idx)
 
@@ -142,7 +142,7 @@ def call(model, obs, directions, offset, qtime, takes_time):
 def evaluate(model, batches, device, autocast, prepare, metrics,
              takes_time, steps, shuffle_directions=False, by_query=None):
     """``shuffle_directions`` permutes each episode's odometry tokens in
-    time (directions on z2, symbols on se2). Returns the whole-set metrics
+    time (directions on z2, symbols on se2d). Returns the whole-set metrics
     plus the per-prefix-length breakdown. Under odometry dropout the
     permutation moves the unknown symbols too, so it tests only the known
     ones; with every symbol dropped it is a no-op (see
@@ -221,7 +221,10 @@ def main():
                     'query_times': 'last', 'texture': 'mnist'}
         for key in ('task', 'model', 'size', 'batch', 'seed', 'step_px',
                     'odometry_dropout', 'query_times', 'texture'):
-            if branch['args'].get(key, defaults.get(key)) != vars(args)[key]:
+            saved = branch['args'].get(key, defaults.get(key))
+            if key == 'task':               # old checkpoints say 'se2'
+                saved = tasks.canonical(saved)
+            if saved != vars(args)[key]:
                 raise SystemExit(f'--branch {key} mismatch: checkpoint '
                                  f'{branch["args"].get(key, defaults.get(key))!r}, '
                                  f'run '

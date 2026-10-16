@@ -1,6 +1,6 @@
 """hybrid4_cdiag, SE(2) port: ablation of hybrid4 with a complex-diagonal transition.
 
-A copy of ``mapping/models/se2/hybrid4.py`` with one change: the Gated DeltaNet mixer is
+A copy of ``mapping/models/se2d/hybrid4.py`` with one change: the Gated DeltaNet mixer is
 replaced by ``ComplexDiagonal``, identical except for the state
 transition. hybrid4's transition ``a (I - beta k k^T)`` can rotate the
 state through products of reflections, which do NOT commute.
@@ -19,7 +19,7 @@ hybrid4: no beta projection, plus a 16-angle-per-head projection.
 Parent docstring follows.
 hybrid4, SE(2) port: hybrid3.5 with the scan on the fused kernel.
 
-A copy of ``mapping/models/se2/hybrid3_5.py`` with one change: ``GatedDeltaNet.scan`` calls
+A copy of ``mapping/models/se2d/hybrid3_5.py`` with one change: ``GatedDeltaNet.scan`` calls
 ``fla.ops.gated_delta_rule.chunk_gated_delta_rule`` (flash-linear-attention
 0.5.2, Triton) instead of the sequential ``delta_scan`` loop. The layer's
 inputs are unchanged: L2-normalised q (pre-scaled, so the kernel scale is
@@ -33,7 +33,7 @@ Parent docstring follows.
 hybrid3.5, SE(2) port: hybrid3 with Gated DeltaNet in place of gated linear
 attention, scan written by hand in PyTorch.
 
-A copy of ``mapping/models/se2/hybrid3.py`` with one change: the linear-attention mixer is a
+A copy of ``mapping/models/se2d/hybrid3.py`` with one change: the linear-attention mixer is a
 bidirectional Gated DeltaNet with negative eigenvalues (``GatedDeltaNet``).
 
 Why: the parent's scan updates its state by a positive scalar decay plus
@@ -59,7 +59,7 @@ computed from the odometry outside learned layers.
 Parent docstring follows.
 hybrid3, SE(2) port: hybrid2 with SwiGLU in place of the 4x GELU MLP.
 
-A copy of ``mapping/models/se2/hybrid2.py`` with one change: every block's MLP, after both the
+A copy of ``mapping/models/se2d/hybrid2.py`` with one change: every block's MLP, after both the
 gated-linear-attention and the softmax-attention mixers, is SwiGLU with
 hidden width 8/3 w rounded up to a multiple of 32, parameter-matched to
 the parent's 4x GELU MLP. Mixers, RoPE on the step index, tied patch and
@@ -235,7 +235,7 @@ import torch.nn.functional as F
 from fla.ops.gated_delta_rule import chunk_gated_delta_rule  # noqa: F401
 from fla.ops.simple_gla import chunk_simple_gla
 
-from mapping.models.se2 import register  # SE2
+from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
 

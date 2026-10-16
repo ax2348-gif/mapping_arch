@@ -1,55 +1,4 @@
-"""hybrid4, SE(2) port: hybrid3.5 with the scan on the fused kernel.
-
-A copy of ``mapping/models/se2/hybrid3_5.py`` with one change: ``GatedDeltaNet.scan`` calls
-``fla.ops.gated_delta_rule.chunk_gated_delta_rule`` (flash-linear-attention
-0.5.2, Triton) instead of the sequential ``delta_scan`` loop. The layer's
-inputs are unchanged: L2-normalised q (pre-scaled, so the kernel scale is
-1) and k, log decay g, and beta in (0, 2) passed directly, which the
-kernel applies as given. Checked against ``delta_scan``: relative error
-2e-3 in fp32 and 7e-3 in bf16 on outputs, 2-4e-3 on every gradient, at
-the model's sequence length; about 100x faster. With the same weights,
-hybrid4 and hybrid3.5 agree to the same tolerance.
-
-Parent docstring follows.
-hybrid3.5, SE(2) port: hybrid3 with Gated DeltaNet in place of gated linear
-attention, scan written by hand in PyTorch.
-
-A copy of ``mapping/models/se2/hybrid3.py`` with one change: the linear-attention mixer is a
-bidirectional Gated DeltaNet with negative eigenvalues (``GatedDeltaNet``).
-
-Why: the parent's scan updates its state by a positive scalar decay plus
-an additive write, so an input can only shrink the stored state, never
-rotate it. Placing an earlier frame relative to the current one on SE(2)
-needs exactly that rotation every time the agent turns. The delta rule's
-transition ``a (I - beta k k^T)`` with ``beta`` up to 2 is a reflection at
-the extreme, and two reflections compose into a rotation (Grazzi et al.
-2024, negative eigenvalues for state tracking). One odometry token can
-supply one reflection; the short convolution lets the following tokens
-see it and supply the second.
-
-The scan is a plain sequential loop (``delta_scan``): slow, but it is the
-reference ``hybrid4`` is checked against. Everything else (SwiGLU, RoPE
-on the step index, tied embeddings, per-step query placement, ladder,
-muP rule, init) is the parent's.
-
-Audit additions: the short convolution mixes neighbouring tokens in
-sequence order (a sequence-index operation, like the scan itself); beta,
-the decay and the convolution are learned from token content. Nothing is
-computed from the odometry outside learned layers.
-
-Parent docstring follows.
-hybrid3, SE(2) port: hybrid2 with SwiGLU in place of the 4x GELU MLP.
-
-A copy of ``mapping/models/se2/hybrid2.py`` with one change: every block's MLP, after both the
-gated-linear-attention and the softmax-attention mixers, is SwiGLU with
-hidden width 8/3 w rounded up to a multiple of 32, parameter-matched to
-the parent's 4x GELU MLP. Mixers, RoPE on the step index, tied patch and
-query embeddings, per-step query placement, ladder, muP rule and
-initialisation are the parent's. The audit is the parent's: SwiGLU adds
-no positional or geometric input.
-
-Parent docstring follows.
-hybrid2, SE(2) port. A copy of ``mapping/models/hybrid2.py`` with the
+"""hybrid2, SE(2) port. A copy of ``mapping/models/hybrid2.py`` with the
 interface changed and nothing else: the 4-way direction token becomes the
 16-way odometry symbol, and the query tokens carry the heading change
 through a 4-entry embedding beside the offset features. The query pose is
@@ -213,9 +162,8 @@ import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 
-from mapping.models.se2 import register  # SE2
+from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
 
@@ -244,8 +192,7 @@ SCALING_RULE = (
     'heads = w/32 with head dim 32 fixed (half the heads scan left-to-right, '
     'half right-to-left); recurrent state per head 32x32 so total state is '
     '32w; token-mixer layers = w/32 alternating gated linear attention and '
-    'softmax attention (w/64 pairs), each followed by a SwiGLU MLP with '
-    'hidden 8/3 w rounded up to a multiple of 32. '
+    'softmax attention (w/64 pairs), each followed by a 4x GELU MLP. '
     'Parameters grow ~w^3 (0.39 w^3 + embeddings). Learning rate: LR[size] '
     'is 3e-4 on every rung and is the muP base lr at base width 256; hidden and '
     'readout matrices carry a weight multiplier 256/w, which under Adam '
@@ -357,90 +304,6 @@ class GatedLinearAttention(nn.Module):
         return self.out(o.reshape(b, l, h * d))
 
 
-def delta_scan(q, k, v, g, beta):
-    """Gated delta rule, left to right, as a plain sequential recurrence.
-
-    ``S_t = a_t (I - beta_t k_t k_t^T) S_{t-1} + beta_t k_t v_t^T`` and
-    ``o_t = S_t^T q_t``, with ``a_t = exp(g_t)``. Written as
-    ``S' = a_t S``, ``S_t = S' + beta_t k_t (v_t - S'^T k_t)^T``.
-    q, k: (B, L, H, dk) with k unit-norm; v: (B, L, H, dv); g, beta:
-    (B, L, H). Runs in float32. This is the reference the fused kernel in
-    ``hybrid4`` is checked against.
-    """
-    dtype = v.dtype
-    q, k, v, g, beta = (x.float() for x in (q, k, v, g, beta))
-    b, l, h, dk = k.shape
-    S = q.new_zeros(b, h, dk, v.shape[-1])
-    out = []
-    for t in range(l):
-        S = S * g[:, t].exp()[..., None, None]
-        kS = torch.einsum('bhk,bhkv->bhv', k[:, t], S)
-        S = S + torch.einsum('bhk,bhv->bhkv', k[:, t] * beta[:, t, :, None],
-                             v[:, t] - kS)
-        out.append(torch.einsum('bhk,bhkv->bhv', q[:, t], S))
-    return torch.stack(out, 1).to(dtype)
-
-
-class GatedDeltaNet(nn.Module):
-    """Bidirectional Gated DeltaNet with negative eigenvalues: heads
-    [0, H/2) scan left-to-right, [H/2, H) right-to-left.
-
-    Per head: a depthwise short convolution (width 4, causal in the head's
-    own scan direction) on q, k, v, then SiLU; q and k L2-normalised; a
-    scalar data-dependent decay ``a``; a write strength ``beta = 2 *
-    sigmoid(.)`` in (0, 2), so ``I - beta k k^T`` ranges up to a
-    reflection and products of two can rotate the state; per-head RMSNorm
-    and a SiLU output gate on the scan output, as in the parent's GLA.
-    """
-
-    def __init__(self, width, heads, mult, std, out_std, conv=4):
-        super().__init__()
-        assert heads % 2 == 0, 'need an even number of heads (two directions)'
-        self.heads, self.d, self.conv = heads, HEAD_DIM, conv
-        inner = heads * HEAD_DIM
-        self.q = MuLinear(width, inner, mult, std)
-        self.k = MuLinear(width, inner, mult, std)
-        self.v = MuLinear(width, inner, mult, std)
-        self.short = nn.Conv1d(3 * inner, 3 * inner, conv, groups=3 * inner,
-                               bias=False)
-        self.gate = MuLinear(width, inner, mult, std)
-        self.decay = MuLinear(width, heads, mult, std)
-        nn.init.constant_(self.decay.bias, 3.0)   # a ~ 0.997 at init
-        self.beta = MuLinear(width, heads, mult, std)
-        nn.init.constant_(self.beta.bias, 0.0)    # beta = 1 at init
-        self.norm = nn.RMSNorm(HEAD_DIM)
-        self.out = MuLinear(inner, width, mult, out_std)
-
-    def scan(self, q, k, v, g, beta):
-        o, _ = chunk_gated_delta_rule(q.contiguous(), k.contiguous(),
-                                      v.contiguous(), g.contiguous(),
-                                      beta.contiguous(), scale=1.0)
-        return o
-
-    def forward(self, x):
-        b, l, _ = x.shape
-        h, d, half = self.heads, self.d, self.heads // 2
-        qkv = torch.stack([self.q(x), self.k(x), self.v(x)], 2)  # (b,l,3,h*d)
-        qkv = qkv.view(b, l, 3, h, d)
-        g = (F.logsigmoid(self.decay(x).float()) / DECAY_TAU)     # (b,l,h)
-        beta = 2 * torch.sigmoid(self.beta(x).float())            # (0, 2)
-        # put each half in its own scan order, then a causal short conv
-        fwd = qkv[:, :, :, :half]
-        bwd = qkv[:, :, :, half:].flip(1)
-        seq = torch.cat([fwd, bwd], 3).reshape(b, l, 3 * h * d)
-        seq = F.pad(seq.transpose(1, 2), (self.conv - 1, 0))
-        seq = F.silu(self.short(seq)).transpose(1, 2).view(b, l, 3, h, d)
-        q, k, v = seq.unbind(2)
-        q = F.normalize(q.float(), dim=-1).to(v.dtype) * d ** -0.5
-        k = F.normalize(k.float(), dim=-1).to(v.dtype)
-        gh = torch.cat([g[:, :, :half], g[:, :, half:].flip(1)], 2)
-        bh = torch.cat([beta[:, :, :half], beta[:, :, half:].flip(1)], 2)
-        o = self.scan(q, k, v, gh, bh)                            # (b,l,h,d)
-        o = torch.cat([o[:, :, :half], o[:, :, half:].flip(1)], 2)
-        o = self.norm(o).to(x.dtype) * F.silu(self.gate(x)).view(b, l, h, d)
-        return self.out(o.reshape(b, l, h * d))
-
-
 def rope_cos_sin(pos, dim, base=ROPE_BASE):
     """``(cos, sin)`` of shape ``(b, l, dim/2)`` for integer positions
     ``pos (b, l)``: the standard rotary table, one angle per pair."""
@@ -477,26 +340,14 @@ class Attention(nn.Module):
         return self.out(o.transpose(1, 2).reshape(b, l, w))
 
 
-def swiglu_hidden(width):
-    """8/3 width rounded up to a multiple of 32: parameter-matched to the
-    parent's 4x GELU MLP (3 * w * h ~ 8 w^2)."""
-    return 32 * math.ceil(8 * width / 3 / 32)
-
-
 class MLP(nn.Module):
-    """SwiGLU: ``down(silu(gate(x)) * up(x))``. The product of two linear
-    maps of the input lets a block compute bilinear functions of its input
-    directly, which the parent's GELU MLP can only approximate."""
-
     def __init__(self, width, mult, std, out_std):
         super().__init__()
-        hidden = swiglu_hidden(width)
-        self.gate_up = MuLinear(width, 2 * hidden, mult, std)
-        self.down = MuLinear(hidden, width, mult, out_std)
+        self.fc1 = MuLinear(width, 4 * width, mult, std)
+        self.fc2 = MuLinear(4 * width, width, mult, out_std)
 
     def forward(self, x):
-        gate, up = self.gate_up(x).chunk(2, -1)
-        return self.down(F.silu(gate) * up)
+        return self.fc2(F.gelu(self.fc1(x)))
 
 
 class Block(nn.Module):
@@ -515,7 +366,7 @@ class Block(nn.Module):
         return x + self.mlp(self.norm2(x))
 
 
-class Hybrid4(nn.Module):
+class Hybrid2(nn.Module):
     def __init__(self, spec, width):
         super().__init__()
         assert spec.view == 9, 'tokeniser assumes 9x9 views (3x3 patches)'
@@ -536,7 +387,7 @@ class Hybrid4(nn.Module):
         self.blocks = nn.ModuleList()
         for i in range(mixers):
             if i % 2 == 0:
-                mixer = GatedDeltaNet(width, heads, mult, std, out_std)
+                mixer = GatedLinearAttention(width, heads, mult, std, out_std)
             else:
                 mixer = Attention(width, heads, mult, std, out_std)
             self.blocks.append(Block(mixer, width, mult, std, out_std))
@@ -619,7 +470,7 @@ class Hybrid4(nn.Module):
 
 
 def build(size, spec):
-    return Hybrid4(spec, **SIZES[size])
+    return Hybrid2(spec, **SIZES[size])
 
 
-register('hybrid4')(sys.modules[__name__])
+register('hybrid2')(sys.modules[__name__])

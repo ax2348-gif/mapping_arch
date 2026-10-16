@@ -1,28 +1,7 @@
-"""hybrid4_gelu, SE(2) port: ablation of hybrid4 without SwiGLU.
-
-A copy of ``mapping/models/se2/hybrid4.py`` with one change: every block's MLP is the
-ungated 4x GELU MLP of hybrid and hybrid2 instead of SwiGLU. Together with
-hybrid3 (hybrid4 without the delta rule) it isolates the two changes
-hybrid4 made over hybrid2: delta rule here, SwiGLU there.
-
-Parent docstring follows.
-hybrid4, SE(2) port: hybrid3.5 with the scan on the fused kernel.
-
-A copy of ``mapping/models/se2/hybrid3_5.py`` with one change: ``GatedDeltaNet.scan`` calls
-``fla.ops.gated_delta_rule.chunk_gated_delta_rule`` (flash-linear-attention
-0.5.2, Triton) instead of the sequential ``delta_scan`` loop. The layer's
-inputs are unchanged: L2-normalised q (pre-scaled, so the kernel scale is
-1) and k, log decay g, and beta in (0, 2) passed directly, which the
-kernel applies as given. Checked against ``delta_scan``: relative error
-2e-3 in fp32 and 7e-3 in bf16 on outputs, 2-4e-3 on every gradient, at
-the model's sequence length; about 100x faster. With the same weights,
-hybrid4 and hybrid3.5 agree to the same tolerance.
-
-Parent docstring follows.
-hybrid3.5, SE(2) port: hybrid3 with Gated DeltaNet in place of gated linear
+"""hybrid3.5, SE(2) port: hybrid3 with Gated DeltaNet in place of gated linear
 attention, scan written by hand in PyTorch.
 
-A copy of ``mapping/models/se2/hybrid3.py`` with one change: the linear-attention mixer is a
+A copy of ``mapping/models/se2d/hybrid3.py`` with one change: the linear-attention mixer is a
 bidirectional Gated DeltaNet with negative eigenvalues (``GatedDeltaNet``).
 
 Why: the parent's scan updates its state by a positive scalar decay plus
@@ -48,7 +27,7 @@ computed from the odometry outside learned layers.
 Parent docstring follows.
 hybrid3, SE(2) port: hybrid2 with SwiGLU in place of the 4x GELU MLP.
 
-A copy of ``mapping/models/se2/hybrid2.py`` with one change: every block's MLP, after both the
+A copy of ``mapping/models/se2d/hybrid2.py`` with one change: every block's MLP, after both the
 gated-linear-attention and the softmax-attention mixers, is SwiGLU with
 hidden width 8/3 w rounded up to a multiple of 32, parameter-matched to
 the parent's 4x GELU MLP. Mixers, RoPE on the step index, tied patch and
@@ -221,9 +200,8 @@ import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 
-from mapping.models.se2 import register  # SE2
+from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
 
@@ -420,10 +398,7 @@ class GatedDeltaNet(nn.Module):
         self.out = MuLinear(inner, width, mult, out_std)
 
     def scan(self, q, k, v, g, beta):
-        o, _ = chunk_gated_delta_rule(q.contiguous(), k.contiguous(),
-                                      v.contiguous(), g.contiguous(),
-                                      beta.contiguous(), scale=1.0)
-        return o
+        return delta_scan(q, k, v, g, beta)
 
     def forward(self, x):
         b, l, _ = x.shape
@@ -485,16 +460,26 @@ class Attention(nn.Module):
         return self.out(o.transpose(1, 2).reshape(b, l, w))
 
 
+def swiglu_hidden(width):
+    """8/3 width rounded up to a multiple of 32: parameter-matched to the
+    parent's 4x GELU MLP (3 * w * h ~ 8 w^2)."""
+    return 32 * math.ceil(8 * width / 3 / 32)
+
+
 class MLP(nn.Module):
-    """Ablation: the 4x GELU MLP of hybrid and hybrid2, no gating."""
+    """SwiGLU: ``down(silu(gate(x)) * up(x))``. The product of two linear
+    maps of the input lets a block compute bilinear functions of its input
+    directly, which the parent's GELU MLP can only approximate."""
 
     def __init__(self, width, mult, std, out_std):
         super().__init__()
-        self.fc1 = MuLinear(width, 4 * width, mult, std)
-        self.fc2 = MuLinear(4 * width, width, mult, out_std)
+        hidden = swiglu_hidden(width)
+        self.gate_up = MuLinear(width, 2 * hidden, mult, std)
+        self.down = MuLinear(hidden, width, mult, out_std)
 
     def forward(self, x):
-        return self.fc2(F.gelu(self.fc1(x)))
+        gate, up = self.gate_up(x).chunk(2, -1)
+        return self.down(F.silu(gate) * up)
 
 
 class Block(nn.Module):
@@ -513,7 +498,7 @@ class Block(nn.Module):
         return x + self.mlp(self.norm2(x))
 
 
-class Hybrid4Gelu(nn.Module):
+class Hybrid35(nn.Module):
     def __init__(self, spec, width):
         super().__init__()
         assert spec.view == 9, 'tokeniser assumes 9x9 views (3x3 patches)'
@@ -617,7 +602,7 @@ class Hybrid4Gelu(nn.Module):
 
 
 def build(size, spec):
-    return Hybrid4Gelu(spec, **SIZES[size])
+    return Hybrid35(spec, **SIZES[size])
 
 
-register('hybrid4_gelu')(sys.modules[__name__])
+register('hybrid3_5')(sys.modules[__name__])

@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import torch
 
-from mapping import se2
+from mapping import se2d
 from mapping.data import MOVES, Config as DConfig, load_bank, make_batch as dbatch
 from mapping.se2c import geometry as geo
 from mapping.se2c import texture as tex
@@ -118,9 +118,9 @@ def test_decoupled_grid_mode_reproduces_discrete_statistics():
     h = torch.round(b['poses'][..., 2] / (math.pi / 2)).long() % 4
     freq = torch.bincount(h.flatten(), minlength=4).float() / h.numel()
     assert (freq - 0.25).abs().max() < 0.03
-    # and every odometry symbol composes back to the poses, as in se2.compose
+    # and every odometry symbol composes back to the poses, as in se2d.compose
     sym = symbols_from_continuous(b['odometry'], 9.0)
-    disp, hh = se2.compose(sym, 9, h0=h[:, 0].cpu().numpy())
+    disp, hh = se2d.compose(sym, 9, h0=h[:, 0].cpu().numpy())
     assert (hh == h.cpu().numpy()).all()
     p = (b['poses'][..., :2] - b['poses'][:, :1, :2]).cpu().numpy()
     assert np.abs(disp - p).max() < 1e-3

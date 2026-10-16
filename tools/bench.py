@@ -1,7 +1,7 @@
 """Throughput for sizing long runs: training steps per second per model,
 rung and batch, and the data loader's episodes per second.
 
-    python tools/bench.py --task se2 --models vanilla4 hybrid4 \
+    python tools/bench.py --task se2d --models vanilla4 hybrid4 \
         --sizes m l xl xxl --batches 64 128 256 --query-times uniform
 
 Each configuration builds the model, runs a few warm-up steps, then times
@@ -23,7 +23,7 @@ from mapping.loader import eval_set, load_banks, train_loader  # noqa: E402
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--task', default='se2')
+    p.add_argument('--task', default='se2d')
     p.add_argument('--models', nargs='+', required=True)
     p.add_argument('--sizes', nargs='+', required=True)
     p.add_argument('--batches', nargs='+', type=int, default=[64, 128, 256])
