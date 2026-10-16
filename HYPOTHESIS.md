@@ -263,3 +263,38 @@ delta-rule head:
 accumulated angle on at least 95% of pairs. The clean per-step rotation
 would then be local bookkeeping rather than a maintained frame, and the
 report must say so.
+
+### 2026-10-15: P5 and P5′ results (seeds 0 and 1)
+
+`tools/probe_p5.py`, hybrid4 SE(2) xs, 512 test episodes (eval seed
+4242), on CPU, ridge with an episode-level split.
+
+| check | seed 0 | seed 1 | verdict |
+| --- | --- | --- | --- |
+| P5 (frozen): left-to-right state at a query token, min R² over lags 1-16 | -0.17 | -0.43 | **fails** |
+| P5′(b): right-to-left state at observation s, min R² over lags 1-16 | -0.01 | -0.01 | **fails** |
+| P5′(a): rotation pair at the accumulated heading change, spans of 1-16 steps | 99.3% | 98.9% | **passes** |
+
+**P5.** The left-to-right state decodes the pose one step back almost
+perfectly (R² 0.98 to 1.00 on every target in both seeds). From two steps
+back the heading terms are near zero, and position stays near 0.5. This
+fits the contracting, short-memory head the transition probe found.
+
+**P5′(b).** A linear probe of the right-to-left state decodes the pose one
+step ahead (position R² 0.76 to 0.81, heading 0.85 to 0.94). Beyond two
+steps it is near zero.
+
+**P5′(a).** Across spans of up to 16 steps, the right-to-left head's
+combined transition carries its rotation pair at the accumulated heading
+change. The same two-dimensional subspace is rotated at every step, so
+the per-step rotations compose into a maintained frame. Gaps in seed 1:
+100% up to 4 steps, 98.3% at 12, 93.2% at 16.
+
+**Interpretation, post hoc and to be tested.** A delta-rule state is an
+associative memory: the relevant stored item depends on which later
+anchor is asked about, and the model retrieves it with a content-dependent
+query (`S^T q`). A fixed linear readout per lag cannot select that item,
+so a failed linear probe does not show the pose is absent. An exploratory
+follow-up, not a prediction: a bilinear readout using the model's own
+query vectors from each anchor's tokens. The pre-registered P5′(b)
+criterion failed, and that verdict stands.
