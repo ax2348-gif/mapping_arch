@@ -41,7 +41,7 @@ prose node 579ba254-c943).
   - D: learning-rate check 20028844, 20028846
   - E: second seed 20028847, 20028848
 - **Visual odometry, high-pass texture, s and m, 200k:** 20012146 (done), 20012147 (odometry given; m was running).
-- **Old SE(2) hybrid sweep 19991387.** It predates hybrid2 and still occupies a slot. The user was asked repeatedly whether to cancel it and has not answered; leave it.
+- **Old sweep 19991387:** the original `hybrid` model (pre-hybrid2) on DISCRETE SE(2), day 1's 40k-step lr ladder with last-step queries. The user confirmed 2026-10-16 that it stays.
 
 After runs land: `scripts/sync.sh pull`, then `python summarize.py --task se2`,
 tools/audit_se2.py on near-zero checkpoints, and the analysis plan in
@@ -50,7 +50,6 @@ docs/scaling_study_design.md.
 ## Open decisions for the user
 
 - Decision-arm `[decide]` items (docs/decision_arm_design.md).
-- Whether to cancel the old SE(2) sweep.
 - Multi-agent arm: a design note, after reviewing the multi-robot SLAM literature.
 
 ## Working rules learned (also in the agent memory)
@@ -95,7 +94,10 @@ docs/scaling_study_design.md.
 **Boundaries:**
 
 - Do NOT freeze HYPOTHESIS-v2; draft it for the user's sign-off.
-- Do not cancel jobs I did not submit (the old sweep stays).
+- Do not cancel jobs I did not submit (the discrete-SE(2) `hybrid` sweep 19991387 stays).
+- **Lift and ablation work is LOCAL only, with training jobs SEQUENTIAL across all agents.** Enforced with a shared lock:
+  `flock /tmp/claude-1000/-home-adrianna/b0ebca23-53ce-4dc1-a5c5-072191a4dabe/scratchpad/gpu_train.lock <train command>`.
+  Data work, tests and smoke runs are exempt. The scaling study stays on the cluster.
 - Never edit the user's lift notes or the frozen hypothesis text; amendments only.
 - Keep all the working rules above.
 
