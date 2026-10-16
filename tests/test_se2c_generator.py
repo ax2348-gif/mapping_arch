@@ -210,3 +210,21 @@ def test_odometry_dropout_zeroes_whole_steps_and_nothing_else():
     assert torch.equal(half['odometry'][~zero], base['odometry'][~zero])
     for k in ('observations', 'query_pose', 'target', 'poses'):
         assert torch.equal(half[k], base[k]), k
+
+
+@pytest.mark.parametrize('p', [-0.1, 1.5])
+def test_odometry_dropout_outside_0_1_is_refused(p):
+    """A probability: refused by the generator, the config objects (both
+    generators) and train.py's flags, before anything is written."""
+    import run
+    import train
+    with pytest.raises(ValueError, match='probability'):
+        Config(odometry_dropout=p)
+    for model in ('se2c/vanilla4c', 'se2d/vanilla4', 'z2/vanilla4'):
+        with pytest.raises(Exception, match='probability'):
+            run.build(run.resolved(run.load([f'model={model}',
+                                             f'task.generator.odometry_dropout={p}'])))
+    with pytest.raises(Exception, match='probability'):
+        train.main_from_flags(['--task', 'se2c', '--model', 'vanilla4c', '--size', 'xs',
+                               '--odometry-dropout', str(p), '--device', 'cpu',
+                               '--out', '/nonexistent/never_written'])

@@ -149,6 +149,15 @@ class Generator(Node):
     the legacy ``args`` record where the two differ."""
     record = {}
 
+    def __post_init__(self):
+        super().__post_init__()
+        p = getattr(self, 'odometry_dropout', 0.0)
+        if not 0.0 <= p <= 1.0:
+            raise ValueError(
+                f'task.generator.odometry_dropout={p!r} is not a probability: it must be '
+                f'in [0, 1] (0: every step keeps its odometry; 1: all hidden, visual '
+                f'odometry)')
+
 
 @dataclass(frozen=True)
 class BankGenerator(Generator):

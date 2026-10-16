@@ -97,6 +97,9 @@ class Config:
             raise ValueError('omega_max in (0, pi]')
         if self.turn_n and self.turn_n < 2:
             raise ValueError('turn_n is 0 or >= 2')
+        if not 0.0 <= self.odometry_dropout <= 1.0:
+            raise ValueError(f'odometry_dropout {self.odometry_dropout!r} is not a '
+                             f'probability: it must be in [0, 1] (1: visual odometry)')
         if self.directions == 'lattice' and not (self.motion == 'decoupled' and self.turn_n):
             raise ValueError("directions='lattice' needs motion='decoupled' and turn_n")
         for k, ok in (('motion', ('arc', 'decoupled')),
