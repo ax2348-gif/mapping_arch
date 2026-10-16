@@ -132,3 +132,4 @@ docs/scaling_study_design.md.
   - The queued arc default run was cancelled before it started. Queued instead, under the lock:
     1. `bridge_n4dec_100k_qt` (`--directions lattice --turn-n 4 --v-min 9 --v-max 9`)
     2. `dec_100k_qt` (the new default)
+- **2026-10-16, the bridge moved to Torch** (user's call): job 20036564. It runs from a separate tree, /scratch/ax2348/mapping_lift, so the scaling study's code stays frozen while its jobs are queued. Job file: jobs/lift/se2c_bridge_hybrid4c_xs.sbatch (jobs/ is gitignored). Locally, `dec_100k_qt` (the new default) is next under the lock, and the ablation queue waits for it.
