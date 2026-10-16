@@ -212,9 +212,10 @@ work. Iterate locally first.
     - Not full SE(3), but no longer a toy: SE(2) motion with a pitched perspective camera over 2.5D terrain is mostly what autonomous vehicles need.
     - Full SE(3) camera control (varying altitude, pitch and roll in queries) stays out of scope.
     - **Ablation for the "both" setup (the user): SEPARATE vs TIED queries.**
-      - Separate: one query token per render type, each with its own readout.
-      - Tied: one token per SE(2) pose, decoded into BOTH renders by two heads from the same state.
-      - Fair comparison: same query poses (tied = one token with two targets; separate = the same poses duplicated per type), matched readout parameters, each render's error reported separately, plus BEV-only and camera-only baselines for transfer.
+      - NOTE: queries are MULTI-TOKEN: one token per output patch (9 in hybrid4, 25 in hybrid4c), each the pose encoding plus a learned patch-position vector. "Tied" means a shared SET of query tokens, not one token.
+      - Separate: per render type, its own set of patch tokens (BEV patches, camera patches), each read out to its own patch.
+      - Tied: one shared set of tokens at the pose, read out into BOTH renders. OPEN sub-choice (the user's): BEV and camera patches cover different ground, so either a common token grid with each head reading the whole set (small cross-attention or linear readout), or tie only the pose encoding and keep per-render patch tokens.
+      - Fair comparison: same query poses, matched readout parameters, each render's error reported separately, plus BEV-only and camera-only baselines for transfer.
       - A tied win means a shared pose-indexed belief (the program criterion); a large tied loss means the renders want different things from one token. Optional third arm: separate tokens at untied poses.
   - **BEV decoding (the user):** in an SE(3)-ready design it is NOT a new head. A BEV view is just another query camera (pitch 90°, orthographic or very narrow field of view), handled by the same query token and readout.
     - Ablation: ego queries only, BEV only, both. Which builds the better belief, and BEV is what a planner wants.
