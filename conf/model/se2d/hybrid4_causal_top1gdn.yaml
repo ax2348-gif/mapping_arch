@@ -1,0 +1,17 @@
+# @package _global_
+# hybrid4_causal_top1gdn: hybrid4 with layer causality set by its fields
+# (mapping/models/se2d/hybrid4_mix.py, VARIANTS).
+defaults:
+  - /task: se2d
+
+model:
+  name: hybrid4_causal_top1gdn
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.se2d.hybrid4_mix.Hybrid4Mix
+    _partial_: true
+    delta: l2r
+    attn: causal
+    top: 1
+    top_op: gdn
