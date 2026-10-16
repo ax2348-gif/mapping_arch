@@ -336,14 +336,14 @@ experiments:
 # Pending: registered and submitted, no run directory exists yet.
 pending:
   - {id: se2c-odometry-queries, job: "20084102_[0-2]", tree: /scratch/ax2348/mapping_odq, commit: a353d1e, branch: exp/odq, note: "commit exists only on exp/odq in ~/code/mapping-hydra, not in ~/code/mapping; presets se2c_odq_after, se2c_odq_before, se2c_vo_dropout"}
-  - {id: se2d-h1c-causal-grid, job: "20072852_[3-22]", note: "17 more H1c tasks"}
+  - {id: se2d-h1c-causal-grid, job: "20072852_[3-22]", note: "20 more H1c tasks"}
   - {id: se2d-h1d-walk-length, job: "20076519_[1-5]", note: "T=16 vanilla pair and the four T=128 runs"}
 
 # Borderline: for the user to decide (documented but cheap, or similar). Not counted as major.
 borderline:
   - id: se2d-prefreeze-ablations
     title: "pre-freeze ablations: conv muP init, conv-width race (paused at 78k), hybrid4.5b and its last-layer variant at s"
-    why: "documented only as a line in STATUS; promised docs/lift/prefreeze_ablations.md does not exist; 1.2 GPU-h; no hypothesis"
+    why: "documented only as a line in STATUS; promised docs/lift/prefreeze_ablations.md does not exist; 1.1 GPU-h; no hypothesis"
     gpu_hours: 1.1
     runs: ["erid-2:se2d/hybrid45b/s/seed0_50k_qt", "erid-2:se2d/hybrid45b_last/s/seed0_50k_qt", "erid-2:se2d/hybrid4_convrace/xs/seed0_100k_qt", "erid-2:se2d/hybrid4_muconv/xs/seed0_100k_qt"]
   - id: se2d-time-recurrence
