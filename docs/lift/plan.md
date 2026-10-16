@@ -108,8 +108,8 @@ work. Iterate locally first.
 3. 3D scenes with occlusion: true NVS.
 
 **Baselines for the camera rung:**
-- LVSM-style decoding, conditioned on the egocentric history: the vanilla analogue.
-- VGGT as the reference for geometry alone, and as an optional frozen visual front end.
+- LVSM-style decoding, conditioned on the egocentric history: the vanilla analogue. The right conceptual family is a latent belief in activations, readable by free pose queries through the network (LVSM, SRT, CUT3R's state).
+- VGGT-style models (explicit pointmap/geometry outputs) are a POOR fit for the program, however good their geometry. Their map lives outside the activations, and using it for decisions needs a renderer or geometry seam with restrictive inductive biases. At most a frozen visual front end. (User correction, 2026-10-16; see the Spatial POMDP Program Notes.)
 
 **Prerequisites:**
 - the continuous-SE(2) mechanism probe (calibration plus seam);
