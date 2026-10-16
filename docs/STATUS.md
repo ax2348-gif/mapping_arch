@@ -317,3 +317,13 @@ docs/scaling_study_design.md.
   - Related runs: vanilla4_causal s seed 0 (local); 20070043 (hybrid4_causal s and vanilla4_causal l, seed 0).
   - We are at the per-user GPU cap (QOSMaxGRESPerUser), so the grid queues behind running jobs.
 - **2026-10-16, H1d (causal penalty vs walk length) registered (cece910) and submitted:** Torch array of 6 GPU jobs. T = 16 and 128 for hybrid4, hybrid4_causal, vanilla4 and vanilla4_causal at s, seed 0 (T = 16 packed two per GPU). It runs regardless of H1c's outcome.
+- **2026-10-16, H1c cell vanilla4 s seed 0 (400k WSD, local): causal NEVER solves.**
+  | vanilla4 s | all | last step | first solved |
+  | --- | --- | --- | --- |
+  | causal | 0.0229 | 0.0479 | never |
+  | bidirectional | 0.0061 | 0.0222 | 210k |
+  
+  - The last-step penalty is 2.2 (≥ 1.5, as predicted for vanilla4).
+  - The penalty by query step: 0-8: 1.9x; 8-16: 4.6x; 16-24: 4.8x; 24-32: 3.4x. It grows with the composition demanded.
+  - Causal hybrid4 s forms the exact rotation in a FORWARD head (β = 2.00, a 91° eigenpair on 100% of quarter-turn steps).
+  - The matched hybrid4 cell (400k WSD) is on Torch, 20070043_0.
