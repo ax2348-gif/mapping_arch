@@ -169,7 +169,8 @@ def config_from_args(args, eval_holdout=None):
                   query_times=a.get('query_times', 'uniform'),
                   query_coverage=a.get('query_coverage', 'causal'),
                   bank='' if bank == 'procedural' else bank,
-                  texture=TextureSpec(), seed=a.get('seed', 0))
+                  texture=TextureSpec(), seed=a.get('seed', 0),
+                  odometry_dropout=a.get('odometry_dropout', 0.0))
 
 
 def data(args, device, start=0, eval_batches=None, batch=None):

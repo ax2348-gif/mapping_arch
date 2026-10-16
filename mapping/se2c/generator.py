@@ -86,6 +86,7 @@ class Config:
                                  # (mapping.data.TEXTURES, mapping.se2c.bank)
     aa: int = 4                  # bank: supersampling per pixel side
     seed: int = 0
+    odometry_dropout: float = 0.0  # P(step's odometry -> zero vector); 1.0 = visual odometry
 
     def __post_init__(self):
         if self.view % 2 != 1:
@@ -297,6 +298,17 @@ def snap(angle, n):
     return k.float() * (TWO_PI / n)
 
 
+def _drop_odometry(g, odo, p):
+    """Replace each step's odometry (dy, dx, turn) by zeros with probability
+    ``p``. Unambiguous: every real step moves at least v_min > 0 px, so a
+    zero translation never occurs otherwise. p = 1 hides all odometry
+    (visual odometry); p = 0 draws nothing, leaving the stream unchanged."""
+    if p <= 0:
+        return odo
+    drop = torch.rand(odo.shape[:-1], generator=g, device=odo.device) < p
+    return torch.where(drop[..., None], torch.zeros_like(odo), odo)
+
+
 def make_batch(config, index, device, batch=64, eval_set=False,
                with_raster=False, bank=None):
     """Batch ``index`` of the stream (or of the evaluation stream).
@@ -326,7 +338,8 @@ def make_batch(config, index, device, batch=64, eval_set=False,
         turn = snap(turn, c.turn_n)
         qpose[..., 2] = snap(qpose[..., 2], c.turn_n)
     out = {'observations': obs,
-           'odometry': torch.cat([body, turn[..., None]], -1),
+           'odometry': _drop_odometry(g, torch.cat([body, turn[..., None]], -1),
+                                      c.odometry_dropout),
            'query_pose': qpose,
            'query_time': qt, 'target': target,
            'poses': torch.cat([pos, theta[..., None]], -1),
