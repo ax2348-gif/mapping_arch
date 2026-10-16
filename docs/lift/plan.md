@@ -206,6 +206,13 @@ work. Iterate locally first.
     - The frontier is defined on the occlusion-aware seen raster.
 - **Patch size and BEV queries (discussion, 2026-10-16):**
   - **Patch size** changes parameters only in the embedding and readout (about 2% at s, from 3x3 to 8x8). The tiers stay meaningful. It changes compute a lot (tokens per 32x32 view: ~114 at 3x3, 64 at 4x4, 16 at 8x8), and may raise the capacity needed to solve, since larger patches squeeze more pixels per token. Choose it with one throughput measurement plus one quality check at one size.
+  - **DECIDED (the user, 2026-10-16): 8x8 PATCHES for 32x32 ocean views** (688 tokens/episode, faster than today's se2c at 15x15/3x3; params within 2%). Reasonable because the haze and the sky make large parts of the view low-detail. Local train-step benchmark at s (shared GPU, so absolute numbers about halved):
+    | view, patch | tokens/ep | hybrid4c | vanilla4c |
+    | --- | --- | --- | --- |
+    | 15, 3 | 1057 | 7.7 it/s | 12.9 it/s |
+    | 33, 3 | 4993 | 1.3 | 1.6 |
+    | 32, 4 | 2656 | 2.6 | 3.8 |
+    | 32, 8 | 688 | 12.6 | 21.1 |
   - **DECIDED (the user, 2026-10-16): BEV queries are the STARTING POINT for the ocean.** Full SE(3) camera control is awkward to sample, and the trajectory camera is already limited to an SE(2) subspace. So queries render top-down BEV patches at an SE(2) pose; ego-camera queries come later.
   - **DECIDED (the user, 2026-10-16): the CAMERA decoder takes the SAME form.** An SE(2) query pose, rendered as the egocentric CAMERA view at that pose (the same fixed altitude, pitch and field of view as the observations), instead of the egocentric BEV patch.
     - So both decoders share one query interface: SE(2) pose in, view out. Only the render type differs (BEV or camera).
