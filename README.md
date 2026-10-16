@@ -12,6 +12,8 @@ that keep architectures honest, and the deliverables for a new model.
 
 ```bash
 pip install torch numpy pillow datasets     # torch with CUDA for training
+pip install --no-deps fla-core==0.5.2 einops # kernels (hybrid4 and later);
+                                             # --no-deps keeps torch untouched
 python scripts/get_mnist.py                 # writes data/mnist.npz once
 python profile_loader.py                    # optional: data path sanity
 ```
