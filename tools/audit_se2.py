@@ -4,7 +4,6 @@ odometry (turns, moves, query heading change).
 
     python tools/audit_se2.py results/se2/<model>/<size>/<run>/final.pt
 """
-trivial-copy rate, and targeted corruption of the odometry."""
 import sys
 import numpy as np
 import torch
