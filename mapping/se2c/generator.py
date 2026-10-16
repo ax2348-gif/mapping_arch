@@ -8,15 +8,18 @@ DataLoader.
 
 An episode:
 
-1. **Walk.** ``motion='arc'`` (the default, the isotropic walk): each step
+1. **Walk.** ``motion='decoupled'`` (the default since 2026-10-16, the
+   user's decision; the arc walk proved diffusive, build_log.md): each
+   step moves v ~ U[v_min, v_max] in a world direction that changes by
+   delta ~ U[-3 pi/4, 3 pi/4) per step (``directions='persistent'``), and
+   turns by an i.i.d. omega, uniform on [-omega_max, omega_max) or on the
+   n-lattice, minus any held-out band. ``directions='lattice'`` with
+   ``turn_n=4``, ``v_min = v_max = 9`` is the discrete SE(2) walk
+   (``tests/test_se2c_generator.py``). ``motion='arc'``: each step
    draws a speed v ~ U[v_min, v_max] and a turn omega ~ U[-omega_max,
    omega_max) (or the lattice 2 pi k / n with ``turn_n = n``), and drives
    along the arc (``geometry.arc``). The first heading is uniform (on the
-   lattice when quantised). ``motion='decoupled'``: the world move
-   direction and the heading are drawn independently, as in the discrete
-   task: directions on the lattice (or uniform), no immediate reversal,
-   length v; headings i.i.d. uniform. With ``turn_n=4``, ``v_min = v_max =
-   9`` this is the discrete SE(2) walk (``tests/test_se2c_generator.py``).
+   lattice when quantised).
 2. **Texture.** A fresh procedural field per episode (``texture``).
 3. **Queries.** Each query gets a step t (uniform in 0..T, or T) and a
    pose uniform over the poses whose every sample point lies in the
@@ -65,11 +68,12 @@ class Config:
     view: int = 15
     steps: int = 32
     queries: int = 8
-    v_min: float = 3.75          # px per step: S/4 .. S/2 (build_log.md)
-    v_max: float = 7.5
+    v_min: float = 4.5           # px per step (user decision 2026-10-16;
+    v_max: float = 9.0           # the arc walk's first default was 3.75 .. 7.5)
     omega_max: float = math.pi
     turn_n: int = 0              # 0: continuous; n: multiples of 2 pi / n
-    motion: str = 'arc'          # 'arc' | 'decoupled'
+    motion: str = 'decoupled'    # 'decoupled' (default, 2026-10-16) | 'arc'
+    directions: str = 'persistent'   # decoupled: 'persistent' | 'lattice'
     holdout: tuple = ()          # () or (lo, hi): a band of |omega|, rad
     holdout_mode: str = 'exclude'    # 'exclude' | 'include' | 'only'
     query_times: str = 'uniform'     # 'uniform' | 'last'
@@ -92,7 +96,10 @@ class Config:
             raise ValueError('omega_max in (0, pi]')
         if self.turn_n and self.turn_n < 2:
             raise ValueError('turn_n is 0 or >= 2')
+        if self.directions == 'lattice' and not (self.motion == 'decoupled' and self.turn_n):
+            raise ValueError("directions='lattice' needs motion='decoupled' and turn_n")
         for k, ok in (('motion', ('arc', 'decoupled')),
+                      ('directions', ('persistent', 'lattice')),
                       ('holdout_mode', ('exclude', 'include', 'only')),
                       ('query_times', ('uniform', 'last')),
                       ('query_coverage', ('causal', 'global'))):
@@ -102,8 +109,6 @@ class Config:
             lo, hi = self.holdout
             if not 0 <= lo < hi:
                 raise ValueError('holdout band needs 0 <= lo < hi')
-            if self.motion != 'arc':
-                raise ValueError('a held-out band applies to the arc walk')
 
     @property
     def half(self):
@@ -121,6 +126,10 @@ def generator(config, index, device, eval_set=False):
 
 def _rand(g, shape, device):
     return torch.rand(shape, generator=g, device=device)
+
+
+DIR_DELTA_MAX = 0.75 * math.pi   # decoupled 'persistent' directions: E cos = 0.30
+                                 # (the discrete walk's 1/3); user decision 2026-10-16
 
 
 def lattice(n, lo=-math.pi, hi=math.pi):
@@ -181,8 +190,12 @@ def walk(g, config, batch, device):
     if c.motion == 'arc':
         omega = sample_turns(g, c, (batch, T), device)
         return geo.integrate(geo.arc(v, omega), omega, p0, theta0)
-    # decoupled: world directions with no immediate reversal, i.i.d. headings
-    if c.turn_n:
+    # decoupled: world move directions and headings drawn independently.
+    # 'lattice': directions on the n-lattice, any but the immediate reverse
+    # (with n = 4 this is the discrete walk). 'persistent': the direction
+    # changes by delta ~ U[-DIR_DELTA_MAX, DIR_DELTA_MAX) per step, whatever
+    # n (so the walk's spread does not change along the n-curriculum).
+    if c.directions == 'lattice':
         n = c.turn_n
         k = torch.empty(batch, T, dtype=torch.long, device=device)
         k[:, 0] = torch.randint(0, n, (batch,), generator=g, device=device)
@@ -192,11 +205,17 @@ def walk(g, config, batch, device):
                 else (k[:, t - 1] + step) % n
         phi = k.float() * (TWO_PI / n)
     else:
-        phi = (2 * _rand(g, (batch, T), device) - 1) * math.pi
+        phi0 = (2 * _rand(g, (batch, 1), device) - 1) * math.pi
+        delta = (2 * _rand(g, (batch, T - 1), device) - 1) * DIR_DELTA_MAX
+        phi = phi0 + torch.cat([torch.zeros_like(phi0), torch.cumsum(delta, 1)], 1)
     move = v[..., None] * torch.stack([-torch.cos(phi), torch.sin(phi)], -1)
     pos = torch.cat([p0[:, None], p0[:, None] + torch.cumsum(move, 1)], 1)
-    rest = sample_headings(g, c, (batch, T), device)
-    theta = torch.cat([theta0[:, None], rest], 1)
+    # turns i.i.d. (uniform on the lattice or on [-omega_max, omega_max),
+    # minus a held-out band): with omega_max = pi the headings are i.i.d.
+    # uniform, as in the discrete task
+    turn = sample_turns(g, c, (batch, T), device)
+    theta = theta0[:, None] + torch.cat([torch.zeros_like(theta0[:, None]),
+                                         torch.cumsum(turn, 1)], 1)
     return pos, theta
 
 

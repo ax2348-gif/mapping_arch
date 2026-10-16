@@ -105,7 +105,10 @@ def add_args(p):
                             'imagenette_hp'))
     g.add_argument('--turn-n', type=int, default=0,
                    help='0: continuous turns; n: multiples of 2 pi / n')
-    g.add_argument('--motion', default='arc', choices=('arc', 'decoupled'))
+    g.add_argument('--motion', default=Config.motion, choices=('arc', 'decoupled'))
+    g.add_argument('--directions', default=Config.directions,
+                   choices=('persistent', 'lattice'),
+                   help="decoupled: 'lattice' = the discrete walk's no-reversal rule on the n-lattice")
     g.add_argument('--v-min', type=float, default=Config.v_min)
     g.add_argument('--v-max', type=float, default=Config.v_max)
     g.add_argument('--omega-max', type=float, default=math.pi)
@@ -127,6 +130,8 @@ def config_from_args(args, eval_holdout=None):
                   v_max=a.get('v_max', Config.v_max),
                   omega_max=a.get('omega_max', math.pi),
                   turn_n=a.get('turn_n', 0), motion=a.get('motion', 'arc'),
+                  directions=a.get('directions', 'lattice' if a.get('motion') == 'decoupled'
+                                   and a.get('turn_n') else 'persistent'),
                   holdout=tuple(a.get('holdout') or ()),
                   holdout_mode=eval_holdout or a.get('holdout_mode', 'exclude'),
                   query_times=a.get('query_times', 'uniform'),

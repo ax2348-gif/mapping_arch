@@ -100,12 +100,12 @@ def symbols_from_continuous(odo, step):
 
 
 def test_decoupled_grid_mode_reproduces_discrete_statistics():
-    c = Config(motion='decoupled', turn_n=4, v_min=9.0, v_max=9.0)
+    c = Config(motion='decoupled', directions='lattice', turn_n=4, v_min=9.0, v_max=9.0)
     cont = np.concatenate([symbols_from_continuous(
-        make_batch(c, i, DEV)['odometry'], 9.0).ravel() for i in range(4)])
+        make_batch(c, i, DEV)['odometry'], 9.0).ravel() for i in range(16)])
     bank, _ = load_bank('data/mnist.npz', 32, 'train', True)
     disc = np.concatenate([dbatch(np.random.default_rng(i), DConfig(heading=True),
-                                  bank, 64)['odometry'].ravel() for i in range(4)])
+                                  bank, 64)['odometry'].ravel() for i in range(16)])
     hc = np.bincount(cont, minlength=16) / cont.size
     hd = np.bincount(disc, minlength=16) / disc.size
     assert 0.5 * np.abs(hc - hd).sum() < 0.03          # total variation
@@ -124,6 +124,50 @@ def test_decoupled_grid_mode_reproduces_discrete_statistics():
     assert (hh == h.cpu().numpy()).all()
     p = (b['poses'][..., :2] - b['poses'][:, :1, :2]).cpu().numpy()
     assert np.abs(disp - p).max() < 1e-3
+
+
+@pytest.mark.parametrize('n', [0, 4, 16])
+def test_default_walk_is_persistent_decoupled_and_odometry_is_canonical(n):
+    """The default (2026-10-16): move directions change by U[-3pi/4, 3pi/4)
+    per step whatever n, speeds in [4.5, 9], turns i.i.d. on [-pi, pi) (or
+    the n-lattice); odometry is the body-frame move in the pre-step heading
+    plus the turn wrapped to [-pi, pi), and composes back to the poses."""
+    c = Config(turn_n=n)
+    assert c.motion == 'decoupled' and (c.v_min, c.v_max) == (4.5, 9.0)
+    b = make_batch(c, 0, DEV, batch=256)
+    pos, th, odo = b['poses'][..., :2], b['poses'][..., 2], b['odometry']
+    d = pos[:, 1:] - pos[:, :-1]
+    speed = d.norm(dim=-1)
+    assert speed.min() >= 4.5 - 1e-3 and speed.max() <= 9.0 + 1e-3
+    phi = torch.atan2(d[..., 1], -d[..., 0])
+    delta = torch.remainder(phi[:, 1:] - phi[:, :-1] + math.pi, 2 * math.pi) - math.pi
+    assert delta.abs().max() <= 0.75 * math.pi + 1e-3
+    assert abs(torch.cos(delta).mean().item() - 0.30) < 0.03
+    turn = odo[..., 2]
+    assert turn.min() >= -math.pi and turn.max() < math.pi
+    if n:
+        k = turn / (2 * math.pi / n)
+        assert (k - torch.round(k)).abs().max() < 1e-5
+        freq = torch.bincount((torch.round(k).long() + n // 2).flatten(), minlength=n).float() / k.numel()
+        assert freq.numel() == n and (freq - 1 / n).abs().max() < 0.02   # a half turn is -pi
+    else:
+        assert abs(turn.mean().item()) < 0.1 and abs(turn.abs().mean().item() - math.pi / 2) < 0.1
+    # integrate the odometry (a test-only re-implementation) back to the poses
+    h, p = th[:, 0].clone(), pos[:, 0].clone()
+    for t in range(odo.shape[1]):
+        cs, sn = torch.cos(h), torch.sin(h)
+        by, bx = odo[:, t, 0], odo[:, t, 1]
+        p = p + torch.stack([cs * by + sn * bx, -sn * by + cs * bx], -1)
+        h = h + odo[:, t, 2]
+        assert (p - pos[:, t + 1]).abs().max() < 1e-3
+        dh = torch.remainder(h - th[:, t + 1] + math.pi, 2 * math.pi) - math.pi
+        assert dh.abs().max() < 1e-3
+
+
+def test_holdout_band_applies_to_decoupled_turns():
+    c = Config(holdout=(1.0, 2.0))
+    turn = make_batch(c, 0, DEV, batch=256)['odometry'][..., 2].abs()
+    assert not ((turn >= 1.0 + 1e-4) & (turn < 2.0 - 1e-4)).any()
 
 
 def test_bank_option_runs():

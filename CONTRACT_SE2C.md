@@ -10,8 +10,36 @@ what is different. Design notes and measurements: `docs/lift/`.
 ## The task
 
 The agent's pose is continuous: a position (y, x) in pixels and a heading
-θ in radians. Each of 32 steps drives forward at a speed v ~ U[3.75, 7.5]
-px while turning by ω ~ U[-π, π), along the arc (the SE(2) exponential).
+θ in radians. Each of 32 steps, as in the discrete task, MOVES and then
+TURNS, independently (`motion='decoupled'`, the default since 2026-10-16
+by the user's decision):
+
+- **Move:** v ~ U[4.5, 9] px in a world direction that changes by
+  δ ~ U[-3π/4, 3π/4) per step (`directions='persistent'`). This is the
+  continuous form of "no immediate reversal": E cos δ = 0.30 against
+  the discrete walk's 1/3, and it is the same at every turn granularity
+  n, so the walk's spread is constant along the curriculum.
+- **Turn:** ω i.i.d., uniform on [-π, π) or on the n-lattice, so the
+  headings are i.i.d. uniform as in the discrete task.
+
+The first walk, driving along an arc while turning by ω ~ U[-π, π) at
+v ~ U[3.75, 7.5], stayed in a ~40 px blob (queries a median 10 px from
+their anchor; `docs/lift/sheets/episode_arc.png`). It remains available
+as `--motion arc`. The decoupled walk ends a median 40 px from its start,
+with queries a median 15 px from their anchor (`episode_decoupled.png`).
+
+**The odometry is the relative pose, canonical.** Step t's odometry is
+pose t+1 seen from pose t: the move as a body-frame (dy, dx) in the
+heading BEFORE the step, then the turn, wrapped to the minimal angle in
+[-π, π) (a half turn is -π; on the n-lattice the angle is snapped to
+2πk/n exactly). This is the discrete contract's convention: move
+relative to the pre-step heading, then turn. Since the motion is
+move-then-turn, this relative pose is the exact increment. A Lie-algebra
+twist (the log map) would describe an arc instead, and is not what is
+given. The shared encoding uses cos and sin of mθ, so the choice of
+representative changes nothing a model sees. It matters only to raw-angle
+consumers: held-out bands, probes and metrics.
+
 At each of the 33 poses it sees a 15 x 15 view rotated so that its
 heading is image-up, rendered EXACTLY from a procedural texture (white
 strokes on black, drawn fresh per episode; `mapping.se2c.texture`). It is
@@ -69,12 +97,13 @@ earlier rules apply, read with "odometry" for "directions":
 - `--turn-n n` (n in 4, 8, 16, 32; default 0, continuous): turns, the
   first heading and query heading changes on the lattice 2πk/n. The
   granularity curriculum.
-- `--motion decoupled`: heading drawn independently of the motion, world
-  moves on the lattice with no immediate reversal, as in the discrete
-  task; with `--turn-n 4 --v-min 9 --v-max 9` the odometry statistics
-  are the discrete SE(2) task's (tested).
+- `--motion decoupled|arc` (default decoupled) and `--directions
+  persistent|lattice` (default persistent). `lattice` takes move
+  directions on the n-lattice with no immediate reversal; with `--turn-n
+  4 --v-min 9 --v-max 9` the odometry statistics are the discrete SE(2)
+  task's (tested). This is the bridge setting.
 - `--holdout LO HI` with `--holdout-mode exclude|include|only`: a band of
-  |ω| left out of training; evaluation includes it.
+  |ω| (the turn) left out of training, in either motion; evaluation includes it.
 - `--v-min`, `--v-max`, `--omega-max`; `--query-coverage causal|global`.
 - `--se2c-texture procedural|mnist|imagenette|imagenette_hp`: the tile
   banks as an option, rendered with bilinear interpolation and 4 x 4
@@ -92,7 +121,7 @@ As before (`mse`, `mse_centered`, per prefix-length bins, last-step, the
 shuffled-odometry diagnostic which permutes the odometry vectors in
 time), with foreground = ink (target > 0.5), plus `mse_turnA_B`: error
 per |query heading change| bin. References on the default settings: the
-constant floor is 0.131 (16 evaluation batches, seed 0); a pose-oracle that interpolates the
+constant floor is 0.1307 on the decoupled default (0.1311 on the old arc walk; 16 evaluation batches, seed 0); a pose-oracle that interpolates the
 observations bicubically with the TRUE poses reaches 0.0005
 (`mapping.se2c.oracle`). Proposed reading (not frozen):
 **solved ≤ 0.02** (about a 0.5 px / 3° pose error, or a 1-px blur, per

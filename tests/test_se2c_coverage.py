@@ -34,7 +34,8 @@ def exact_check(batch, config):
 
 @pytest.mark.parametrize('kw', [dict(), dict(turn_n=8),
                                 dict(query_coverage='global'),
-                                dict(motion='decoupled'),
+                                dict(motion='arc'), dict(motion='arc', v_min=3.75, v_max=7.5),
+                                dict(motion='decoupled', directions='lattice', turn_n=4, v_min=9.0, v_max=9.0),
                                 dict(v_min=1.0, v_max=2.0)])
 def test_every_target_point_is_covered(kw):
     c = Config(**kw)
