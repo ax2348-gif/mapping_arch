@@ -319,7 +319,9 @@ def test_flags_and_config_agree(line):
     args = run.build(run.resolved(run.load(train.overrides_from_flags(parsed)))).legacy_args()
     if parsed.lr is None:
         parsed.lr = model_lr(parsed.task, parsed.model, parsed.size)
-    assert vars(args) == vars(parsed)
+    # every setting a flag expresses (a config field with no flag, a new
+    # generator setting say, is in args only, at its config default)
+    assert {k: vars(args).get(k, '<missing>') for k in vars(parsed)} == vars(parsed)
 
 
 @pytest.mark.parametrize('line', ['--model hybrid4 --size xs --turn-n 4',
@@ -540,3 +542,11 @@ def test_job_generators_write_commands_that_compose(tmp_path):
                               '$(( S / 1000 ))': '62', '$S': '62500'})
     e = run.build(run.resolved(run.load(argv)))
     assert (e.task.name, e.run.steps, e.run.name, e.schedule.name) == ('se2c', 62500, 'p_cd62k', 'wsd')
+
+
+def test_a_value_for_another_variant_is_explained(tmp_path):
+    f = tmp_path / 'x.yaml'
+    f.write_text('# @package _global_\ndefaults:\n  - override /schedule: wsd\n'
+                 'schedule:\n  cooldown: 0.3\n')
+    with pytest.raises(SystemExit, match='cooldown is set .* mapping.config.Cosine, has no such field'):
+        run.main(['--exp', str(f), 'model=z2/hybrid4', 'schedule=cosine', '--print'])

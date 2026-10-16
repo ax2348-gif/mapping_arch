@@ -251,7 +251,11 @@ def main(argv=None):
     try:
         experiment = build(cfg)
     except InstantiationException as e:
-        raise SystemExit(f'config error: {e}') from e
+        m = re.search(r"target '([\w.]+)'.*unexpected keyword argument '(\w+)'", str(e), re.S)
+        hint = (f'\n{m.group(2)} is set (by a file in the composition, the experiment or an '
+                f'override) for a node whose class, {m.group(1)}, has no such field: was '
+                f'it written for another variant (a schedule, a generator)?') if m else ''
+        raise SystemExit(f'config error: {e}{hint}') from e
     if show:
         print(OmegaConf.to_yaml(cfg))
         print(flags_equivalent(cfg, experiment))
