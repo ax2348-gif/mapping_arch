@@ -135,7 +135,7 @@ docs/scaling_study_design.md.
 - **2026-10-16, the bridge moved to Torch** (user's call): job 20036564. It runs from a separate tree, /scratch/ax2348/mapping_lift, so the scaling study's code stays frozen while its jobs are queued. Job file: jobs/lift/se2c_bridge_hybrid4c_xs.sbatch (jobs/ is gitignored). Locally, `dec_100k_qt` (the new default) is next under the lock, and the ablation queue waits for it.
 - **2026-10-16, PAUSE, user's call: focus only on the bridge -> new-default hill climb.**
   - Both agents (pre-freeze ablations, blind probe) are stopped, along with their launchers. Paused, not cancelled:
-    - convrace xs, killed at ~35k of 100k (checkpoints every 5k);
+    - convrace xs, killed at 78k of 100k (checkpoints every 5k; I first misreported this as ~35k);
     - hybrid45b_nocopro, _mid and _two at s;
     - the blind probe's cdiag and its n-sweep. Its gdn_b1 was reported solving: long-lag position nmse 0.017 at 68k.
   - The Torch bridge job 20036564 was cancelled. The bridge runs locally now, alone on the GPU.
