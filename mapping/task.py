@@ -30,7 +30,7 @@ class TaskSpec:
     """What a model needs to know to size itself."""
     view: int = 9            # S
     steps: int = 32          # T; T + 1 observations
-    directions: int = 4
+    directions: int = 4      # 5 under odometry dropout: 4 is "unknown"
     step_px: int = 9
     queries: int = 8
 
@@ -41,7 +41,8 @@ class TaskSpec:
         return self.steps * self.step_px
 
 
-FORBIDDEN_KEYS = ('positions',)
+# directions_true: the undropped symbols under odometry dropout, diagnostics
+FORBIDDEN_KEYS = ('positions', 'directions_true')
 
 
 def prepare(batch, device):

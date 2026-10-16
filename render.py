@@ -27,9 +27,7 @@ def main():
     a = p.parse_args()
     import inspect
     model, args, spec, task = load_checkpoint(a.checkpoint, a.device)
-    config, _ = tasks.config_and_spec(task, spec.steps, spec.queries,
-                                      args['seed'],
-                                      args.get('query_times', 'last'))
+    config = tasks.config_from_args(task, spec, args)
     _, eval_bank = load_banks(args['bank'], config)
     batches = eval_set(config, eval_bank, 64, 2, args['seed'])
     out = a.out or os.path.join(os.path.dirname(a.checkpoint), 'grid.png')

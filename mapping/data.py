@@ -19,6 +19,11 @@ import numpy as np
 # direction k moves by MOVES[k]; the reverse of k is (k + 2) % 4
 MOVES = np.array([[-1, 0], [0, 1], [1, 0], [0, -1]], dtype=np.int64)
 
+# odometry vocabularies, and the reserved "unknown" symbol odometry dropout
+# writes: the next index after the real ones (4 on Z^2, 16 on SE(2))
+VOCAB = {False: 4, True: 16}           # keyed by Config.heading
+UNKNOWN = dict(VOCAB)
+
 
 @dataclass(frozen=True)
 class Config:
@@ -35,6 +40,9 @@ class Config:
                                 # step; 'uniform': each query at a step drawn
                                 # uniformly from 0..T and answerable from the
                                 # observations up to that step
+    odometry_dropout: float = 0.0   # probability that each step's odometry
+                                    # symbol is replaced by the reserved
+                                    # "unknown" symbol (see make_batch)
     seed: int = 0
 
     def __post_init__(self):
@@ -43,6 +51,10 @@ class Config:
                              'non-uniform')
         if self.query_times not in ('last', 'uniform'):
             raise ValueError(f'query_times {self.query_times!r}')
+        if not 0.0 <= self.odometry_dropout <= 1.0:
+            raise ValueError(f'odometry_dropout {self.odometry_dropout}')
+        if not 1 <= self.step:
+            raise ValueError(f'step {self.step}')
 
 
 
@@ -258,6 +270,16 @@ def make_batch(rng, config, bank, batch):
     written for one cannot silently consume the other. The heading draws
     come after everything else, so with ``heading`` off the batch is
     byte-identical to what the Z^2 generator always produced.
+
+    Odometry dropout (``config.odometry_dropout`` p > 0): each step's
+    symbol in ``directions`` / ``odometry`` is independently replaced, with
+    probability p, by ``UNKNOWN[config.heading]`` (4 on Z^2, 16 on SE(2)),
+    and the batch gains the undropped symbols as ``directions_true`` /
+    ``odometry_true``, for diagnostics only (in the task modules'
+    ``FORBIDDEN_KEYS``). The mask is the last draw from ``rng``, and is not
+    drawn at all when p is 0, so with p = 0 the batch is exactly what it was
+    before the option existed, and with p > 0 every other field is
+    identical to the p = 0 batch of the same seed.
     """
     c = config
     directions, displacement = random_walk(rng, batch, c.steps, c.step)
@@ -277,9 +299,10 @@ def make_batch(rng, config, bank, batch):
         times[i] = episode.query_times
         episodes.append(episode)
     if not c.heading:
-        return dict(observations=observations, directions=directions,
-                    positions=positions, query_offset=offsets,
-                    query_time=times, target=targets, episodes=episodes)
+        out = dict(observations=observations, directions=directions,
+                   positions=positions, query_offset=offsets,
+                   query_time=times, target=targets, episodes=episodes)
+        return drop_odometry(rng, c, out, 'directions')
     from mapping import se2
     headings = rng.integers(0, 4, size=(batch, c.steps + 1))
     query_headings = rng.integers(0, 4, size=(batch, c.queries))
@@ -287,11 +310,26 @@ def make_batch(rng, config, bank, batch):
     rows = np.arange(batch)[:, None]
     pose = se2.query_pose(queries, query_headings, positions[rows, times],
                           headings[rows, times])
-    return dict(observations=se2.face(observations, headings),
-                odometry=se2.encode(directions, headings),
-                positions=positions, headings=headings,
-                query_pose=pose.astype(np.int32), query_time=times,
-                target=se2.face(targets, query_headings), episodes=episodes)
+    out = dict(observations=se2.face(observations, headings),
+               odometry=se2.encode(directions, headings),
+               positions=positions, headings=headings,
+               query_pose=pose.astype(np.int32), query_time=times,
+               target=se2.face(targets, query_headings), episodes=episodes)
+    return drop_odometry(rng, c, out, 'odometry')
+
+
+def drop_odometry(rng, config, batch, key):
+    """Odometry dropout in place on ``batch[key]``, keeping the true
+    symbols under ``key + '_true'``. Must be the last draw from ``rng``;
+    draws nothing when the rate is 0, which leaves the batch untouched."""
+    p = config.odometry_dropout
+    if p == 0:
+        return batch
+    true = batch[key]
+    dropped = rng.random(true.shape) < p
+    batch[key] = np.where(dropped, UNKNOWN[config.heading], true)
+    batch[key + '_true'] = true
+    return batch
 
 
 class EpisodeStream:

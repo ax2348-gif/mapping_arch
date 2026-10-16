@@ -17,7 +17,8 @@ and returns
     pred          (B, Q, S, S) float                 the view at each query,
                                                      facing the query heading
 
-``positions`` and ``headings`` are in the batch for diagnostics only.
+``positions`` and ``headings`` are in the batch for diagnostics only, as is
+``odometry_true`` under odometry dropout.
 Loss, metrics and the constant floor are those of the Z^2 task.
 """
 from dataclasses import dataclass
@@ -31,7 +32,8 @@ class TaskSpec:
     """What a model needs to know to size itself."""
     view: int = 9            # S
     steps: int = 32          # T; T + 1 observations
-    odometry: int = 16       # symbols: 4 turns x 4 moves
+    odometry: int = 16       # symbols: 4 turns x 4 moves; 17 under
+                             # odometry dropout, 16 being "unknown"
     turns: int = 4
     step_px: int = 9
     queries: int = 8
@@ -41,7 +43,8 @@ class TaskSpec:
         return self.steps * self.step_px
 
 
-FORBIDDEN_KEYS = ('positions', 'headings')
+# odometry_true: the undropped symbols under odometry dropout, diagnostics
+FORBIDDEN_KEYS = ('positions', 'headings', 'odometry_true')
 
 
 def prepare(batch, device):

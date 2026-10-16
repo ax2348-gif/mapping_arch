@@ -86,6 +86,14 @@ def parse():
                         "tasks); 'uniform': each query at a step drawn "
                         "uniformly from 0..T, answerable from the "
                         "observations up to it")
+    p.add_argument('--step-px', type=int, default=9,
+                   help='walk step in pixels (generator setting, not a new '
+                        'task); below the 9-pixel window consecutive '
+                        'observations overlap. offset_max = steps * step_px')
+    p.add_argument('--odometry-dropout', type=float, default=0.0,
+                   help='probability that each step\'s odometry symbol is '
+                        'replaced by a reserved "unknown" symbol (generator '
+                        'setting, not a new task); 1.0 hides all odometry')
     return p.parse_args()
 
 
@@ -114,7 +122,10 @@ def evaluate(model, batches, device, autocast, prepare, metrics,
              takes_time, steps, shuffle_directions=False):
     """``shuffle_directions`` permutes each episode's odometry tokens in
     time (directions on z2, symbols on se2). Returns the whole-set metrics
-    plus the per-prefix-length breakdown."""
+    plus the per-prefix-length breakdown. Under odometry dropout the
+    permutation moves the unknown symbols too, so it tests only the known
+    ones; with every symbol dropped it is a no-op (see
+    ``shuffle_informative``)."""
     model.eval()
     preds, targets, times = [], [], []
     gen = torch.Generator().manual_seed(0)
@@ -150,7 +161,11 @@ def main():
 
     config, spec = tasks.config_and_spec(args.task, args.episode_steps,
                                          args.queries, args.seed,
-                                         args.query_times)
+                                         args.query_times, args.step_px,
+                                         args.odometry_dropout)
+    # the shuffled-odometry diagnostic permutes the model-facing symbols;
+    # with all of them replaced by "unknown" it cannot change anything
+    shuffle_informative = args.odometry_dropout < 1.0
     train_bank, eval_bank = load_banks(args.bank, config)
     start = 0
     branch = None
@@ -158,8 +173,11 @@ def main():
         branch = torch.load(args.branch, map_location='cpu',
                             weights_only=False)
         start = branch['step']
-        for key in ('task', 'model', 'size', 'batch', 'seed'):
-            if branch['args'][key] != vars(args)[key]:
+        defaults = {'step_px': 9, 'odometry_dropout': 0.0,
+                    'query_times': 'last'}
+        for key in ('task', 'model', 'size', 'batch', 'seed', 'step_px',
+                    'odometry_dropout', 'query_times'):
+            if branch['args'].get(key, defaults.get(key)) != vars(args)[key]:
                 raise SystemExit(f'--branch {key} mismatch: checkpoint '
                                  f'{branch["args"][key]!r}, run '
                                  f'{vars(args)[key]!r}')
@@ -208,13 +226,22 @@ def main():
 
     print(f'{args.task} {args.model}/{args.size} -> {out}: {params:,} params, '
           f'lr {args.lr:.2g}; floor mse {floor["mse"]:.4f}, '
-          f'floor fg_mae {floor["fg_mae"]:.4f}', flush=True)
+          f'floor fg_mae {floor["fg_mae"]:.4f}; step_px {args.step_px}, '
+          f'odometry_dropout {args.odometry_dropout}', flush=True)
+    if not shuffle_informative:
+        print('all odometry is dropped: the "dirs shuffled" number permutes '
+              'unknown symbols only and equals eval mse by construction; it '
+              'says nothing about odometry use', flush=True)
     log = open(os.path.join(out, 'log.jsonl'), 'w')
     log.write(json.dumps({'step': 0, 'task': args.task, 'model': args.model,
                           'size': args.size, 'run': run, 'params': params,
                           'lr': args.lr, 'floor': floor,
                           'schedule': args.schedule, 'branch': args.branch,
-                          'start': start}) + '\n')
+                          'start': start, 'step_px': args.step_px,
+                          'odometry_dropout': args.odometry_dropout,
+                          'offset_max': spec.offset_max,
+                          'shuffle_informative': shuffle_informative,
+                          'args': vars(args)}) + '\n')
     log.flush()
     best, best_step = None, -1
     t_start = time.perf_counter()
@@ -259,7 +286,8 @@ def main():
                       f'fg_mae {ev["fg_mae"]:.4f} '
                       f'fg<0.1 {ev["fg_within_0.1"]:.3f} '
                       f'| dirs shuffled mse '
-                      f'{rec["eval_shuffled"]["mse"]:.4f} '
+                      f'{rec["eval_shuffled"]["mse"]:.4f}'
+                      f'{"" if shuffle_informative else " (n/a: all dropped)"} '
                       f'({rec["steps_per_s"]:.1f} it/s)', flush=True)
             log.write(json.dumps(rec) + '\n')
             log.flush()
@@ -272,6 +300,9 @@ def main():
 
     final = {'task': args.task, 'model': args.model, 'size': args.size,
              'run': run, 'query_times': args.query_times,
+             'step_px': args.step_px,
+             'odometry_dropout': args.odometry_dropout,
+             'shuffle_informative': shuffle_informative,
              'schedule': args.schedule, 'branch': args.branch,
              'start': start,
              'params': params, 'steps': args.steps, 'batch': args.batch,
@@ -293,7 +324,8 @@ def main():
                 takes_time=takes_time)
     plot_run(out, final)
     print(f'done: eval mse {final["final_eval"]["mse"]:.4f} '
-          f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}, '
+          f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}'
+          f'{"" if shuffle_informative else " n/a"}, '
           f'floor {floor["mse"]:.4f}); wrote {out}')
 
 

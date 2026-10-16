@@ -81,6 +81,10 @@ from a learning-rate grid; name one anything with `--run`.
 python train.py --model vanilla --size m --steps 20000          # one run
 python train.py --model vanilla --size m --steps 20000 --lr 1e-3 --run seed0_lr1e-3
 python render.py results/vanilla/m/seed0/final.pt --rows 24     # redraw
+# generator settings (same tasks, CONTRACT.md "Generator settings"):
+python train.py --task se2 --model hybrid4 --size xs --query-times uniform \
+    --step-px 3 --odometry-dropout 1.0 --run seed0_vo  # visual odometry
+python tools/registrability.py --step-px 1 2 3     # ceiling for that run
 python summarize.py                                             # all runs
 python summarize.py --fit                                       # best per rung + fits
 ```

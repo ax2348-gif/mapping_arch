@@ -40,10 +40,17 @@ def run_title(final):
     """Title line from a run's final.json dict."""
     e, s = final['final_eval'], final.get('final_eval_shuffled')
     shuffled = f', dirs shuffled {s["mse"]:.4f}' if s else ''
+    if not final.get('shuffle_informative', True):
+        shuffled = ', dirs shuffled n/a'
+    settings = ''.join(
+        f', {k} {final[k]}' for k, d in (('step_px', 9),
+                                         ('odometry_dropout', 0.0))
+        if final.get(k, d) != d)
     return (f'{final.get("task", "z2")} {final["model"]}/{final["size"]}/'
             f'{final.get("run", "")}  '
             f'{final["params"]:,} params, {final["steps"]} steps, eval mse '
-            f'{e["mse"]:.4f}{shuffled}, floor {final["floor"]["mse"]:.4f}')
+            f'{e["mse"]:.4f}{shuffled}, floor {final["floor"]["mse"]:.4f}'
+            f'{settings}')
 
 
 def _to_image(x):

@@ -30,7 +30,8 @@ def best_per_size(rows):
     mse: the way a learning-rate grid is read."""
     best = {}
     for r in rows:
-        key = (r['model'], r['size'], r.get('query_times', 'last'))
+        key = (r['model'], r['size'], r.get('query_times', 'last'),
+               r.get('step_px', 9), r.get('odometry_dropout', 0.0))
         if key not in best or (r['final_eval']['mse']
                                < best[key]['final_eval']['mse']):
             best[key] = r

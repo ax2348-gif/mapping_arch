@@ -8,7 +8,8 @@ finished contribution consists of.
 
 A map is a grid of MNIST tiles. An agent takes 32 steps of 9 pixels in
 cardinal directions, observing a 9x9 window at each of the 33 positions.
-Windows never overlap. The model is then asked to render the 9x9 window at
+Windows never overlap (unless the step is set smaller, see "Generator
+settings" below). The model is then asked to render the 9x9 window at
 a query position, given only:
 
 | input | shape | meaning |
@@ -36,6 +37,32 @@ Every query pixel was observed at some earlier step, so the task is fully
 determined by the inputs: there is nothing to guess, only to assemble.
 Query offsets fall at arbitrary pixel positions, so a target straddles up
 to four observed windows and is never a single stored one.
+
+## Generator settings: step size and odometry dropout
+
+Two settings of the generator change the episodes without making a new
+task; the interface, the rules and the batch keys are those above, and
+with both at their defaults every batch is byte-identical to before they
+existed (`tests/test_contract_z2.py`, `tests/test_generator_options.py`).
+
+- **Step size** (`Config.step`, `train.py --step-px`, default 9). Below 9
+  consecutive windows overlap by `9 - step` pixels. `TaskSpec.step_px`
+  and `offset_max = steps * step_px` follow it, so a model that scales
+  offsets by `offset_max` sees a different scale; coverage and query
+  sampling are unchanged (a query asked at step t is still fully observed
+  by step t).
+- **Odometry dropout** (`Config.odometry_dropout`, `train.py
+  --odometry-dropout`, default 0). Each step's symbol is independently
+  replaced, with that probability, by a reserved **unknown** symbol: index
+  4 here, the next one after the real vocabulary. When the rate is above
+  0, `TaskSpec.directions` is 5 so tables sized from the spec get a row
+  for it; a model must not give index 4 any other meaning. The undropped
+  symbols are in the batch as `directions_true`, for diagnostics only
+  (`FORBIDDEN_KEYS`); a model never receives them. At rate 1 no odometry
+  reaches the model, so the pose between frames can come only from
+  registering overlapping observations (visual odometry); this makes
+  sense only with a step below 9. The trainer's shuffled-directions
+  number is then a no-op and is reported as n/a.
 
 This is the **single offline setting with relative odometry**: full
 attention over the whole episode is allowed, queries are answered at the

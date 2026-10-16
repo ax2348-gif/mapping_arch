@@ -31,6 +31,21 @@ full attention and relative odometry only.
 `mapping.se2` fixes the conventions and `tests/test_se2.py` checks them;
 `python -m pytest` must pass before any model is trained.
 
+## Generator settings: step size and odometry dropout
+
+The two generator settings of `CONTRACT.md` ("Generator settings") apply
+here unchanged and do not make a new task. `--step-px` sets the walk step
+(`TaskSpec.step_px`, `offset_max = steps * step_px`); below 9 consecutive
+observations overlap. `--odometry-dropout p` replaces each odometry symbol,
+with probability p, by the reserved **unknown** symbol 16; when p > 0
+`TaskSpec.odometry` is 17 so tables sized from it get the extra row, and a
+model must not decode 16 as a (turn, move) pair. The true symbols ride in
+the batch as `odometry_true`, in `FORBIDDEN_KEYS` beside `positions` and
+`headings`. With p = 1 and a step below 9, the relative pose between
+frames (move and turn) is recoverable only by registering the overlap of
+consecutive observations; `tools/registrability.py` measures how often
+that is possible at all on MNIST maps, which is the ceiling for any model.
+
 ## Why this rung
 
 In the Z² task, placing a frame means summing the moves: one abelian group
@@ -57,8 +72,8 @@ All exclusions in `CONTRACT.md` apply, read with "odometry" for
 - **No un-rotating the observations.** The observations arrive facing
   their heading and must be consumed as given. Rotating them by anything
   derived from the odometry is external geometry.
-- **No use of `positions` or `headings`.** Both are in the batch for
-  diagnostics only.
+- **No use of `positions`, `headings` or `odometry_true`.** They are in
+  the batch for diagnostics only.
 - **Query pose is a raw input.** Embed the three integers however you
   like; do not combine them with the odometry by arithmetic the model did
   not learn.
