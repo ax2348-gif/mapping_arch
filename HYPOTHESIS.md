@@ -354,3 +354,35 @@ part of hybrid4's mixer.
 - **What it means for H.** In the transition classes tried here, only the
   one that rotates through learned reflections found the rotation at this
   budget. The capacity to rotate was necessary but not sufficient.
+
+### 2026-10-16: vanilla4 solves SE(2) at scale (P1 effectively falsified at l)
+
+Cluster runs, SE(2), MNIST, per-step queries, warmup-stable-decay, seed
+0, single learning rate (muP base 3e-4).
+
+| run | params | first meets "solved" | 90k steps | final |
+| --- | --- | --- | --- | --- |
+| vanilla4 l | 6.5M | step 50k | 0.0027 | 0.0001 at 400k (shuffled 0.129) |
+| vanilla4 xl | 21M | step 30k | 0.0012 | running |
+| hybrid4 l | 6.8M | step 10k | 0.0006 | running |
+| hybrid4 xs | 0.12M | ~step 90k | | 0.0180 at 100k |
+
+- **What vanilla4 is.** hybrid4 with every mixer replaced by softmax
+  attention, with RoPE on the step index. It is the transformer the user
+  defined as the fair comparison, and it belongs to the class H says
+  lacks the capability.
+- **P1 as written.** It names `vanilla` and `vanilla2`, which have not
+  been run on SE(2). Its substance is falsified at the l rung: an
+  attention-only model solves SE(2) within 400k steps, at a single
+  learning rate.
+- **What survives.** H fails in its "fail" form. It holds, so far, in
+  its "much more efficient" form: hybrid4 l reaches the threshold in 5x
+  fewer steps than vanilla4 l at matched size, and hybrid4 solves at
+  0.12M parameters, where vanilla4 has not been tried. This is
+  consistent with the theory review: Z4 ⋉ Z² is solvable, so attention
+  can represent it.
+- **What decides the efficiency claim.** vanilla4 at xs, s and m against
+  hybrid4 at matched sizes and steps. Does vanilla4 fail below some
+  size, and how far apart are the curves?
+- **Cautions.** Single seeds. Errors near 1e-4 are unusually low and
+  should be audited (tools/audit_se2.py) before being relied on.
