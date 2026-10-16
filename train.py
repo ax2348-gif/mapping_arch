@@ -334,7 +334,8 @@ def main():
                 rec['eval'] = ev
                 rec['eval_shuffled'] = evaluate(model, held_out, device,
                                                 autocast, prepare, metrics,
-                                                takes_time, spec.steps, True)
+                                                takes_time, spec.steps, True,
+                                                by_query=by_query)
                 if best is None or ev['mse'] < best['mse']:
                     best, best_step = ev, step + 1
                 by_t = ('' if args.query_times == 'last' else
@@ -348,6 +349,11 @@ def main():
                       f'{rec["eval_shuffled"]["mse"]:.4f}'
                       f'{"" if shuffle_informative else " (n/a: all dropped)"} '
                       f'({rec["steps_per_s"]:.1f} it/s)', flush=True)
+                if 'mse_far' in ev:      # se2c: by query kind, true | shuffled
+                    sh = rec['eval_shuffled']
+                    print('             by kind: ' + '  '.join(
+                        f'{k} {ev["mse_" + k]:.4f}|{sh["mse_" + k]:.4f}'
+                        for k in ('fallback', 'near', 'mid', 'far')), flush=True)
             log.write(json.dumps(rec) + '\n')
             log.flush()
         if args.save_every and (step + 1) % args.save_every == 0 and not last:
