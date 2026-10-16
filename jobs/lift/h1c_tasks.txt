@@ -1,0 +1,25 @@
+# H1c grid (HYPOTHESIS.md, 2026-10-16 amendment). One line = one GPU job.
+# Fields: model size seed episode_steps ; a second run after '|' is packed onto the same GPU (small models).
+hybrid4_causal s 1 32 | hybrid4_causal s 2 32
+vanilla4_causal s 1 32 | vanilla4_causal s 2 32
+hybrid4 s 2 32 | vanilla4 s 2 32
+hybrid4_causal s 0 64 | vanilla4_causal s 0 64
+hybrid4_causal m 0 32
+hybrid4_causal m 1 32
+hybrid4_causal m 2 32
+vanilla4_causal m 0 32
+vanilla4_causal m 1 32
+vanilla4_causal m 2 32
+hybrid4 m 1 32
+hybrid4 m 2 32
+vanilla4 m 1 32
+vanilla4 m 2 32
+hybrid4_causal l 0 32
+hybrid4_causal l 1 32
+hybrid4_causal l 2 32
+vanilla4_causal l 1 32
+vanilla4_causal l 2 32
+hybrid4 l 1 32
+hybrid4 l 2 32
+vanilla4 l 1 32
+vanilla4 l 2 32

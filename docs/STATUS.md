@@ -310,3 +310,9 @@ docs/scaling_study_design.md.
       - vanilla4_causal l
   - **References:** the existing bidirectional 400k WSD runs at results/se2/{hybrid4,vanilla4}/{s,l}/seed0_400k_qt_wsd.
   - Part A and part B of the earlier interrogation plan are cancelled for now.
+- **2026-10-16, H1c grid submitted:** Torch array 20072852, 23 GPU jobs, ≤10 concurrent. jobs/lift/h1c_grid.sbatch and h1c_tasks.txt are in /scratch/ax2348/mapping_hydra/jobs/.
+  - Packed two runs per GPU for s, against low-utilisation kills.
+  - Covers: causal and bidirectional hybrid4/vanilla4 × s, m, l × seeds 0-2 (cells not already run), plus the T=64 causal s pair.
+  - H1c was registered as a DRAFT amendment in HYPOTHESIS.md (commit ba3206f) BEFORE submission; awaiting the user's sign-off on the thresholds.
+  - Related runs: vanilla4_causal s seed 0 (local); 20070043 (hybrid4_causal s and vanilla4_causal l, seed 0).
+  - We are at the per-user GPU cap (QOSMaxGRESPerUser), so the grid queues behind running jobs.
