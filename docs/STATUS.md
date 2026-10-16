@@ -1,7 +1,9 @@
 # Project status and handoff (updated 2026-10-16)
 
-The single place to resume from after a context reset. The research journal
-holds the narrative:
+The single place to resume from after a context reset. **Run `xp ls` first**:
+the latest runs, newest first, one line each (start, status, note, path, host,
+tag, final mse), live and retroactive (`*`); `xp show <run>` for one of them
+(docs/config.md, "xp"). The research journal holds the narrative:
 https://claude.ai/artifact/24DMrX4JZkcwD4DGthpLYG (Claude Docs doc 088bfc9f-b37f-4622-b6da-c2ec7c39fe39,
 prose node 579ba254-c943).
 

@@ -362,6 +362,46 @@ docs/provenance_design.md, §15 has what was built):
 - See a run's code: `git show refs/runs/<run_id>`; check it out with
   `git worktree add --detach <dir> refs/runs/<run_id>`.
 
+## xp: the porcelain
+
+`xp` (mapping/xp/, `pip install -e .` once, or `python -m mapping.xp`)
+reads the ledger and wraps git and run.py; it never trains itself.
+`--explain` prints every underlying command; `--dry-run` prints those that
+would change something and runs none; queries take `--json`.
+
+```
+xp ls                         the latest 20 runs, newest first: start, status, note, path,
+                              host, tag, final mse (retroactive records marked *)
+xp ls --all --running --tag h1c --task se2d --model hybrid4 --host torch --since 2d --json
+xp show <run>                 one run: record, snapshot (git show --stat), dirty diff, files,
+                              registry entry, reproductions
+xp compare <run> <run> ...    final metrics, config differences, code differences (--grid)
+xp run <preset> -m '<note>' [overrides] [--tag T] [--bg]     python run.py +experiment=<preset>
+xp reproduce <run>            the run's exact code in a temporary worktree, into
+                              <run>/reproductions/<UTC ts>_<new id>/, with reproduce_report.json
+xp sync                       commit experiments/ledger/ (by explicit path; local only for now)
+xp tag <run> <tag> --note ..  append to experiments/registry.yaml (tagged:)
+```
+
+A `<run>` is its id, a unique prefix or 6-hex suffix of it, or its results
+path (`z2/vanilla4/xs/a`, `torch:se2d/hybrid4/s/seed0_400k_qt_wsd`).
+
+**Reproductions.** `xp reproduce` checks out `refs/runs/<id>` as a detached
+worktree, links the data files the run read (refusing if their sha256
+differs from the ledger's, unless `--allow-data-drift`), and runs that
+worktree's own `run.py --from <the run's config>` with
+`run.out=<run>/reproductions/<UTC ts>_<new id>/` and
+`run.note='reproduce <id>'`. The new run's ledger record says
+`"reproduces": "<id>"`, and its snapshot is the original's (the worktree is
+clean at it). `reproduce_report.json` compares final metrics, checkpoint
+tensors (tools/compare_checkpoints.py), code, environment, data and config;
+its verdict is `bitwise` (identical checkpoint tensors and metrics),
+`within_tolerance` (`--tolerance`, 1e-6) or `differs`. A run not on this
+machine gets a stand-in directory marked `STUB`, holding its record.
+summarize.py, scaling.py's fits and `mapping.provenance.iter_run_dirs` never
+count anything under `reproductions/`. A retroactive record has no snapshot
+and is refused.
+
 ## Outputs and reruns
 
 - **What a run directory holds besides the results.** `config.yaml`, the

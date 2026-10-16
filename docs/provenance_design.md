@@ -1,6 +1,6 @@
 # Experiment provenance: design (Phase 2, for approval)
 
-Status: PROPOSAL, 2026-10-16. Nothing here is implemented. §0b (build, adopt or hybrid) decides first; the sections after it assume its recommendation, BUILD. It follows the brief the user agreed,
+Status: APPROVED with the user's decisions (§14); phases 1-4 IMPLEMENTED on master (§15, which records every deviation); the Torch migration is a runbook awaiting the go-ahead (§16). Originally a proposal, 2026-10-16. §0b (build, adopt or hybrid) decides first; the sections after it assume its recommendation, BUILD. It follows the brief the user agreed,
 the audit in `experiments/audit/README.md` (Phase 1), and the user's later decisions (A)
 run-directory template, (B) the `xp reproduce` layout, and (C) a code-structure audit.
 Decisions I added myself, not in the brief, are marked **[mine]**. Open questions are collected
@@ -1081,3 +1081,194 @@ Each phase is one commit on master, with the full suite green against
   is the experiment's registry title; tags `major` and the experiment id.
 - **Not done:** §6 step 1's `refs/archive/torch/*` commits (they need the
   Torch trees; Torch is out of scope until the runbook is approved).
+
+### Phase 4: the `xp` porcelain
+
+- **Where.** `mapping/xp/` (`cli.py`, `ledger_query.py`, `__main__.py`),
+  console script `xp = mapping.xp.cli:main` in the new `pyproject.toml`
+  (installed locally with `pip install -e . --no-deps`; `python -m
+  mapping.xp` works without it). xp imports only `mapping.provenance` and
+  the standard library (plus yaml/omegaconf for the registry and run
+  sources); it never imports the trainer, run.py or torch (AST test, and a
+  check that importing it leaves torch unloaded). Checkpoint comparison is
+  `tools/compare_checkpoints.py`, run as a subprocess.
+- **Subcommands built:** `ls`, `show`, `compare`, `run`, `reproduce`, `sync`
+  (local git only), `tag`. Not built (STOP before Torch): `submit`, `gpu`,
+  the remote half of `sync`, `import-legacy` (the importer is
+  `tools/import_retro.py`), `workspace`.
+- **`xp ls` (the user's addition):** temporal order is the default view,
+  newest first, `--latest N` (20) or `--all`, one line per run: start
+  (local, `MM-DD HH:MM`), status (running, done, failed, stopped), note
+  (clipped to 32), path (`results.rel`, clipped from the left so the run
+  name stays), host, tag (launch tags plus registry `tagged:`; `major` only
+  when it is the only one), final mse (plus last-step when it differs), and
+  the id's 6-hex suffix (`retro` for retroactive records, which are marked
+  `*` and ordered by the audit's start estimate). Filters compose:
+  `--running --tag --task --model --host --since 2d`; `--json` gives the
+  whole records. A `<run>` argument anywhere is an id, a unique prefix or
+  6-hex suffix, or a results path (`host:rel` too).
+- **`xp run`** builds `python run.py +experiment=<preset> | --exp FILE |
+  overrides`, `run.note=<-m, Hydra-quoted>`, `run.tag=[...]`, with
+  `XP_VIA=xp run`; `--bg` detaches with a log under `results/jobs/logs/`.
+  The design's `flock <gpu_lock>` is wired but **no lock path is set**:
+  `conf/hosts.yaml` has the `hosts.<host>.gpu_lock` slot commented, OPEN for
+  the user (the earlier session lock lived in a scratchpad).
+- **`xp reproduce`** follows §5 with the agreed layout: a detached worktree
+  at the snapshot, the data files linked in one by one (a `data` symlink
+  would itself be an untracked path and make the reproduction's snapshot
+  dirty) after checking their sha256 against the ledger, the original's
+  sources rebuilt from its ledger record, and that worktree's own `run.py
+  --from ... run.out=<run>/reproductions/<UTC ts>_<new id>/
+  run.note='reproduce <id>'` with `XP_REPRODUCES` and `XP_RUN_ID` (the new
+  id, chosen first so the folder can carry it; provenance checks its form).
+  `reproduce_report.json` holds the verdict (`bitwise`: identical final
+  checkpoint tensors and metrics; `within_tolerance`; `differs`) with the
+  metric, checkpoint, code, env, data and config comparisons; the verdict is
+  printed as `VERDICT: ...`, and the exit status is 0 only for bitwise or
+  within tolerance. The worktree is removed unless `--keep`. A run that is
+  not on this machine gets a stand-in parent marked `STUB` with
+  `LEDGER.json`. `mapping.results.load_runs` and
+  `mapping.provenance.iter_run_dirs` skip `reproductions/`.
+- **`xp sync`** (local): under `flock <git-common-dir>/xp-sync.lock`, `git
+  add -- experiments/ledger`, then one `git commit -m "ledger: sync (<host>
+  +N ~M)" -- experiments/ledger` (explicit path: other staged work is never
+  swept in); "nothing to sync" when the ledger is already committed.
+- **`xp tag`** appends `{id, tag, note, date}` under `tagged:` at the end of
+  experiments/registry.yaml (text append, comments kept; refused if
+  `tagged:` is not the last section); the ledger stays single-writer.
+- **Tests** (tests/test_xp.py, on throwaway clones with real provenance):
+  each subcommand, `--json` and `--explain`/`--dry-run`, and a real tiny
+  CPU reproduce of a z2 vanilla4 run whose verdict is `bitwise` (identical
+  checkpoint tensors, same snapshot sha, no config or data difference),
+  with summarize.py and `load_runs` shown to ignore the reproduction.
+
+## 16. Torch migration runbook (for the user's go-ahead; nothing here has run)
+
+**State today.** Four rsync exports, no `.git`: `/scratch/ax2348/mapping`
+(z2 and se2 legacy runs), `mapping_lift` (argparse se2c, LIFT_COMMIT),
+`mapping_hydra` (H1c 20072852, H1d 20076519, hydra_causal 20070043; exp/causal
+at 50341e4) and `mapping_odq` (odq 20084102; exp/odq at a353d1e, a commit that
+exists only in ~/code/mapping-hydra). Jobs `cd` into these trees, so none of
+them is renamed, re-synced or written to while any job that uses it is
+pending or running. The ledger already cites their absolute results paths
+(153 retroactive records), and so does the registry.
+
+**Decision needed before step 5 (my recommendation in bold).** §6 proposed
+renaming the old trees into `/scratch/ax2348/archive/` and moving the new
+clone to the name `/scratch/ax2348/mapping`. That would break every
+absolute path the ledger and registry cite (`/scratch/ax2348/mapping/results/...`,
+`.../mapping_hydra/results/...`), and the old `mapping/results` holds the
+pre-template z2 layout, which must not mix with new runs. **Freeze the old
+trees in place instead (no rename), put the clone at
+`/scratch/ax2348/mapping-git`, and give new runs their own results root,
+`/scratch/ax2348/mapping-git/results`.** The steps below assume that.
+
+0. **Preconditions (local).** The user's yes. `ssh torch exit` (ControlMaster,
+   Duo). `ssh torch git --version` must be 2.31 or newer
+   (`mapping.provenance` uses `rev-parse --path-format=absolute`); if older,
+   load a newer git module in the job template (`module load git`) or patch
+   `ledger_dir` first. Local master committed and clean apart from untracked
+   scratch.
+1. **Bring exp/odq into this repository** (read-only for the other clone):
+   `git -C ~/code/mapping fetch ~/code/mapping-hydra refs/heads/exp/odq:refs/heads/exp/odq`,
+   then `git -C ~/code/mapping cat-file -e a353d1e^{commit}`.
+2. **Archive each old tree's exact bytes (read-only on Torch; can run any
+   time, even while jobs run):** for each `T` in `mapping mapping_lift
+   mapping_hydra mapping_odq`, with `C` its closest commit (`mapping` a412327,
+   `mapping_lift` 038f19c, `mapping_hydra` 50341e4, `mapping_odq` a353d1e, as
+   the audit's blob-hash check found):
+   ```sh
+   A=$(mktemp -d)/$T
+   rsync -a --exclude /results --exclude /data --exclude /jobs/logs --exclude '*.pt' \
+         --exclude __pycache__ torch:/scratch/ax2348/$T/ $A/
+   export GIT_INDEX_FILE=$(git rev-parse --absolute-git-dir)/xp-archive-$T
+   git read-tree --empty
+   git --work-tree=$A add -A --force .
+   tree=$(git write-tree); rm -f $GIT_INDEX_FILE; unset GIT_INDEX_FILE
+   c=$(git commit-tree $tree -p $C -m "archive: torch:/scratch/ax2348/$T, code as on disk $(date -u +%FT%TZ)")
+   git update-ref refs/archive/torch/$T/2026-10-16 $c ""
+   git diff --stat $C $c           # what differs from the closest commit, for the record
+   ```
+   (`--force` keeps files the tree's .gitignore would drop: the archive is
+   of the bytes on disk.)
+3. **The hub and the clone (beside the old trees; touches none of them):**
+   ```sh
+   ssh torch git init --bare /scratch/ax2348/mapping.git
+   git remote add torch torch:/scratch/ax2348/mapping.git
+   git push torch master exp/odq 'refs/tags/*:refs/tags/*' \
+       'refs/archive/*:refs/archive/*' 'refs/runs/*:refs/runs/*'      # never with +
+   ssh torch 'git clone -q /scratch/ax2348/mapping.git /scratch/ax2348/mapping-git &&
+              mkdir -p /scratch/ax2348/mapping-data &&
+              rsync -a /scratch/ax2348/mapping/data/ /scratch/ax2348/mapping_lift/data/ /scratch/ax2348/mapping-data/ &&
+              mkdir -p /scratch/ax2348/mapping-git/data &&
+              ln -s /scratch/ax2348/mapping-data/*.npz /scratch/ax2348/mapping-git/data/ &&
+              git -C /scratch/ax2348/mapping-git status --porcelain'      # must print nothing
+   ```
+   Data files are linked one by one under `data/`, whose `*.npz` names are
+   gitignored: a `data` directory symlink would be an untracked path and make
+   every Torch run's snapshot dirty. Then check the bank hashes against the
+   local ones (`sha256sum`), and install the porcelain into the venv:
+   `ssh torch '/scratch/ax2348/venvs/mapping/bin/pip install --no-deps -e /scratch/ax2348/mapping-git'`
+   (that venv also serves the old trees' jobs; an editable install adds a
+   path entry only, but do it after step 4 if in doubt).
+4. **When to cut over.** Only when no job uses an old tree:
+   `ssh torch "squeue -u ax2348 -h -o '%i %j %T %Z'"` lists nothing whose
+   workdir (`%Z`) is under `/scratch/ax2348/mapping{,_lift,_hydra,_odq}`, and
+   `sacct -X -n -j 20070043,20072852,20076519,20084102 -o JobID,State` shows
+   no PENDING or RUNNING task. The held-GPU session (`~/torch-gpu`) and any
+   tmux worker in `mapping_lift` must be idle too. New jobs may start from the
+   clone before that (step 5); the old trees just stay untouched until then.
+5. **New jobs run from the clone, from a per-campaign worktree** (until `xp
+   submit` exists; it automates exactly this):
+   ```sh
+   # locally: commit, then push the code the campaign runs
+   git push torch master
+   # on Torch
+   cd /scratch/ax2348/mapping-git && git pull --ff-only
+   sha=$(git rev-parse HEAD)
+   git worktree add --detach /scratch/ax2348/mapping-wt/<campaign>-${sha:0:7} $sha
+   mkdir /scratch/ax2348/mapping-wt/<campaign>-${sha:0:7}/data
+   ln -s /scratch/ax2348/mapping-data/*.npz /scratch/ax2348/mapping-wt/<campaign>-${sha:0:7}/data/
+   ```
+   and in the sbatch:
+   ```sh
+   cd /scratch/ax2348/mapping-wt/<campaign>-<sha7>        # code fixed for the job's life
+   export XP_HOST=torch
+   python run.py ... run.root=/scratch/ax2348/mapping-git/results "run.note='<campaign> <cell>'"
+   ```
+   Each run snapshots its worktree (clean: the snapshot is `sha`) into the
+   clone's `refs/runs/`, and writes `/scratch/ax2348/mapping-git/experiments/ledger/torch/<id>.json`
+   (the main worktree of the clone, found through the common git dir).
+   Remove a campaign's worktree only after its jobs end:
+   `git -C /scratch/ax2348/mapping-git worktree remove <dir>`.
+6. **Ledger and refs sync (by hand until `xp sync` grows its remote half;
+   these are §9's commands).** On Torch, without touching the clone's
+   checkout or index:
+   ```sh
+   cd /scratch/ax2348/mapping-git
+   export GIT_INDEX_FILE=$(git rev-parse --git-dir)/xp-ledger-index
+   git read-tree ledger/torch 2>/dev/null || git read-tree --empty
+   git add experiments/ledger/torch
+   t=$(git write-tree); p=$(git rev-parse -q --verify ledger/torch)
+   [ "$t" = "$(git rev-parse -q --verify ledger/torch^{tree})" ] || \
+     git update-ref refs/heads/ledger/torch $(git commit-tree $t ${p:+-p $p} -m "ledger: torch") $p
+   unset GIT_INDEX_FILE
+   git push origin ledger/torch 'refs/runs/*:refs/runs/*'
+   ```
+   Locally:
+   ```sh
+   git fetch torch 'refs/runs/*:refs/runs/*' ledger/torch:refs/remotes/torch/ledger/torch
+   git checkout refs/remotes/torch/ledger/torch -- experiments/ledger/torch
+   xp sync                      # one commit of experiments/ledger, by explicit path
+   ```
+   Results come down with `rsync -a torch:/scratch/ax2348/mapping-git/results/<rel>/
+   results/<rel>/` per run (`xp ls --host torch` gives `<rel>`); compare the
+   destination's `RUN_ID` first (the `--results` guard of §9).
+7. **After the cutover** (step 4 satisfied): write a `FROZEN` note into each
+   old tree (`echo "frozen $(date -u +%F): code archived at refs/archive/torch/<T>/2026-10-16;
+   new runs: /scratch/ax2348/mapping-git" > /scratch/ax2348/<T>/FROZEN`) and make
+   its code read-only (`chmod -R a-w` on everything but `results/`), leaving
+   names and results paths as they are. Re-import the 10 retroactive records
+   that were running at the audit (`tools/import_retro.py` after refreshing
+   runs.csv from sacct), and retire `scripts/sync.sh push` (its `pull`
+   stays, for the old trees' results, until `xp sync --results`).

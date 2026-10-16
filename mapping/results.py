@@ -8,14 +8,19 @@ import os
 import numpy as np
 
 ROOT = 'results'
+REPRODUCTIONS = 'reproductions'   # mapping.provenance.REPRODUCTIONS
 
 
 def load_runs(root=ROOT, model=None):
     """One dict per run directory that holds a ``final.json``, with the
-    run name added, sorted by model, parameters, run."""
+    run name added, sorted by model, parameters, run. A run's
+    ``reproductions/`` (``xp reproduce``) are never runs of the study, and
+    are skipped wherever they sit."""
     pattern = os.path.join(root, model or '*', '*', '*', 'final.json')
     rows = []
     for path in glob.glob(pattern):
+        if REPRODUCTIONS in os.path.normpath(path).split(os.sep):
+            continue
         with open(path) as f:
             r = json.load(f)
         r['run'] = os.path.basename(os.path.dirname(path))

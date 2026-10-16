@@ -28,6 +28,9 @@ Environment (all optional):
     XP_VIA                what launched run.py (``xp run``, ``xp reproduce``)
     XP_REPRODUCES         the run id a run reproduces (``xp reproduce``)
     XP_SUBMIT_ID          the submission that started the job (``xp submit``)
+    XP_RUN_ID             a run id chosen by the launcher (``xp reproduce`` names
+                          the reproduction's folder by it); must be well formed,
+                          for this host, and unused
     XP_SNAPSHOT_GIT_DIR   tests only: a git dir (borrowing this repository's
                           objects) that receives snapshot objects and refs,
                           so a test suite run leaves this repository's refs
@@ -437,7 +440,10 @@ def begin(experiment, config, sources, location, data_files=(), device='cpu', pa
     note = check_note(r.note)
     now = utc_now()
     h = host()
-    run_id = new_run_id(h, now)
+    run_id = os.environ.get('XP_RUN_ID') or new_run_id(h, now)
+    if not re.fullmatch(r'\d{8}T\d{6}Z-' + re.escape(h) + r'-[0-9a-f]{6}', run_id):
+        refuse(f'XP_RUN_ID={run_id!r} is not a run id of this host ({h}): '
+               f'<yyyymmddTHHMMSSZ>-{h}-<6 hex>')
     code = snapshot(run_id, top, r.provenance.max_untracked_mb)
     freeze = pip_freeze()
     resolved = OmegaConf.to_container(config) if config is not None else None

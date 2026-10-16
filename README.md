@@ -8,6 +8,12 @@ Every pixel of the answer was observed at some earlier step; the model's
 whole job is to work out where. `CONTRACT.md` has the task, the rules
 that keep architectures honest, and the deliverables for a new model.
 
+**Resuming? Run `xp ls` first.** It lists the latest runs, newest first,
+one line each: start time, status, note, path, host, tag and final mse
+(`--json` for whole records; `--running`, `--tag`, `--task`, `--model`,
+`--host`, `--since 2d` to filter). `xp show <run>` explains one run.
+Install it once with `pip install -e .` (or use `python -m mapping.xp`).
+
 ## Setup
 
 ```bash
@@ -65,6 +71,9 @@ mapping/models/        one file per architecture, auto-registered
 mapping/checkpoint.py  what a run saves; load a model back from it
 mapping/render.py      prediction grids
 mapping/results.py     reading runs back, power-law fit
+mapping/provenance.py  snapshot ref + ledger record for every run (run.note required)
+mapping/xp/            xp: ls, show, compare, run, reproduce, sync, tag
+experiments/ledger/    one JSON record per run, per host (written by runs; xp sync commits)
 train.py               train one model at one size -> a run directory
 scaling.py             ladder, sweep (local or SLURM), fit
 summarize.py           every run as a table; fits per model
@@ -232,8 +241,10 @@ Cluster notes:
 
 ## What results exist
 
-`python summarize.py` (Z²) and `python summarize.py --task se2d` are the
-authoritative lists. `docs/models/*.md` hold each architecture's smoke
+`xp ls` lists every run in the ledger, newest first (experiments/ledger/:
+one record per run, with its code snapshot and note; the major runs from
+before the ledger are there as retroactive records). `python summarize.py`
+(Z²) and `python summarize.py --task se2d` tabulate the runs on disk. `docs/models/*.md` hold each architecture's smoke
 numbers at the time it was written.
 
 ## Research documents

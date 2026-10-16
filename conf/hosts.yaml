@@ -4,3 +4,8 @@
 # Not a Hydra config group: run.py never composes this file.
 machines:
   erid-2: erid-2
+# Per-host settings read by xp. `gpu_lock`: a file `xp run` holds with flock for the
+# whole run (one sequential launcher per GPU). OPEN: no lock path is chosen yet, so
+# xp run takes none; set one here, e.g.
+#   hosts:
+#     erid-2: {gpu_lock: /path/to/gpu.lock}

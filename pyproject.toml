@@ -1,0 +1,18 @@
+# Makes the harness installable for its console script: pip install -e . (no new
+# dependencies; requirements.txt pins the runtime ones). xp is the provenance porcelain
+# (mapping/xp/, docs/provenance_design.md §9); run.py stays the only training entry.
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mapping"
+version = "0.1.0"
+description = "Mapping study harness (Z2 / SE(2)): models, tasks, runs, provenance"
+requires-python = ">=3.10"
+
+[project.scripts]
+xp = "mapping.xp.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mapping*"]
