@@ -301,3 +301,12 @@ docs/scaling_study_design.md.
   - Causal s is solved by ~80k.
   - The xs failure is a capacity-edge cost, not a barrier.
   - Causality page updated (https://claude.ai/artifact/WP6anaPetTzFXYfMefbkeG). The literature review's framing of "our causal gap" must be read with this.
+- **2026-10-16, causal baselines at fair GPU time (user's hypothesis: hybrid4 is less susceptible to causal limits than vanilla).**
+  - **Registered prediction:** the causal penalty (steps-to-solved ratio, last-step error ratio at matched steps) is larger for vanilla4 than for hybrid4, most on long-range queries.
+  - **Runs** (scaling recipe: 400k WSD, seed 0, se2d):
+    - vanilla4_causal s: local (causality agent);
+    - Torch array 20070043, run via Hydra from /scratch/ax2348/mapping_hydra (exp/causal @50341e4; hydra-core and omegaconf installed in the venv):
+      - hybrid4_causal s
+      - vanilla4_causal l
+  - **References:** the existing bidirectional 400k WSD runs at results/se2/{hybrid4,vanilla4}/{s,l}/seed0_400k_qt_wsd.
+  - Part A and part B of the earlier interrogation plan are cancelled for now.
