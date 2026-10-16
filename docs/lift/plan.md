@@ -211,6 +211,11 @@ work. Iterate locally first.
     - So both decoders share one query interface: SE(2) pose in, view out. Only the render type differs (BEV or camera).
     - Not full SE(3), but no longer a toy: SE(2) motion with a pitched perspective camera over 2.5D terrain is mostly what autonomous vehicles need.
     - Full SE(3) camera control (varying altitude, pitch and roll in queries) stays out of scope.
+    - **Ablation for the "both" setup (the user): SEPARATE vs TIED queries.**
+      - Separate: one query token per render type, each with its own readout.
+      - Tied: one token per SE(2) pose, decoded into BOTH renders by two heads from the same state.
+      - Fair comparison: same query poses (tied = one token with two targets; separate = the same poses duplicated per type), matched readout parameters, each render's error reported separately, plus BEV-only and camera-only baselines for transfer.
+      - A tied win means a shared pose-indexed belief (the program criterion); a large tied loss means the renders want different things from one token. Optional third arm: separate tokens at untied poses.
   - **BEV decoding (the user):** in an SE(3)-ready design it is NOT a new head. A BEV view is just another query camera (pitch 90°, orthographic or very narrow field of view), handled by the same query token and readout.
     - Ablation: ego queries only, BEV only, both. Which builds the better belief, and BEV is what a planner wants.
     - The genuinely new option is a geometry channel (height or depth) alongside albedo.
