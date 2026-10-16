@@ -164,6 +164,12 @@ work. Iterate locally first.
   - the anti-aliasing mean bug fixed.
   
   Speed is untouched (~2.7 s per batch on a shared GPU). Appearance comes first.
+- **Renderer v3 (commit 3569764), PINNED by the user:**
+  - pitch 25° (horizon at row 2.6 of 32);
+  - the dark base: strokes on 0.03, ambient 0.15;
+  - **"late elevation" haze**: clear to 60 px, then elevation-weighted with scale 120 px. It roughly halves the aliasing near the horizon (≈0.03 against 0.080 with none) and keeps ≈0.98 of near and mid contrast.
+  
+  Known residue: mid-distance speckle from unfiltered shading normals. The fix is to band-limit the normals; not done.
 - **OPEN (user, 2026-10-16): marked open, not decided:**
   1. Queries: the same camera at a new pose? Do sky pixels count as covered? How are unseen pixels handled?
   2. Odometry: SE(2) at fixed altitude and pitch, or vary them?
