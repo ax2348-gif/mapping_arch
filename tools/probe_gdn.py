@@ -41,6 +41,7 @@ import torch.nn.functional as F
 
 sys.path.insert(0, '.')
 import mapping.tasks as tasks  # noqa: E402
+from mapping.checkpoint import load_checkpoint  # noqa: E402
 from mapping.loader import eval_set, load_banks  # noqa: E402
 
 TURNS = ['none', 'right', 'around', 'left']
@@ -51,21 +52,9 @@ class Stop(Exception):
 
 
 def load_any(path):
-    """(model, args, spec, task) from final.pt or a step<k>.pt."""
-    state = torch.load(path, map_location='cpu', weights_only=False)
-    args = state['args']
-    task = state.get('task', args.get('task', 'z2'))
-    t = tasks.get(task)
-    if 'spec' in state:
-        spec = t['task'].TaskSpec(**state['spec'])
-    else:
-        _, spec = tasks.config_and_spec(
-            task, args['episode_steps'], args['queries'], args['seed'],
-            args.get('query_times', 'last'), args.get('step_px', 9),
-            args.get('odometry_dropout', 0.0), args.get('texture', 'mnist'))
-    model = t['models'].get(args['model']).build(args['size'], spec)
-    model.load_state_dict(state['model'])
-    return model.eval(), args, spec, task
+    """(model, args, spec, task) from final.pt or a step<k>.pt; the task
+    by its current name (an old 'se2' checkpoint is 'se2d')."""
+    return load_checkpoint(path, 'cpu')
 
 
 def gdn_layers(model):

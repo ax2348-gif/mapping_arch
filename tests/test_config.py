@@ -462,3 +462,36 @@ def test_flags_translation_ignores_settings_flags_cannot_express(monkeypatch):
     monkeypatch.setattr(train, 'main', lambda e, config=None, sources=None: ran.append(e))
     train.main_from_flags('--task se2c --model hybrid4c --size xs'.split())
     assert len(ran) == 1
+
+
+def test_old_se2_checkpoints_load_as_se2d(tmp_path):
+    from mapping.checkpoint import load_checkpoint, save_checkpoint
+    module = tasks.get('se2d')['models'].get('vanilla4')
+    spec = tasks.config_and_spec('se2d', 32, 8, 0)[1]
+    args = vars(train.parse('--task se2d --model vanilla4 --size xs'.split()))
+    save_checkpoint(tmp_path / 'final.pt', module.build('xs', spec), {**args, 'task': 'se2'},
+                    spec, 'se2')                  # as written before the rename, no arch
+    assert load_checkpoint(tmp_path / 'final.pt')[3] == 'se2d'
+
+
+def test_summarize_reads_every_task_and_the_old_name(tmp_path):
+    import subprocess
+    import sys
+    run.main(['model=se2c/vanilla4c', f'run.out={tmp_path}/vanilla4c/xs/r', *TINY])
+    for task in ('se2c', 'se2', 'se2d', 'z2'):
+        r = subprocess.run([sys.executable, 'summarize.py', '--task', task, '--root',
+                            str(tmp_path)], capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+    assert 'vanilla4c' in r.stdout
+
+
+def test_a_branch_must_continue_its_parent(tmp_path):
+    parent = ['model=se2c/vanilla4c', f'run.out={tmp_path}/p', 'run.save_every=1', *TINY]
+    run.main(parent)
+    ckpt = f'run.branch={tmp_path}/p/step1.pt'
+    with pytest.raises(SystemExit, match='in task.episode_steps, task.generator.turn_n'):
+        run.main(['model=se2c/vanilla4c', f'run.out={tmp_path}/c1', ckpt, *TINY,
+                  'task.generator.turn_n=4', 'task.episode_steps=16'])
+    run.main(['model=se2c/vanilla4c', f'run.out={tmp_path}/c2', ckpt, *TINY,
+              'schedule=wsd', 'run.steps=3'])          # a new schedule and length: fine
+    assert os.path.exists(tmp_path / 'c2' / 'final.json')

@@ -179,11 +179,24 @@ named like a preset (`se2c_bridge.yaml`) is still your file.
   (`Model.record()`). `load_checkpoint` builds from it, and falls back to
   the registered module's `build(size, spec)` for older checkpoints.
 
+## Branching
+
+`run.branch=<parent>/step<k>.pt` continues a run from a saved step
+(`train.py --branch`), typically with a new length and schedule. A
+branch must continue the same run: when the parent's `config.yaml` is
+beside the checkpoint, every key except `run.*`, `eval.*`, `schedule.*`,
+`optim.weight_decay`, `optim.clip` and `task.generator.workers` must be
+the parent's, or the branch is refused with the keys listed. Older
+parents without `config.yaml` get the old check of their `args`
+(task, model, size, batch, seed, lr, and the bank generator's settings).
+
 ## se2 is now se2d
 
 The discrete SE(2) task was renamed `se2d` (2026-10-16).
 - New runs go to `results/se2d/`.
 - `se2` remains a read-only alias (`mapping.tasks.ALIASES`). Old
-  checkpoints and `final.json` files load, `summarize.py --task se2` reads
-  `results/se2/`, and a new se2d run may branch from an old se2
-  checkpoint. A new run cannot be launched as `se2`.
+  checkpoints and `final.json` files load, and `load_checkpoint` gives
+  their task as `se2d`, so the se2d tools (probe_gdn, read_beta, ...)
+  read them. `summarize.py --task se2` reads `results/se2/`, and a new se2d
+  run may branch from an old se2 checkpoint. A new run cannot be launched
+  as `se2`.

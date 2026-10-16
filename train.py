@@ -333,6 +333,14 @@ def main(experiment, config=None, sources=None):
                                  f'{branch["args"].get(key, defaults.get(key))!r}, '
                                  f'run '
                                  f'{vars(args)[key]!r}')
+        parent = os.path.join(os.path.dirname(os.path.abspath(r.branch)), 'config.yaml')
+        if config is not None and os.path.exists(parent):
+            changed = branch_changes(parent, config)
+            if changed:
+                raise SystemExit(f'--branch: the run differs from its parent ({parent}) in '
+                                 f'{", ".join(changed)}. A branch continues the same run '
+                                 f'(task, model, lr, batch, seed); only run.*, eval.*, '
+                                 f'schedule.* and optim.weight_decay/clip may change')
         if start >= r.steps:
             raise SystemExit(f'checkpoint step {start} >= run.steps {r.steps}')
     if gpu_data:
@@ -509,6 +517,25 @@ def main(experiment, config=None, sources=None):
           f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}'
           f'{"" if shuffle_informative else " n/a"}, '
           f'floor {floor["mse"]:.4f}); wrote {out}')
+
+
+# what a branch may change from its parent: how long and where it runs,
+# how it is evaluated, its schedule, and (as before, unchecked) weight decay
+# and clipping. Everything else (task, generator, model, lr, batch, seed)
+# must be the parent's. task.generator.workers is a loader setting.
+BRANCH_MAY_CHANGE = ('run.', 'eval.', 'schedule.', 'optim.weight_decay', 'optim.clip',
+                     'task.generator.workers')
+
+
+def branch_changes(parent, config):
+    """Dotted keys in which ``config`` differs from the parent run's saved
+    config (a path), other than those a branch may change."""
+    import run as entry
+    from omegaconf import OmegaConf
+    a = OmegaConf.to_container(OmegaConf.load(parent))
+    b = OmegaConf.to_container(config) if OmegaConf.is_config(config) else dict(config)
+    return [k for k in entry.differences(a, b)
+            if not k.startswith(BRANCH_MAY_CHANGE) and k != 'schedule']
 
 
 def write_sources(out, config, sources):
