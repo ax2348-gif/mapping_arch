@@ -1,0 +1,7 @@
+# H1d sweep (HYPOTHESIS.md 2026-10-16): walk length T, size s, seed 0. One line = one GPU job.
+hybrid4 s 0 16 | hybrid4_causal s 0 16
+vanilla4 s 0 16 | vanilla4_causal s 0 16
+hybrid4 s 0 128
+hybrid4_causal s 0 128
+vanilla4 s 0 128
+vanilla4_causal s 0 128

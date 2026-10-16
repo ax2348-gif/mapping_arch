@@ -316,3 +316,4 @@ docs/scaling_study_design.md.
   - H1c was registered as a DRAFT amendment in HYPOTHESIS.md (commit ba3206f) BEFORE submission; awaiting the user's sign-off on the thresholds.
   - Related runs: vanilla4_causal s seed 0 (local); 20070043 (hybrid4_causal s and vanilla4_causal l, seed 0).
   - We are at the per-user GPU cap (QOSMaxGRESPerUser), so the grid queues behind running jobs.
+- **2026-10-16, H1d (causal penalty vs walk length) registered (cece910) and submitted:** Torch array of 6 GPU jobs. T = 16 and 128 for hybrid4, hybrid4_causal, vanilla4 and vanilla4_causal at s, seed 0 (T = 16 packed two per GPU). It runs regardless of H1c's outcome.
