@@ -245,3 +245,11 @@ docs/scaling_study_design.md.
   - Plus vanilla4c m 400k (20043639), running.
 - **Small-model policy (user):** Torch kills low-utilisation jobs (hybrid4 xs seed 1, 20028847_0, was killed at 360k; its 350k checkpoint survives). Roll small jobs together; spend Torch on bigger models.
 - **Hydra branch:** all 13 seams fixed (8 commits). 454 tests pass, re-run independently. The cluster venv needs `pip install -r requirements.txt` before use.
+- **2026-10-16, experiments queued by the user (discrete SE(2), xs, through Hydra on branch exp/time-recurrence off refactor/hydra):**
+  1. **Symmetry, running (agent):**
+     - `hybrid4_time`: the recurrence sees only odometry tokens (DeltaProduct, 2 Householders, β ∈ (0, 2)) and read-only query tokens, forwards and backwards; its outputs are added back to patches. The last layer is regular attention.
+     - `hybrid4_time_full`: the same layer count, with the last layer a full GDN over all tokens.
+     - Reference: hybrid4 xs, 0.0180, solved at ~65k.
+  2. **Causal, NEXT, after 1 finishes:** a fully causal hybrid4 (forward-only GDN, causal attention, matched shape) plus a causal vanilla4 control.
+     - Key question: the rotation was found in the RIGHT-TO-LEFT head (P5 on left-to-right failed), so can it form in the forward direction?
+     - Probe the forward heads.
