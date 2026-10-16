@@ -8,9 +8,13 @@ optionally filtered to one query kind (e.g. far only).
 Each row is one query: the observation at the query's step, the target, then
 per checkpoint its prediction its prediction with the episode's odometry
 permuted in time (the use-of-odometry check; --no-shuffled omits it) and |error|, each labelled with its mse.
-Rows are drawn from the evaluation set of the FIRST checkpoint's settings;
-every checkpoint must share those task settings (refused otherwise), so the
-comparison is matched. --sort dist orders rows by distance from the anchor
+Rows are drawn from the evaluation set of the FIRST checkpoint's settings,
+and every model sees those same inputs. The checkpoints must be of the same
+task (refused otherwise). If any other task setting differs (any field of
+the se2c generator Config their records give, odometry dropout included),
+the comparison is NOT matched: a model is shown inputs it was not trained
+on. That is allowed, but a boxed warning goes to stderr and a banner naming
+every difference is drawn in the image's title area. --sort dist orders rows by distance from the anchor
 (farthest first) instead of a seeded random draw. Query kinds are
 mapping.task_se2c.QUERY_KINDS: fallback, near (< 7.5 px), mid (< 15 px),
 far (>= 15 px).
@@ -33,6 +37,32 @@ from mapping.render import GAP, SCALE, _font, _to_image  # noqa: E402
 TASK_KEYS = ('task', 'episode_steps', 'queries', 'query_times', 'seed',
              'se2c_texture', 'turn_n', 'motion', 'directions', 'v_min',
              'v_max', 'omega_max', 'holdout', 'holdout_mode', 'query_coverage')
+
+
+def settings(args):
+    """Every task setting a record gives: its generator Config as the tools
+    rebuild it (defaults for keys older records lack), and the record's
+    TASK_KEYS."""
+    from dataclasses import asdict
+    from mapping.task_se2c import config_from_args
+    out = {k: v for k, v in asdict(config_from_args(args)).items() if k != 'texture'}
+    out.update({k: args.get(k) for k in TASK_KEYS})
+    return out
+
+
+def setting_diff(args0, args):
+    """``{key: (first's value, this one's)}`` for the settings that differ."""
+    s0, s = settings(args0), settings(args)
+    return {k: (s0.get(k), s.get(k)) for k in sorted(set(s0) | set(s)) if s0.get(k) != s.get(k)}
+
+
+def warn_unmatched(lines, first):
+    """A boxed warning on stderr: the comparison is not matched."""
+    body = ['WARNING: NOT A MATCHED COMPARISON. Task settings differ;',
+            f'every model is shown the inputs of {first}\'s settings:', ''] + lines
+    w = max(len(x) for x in body) + 4
+    print('\n'.join(['#' * (w + 2)] + [f'#  {x.ljust(w - 2)}#' for x in body] + ['#' * (w + 2)]),
+          file=sys.stderr, flush=True)
 
 
 def main():
@@ -58,10 +88,14 @@ def main():
     T = tasks.get(task)['task']
     if not hasattr(T, 'query_kinds'):
         raise SystemExit(f'{task}: compare_grid needs query kinds (se2c)')
-    for (_, args, _, t), c in zip(loaded[1:], a.checkpoints[1:]):
-        diff = {k: (args0.get(k), args.get(k)) for k in TASK_KEYS if args0.get(k) != args.get(k)}
-        if t != task or diff:
-            raise SystemExit(f'{c}: task settings differ from {a.checkpoints[0]}: {diff or (task, t)}')
+    mismatch = []     # 'label: key A -> B' for every task setting that differs
+    for (_, args, _, t), c, lab in zip(loaded[1:], a.checkpoints[1:], labels[1:]):
+        if t != task:
+            raise SystemExit(f'{c}: task {t} differs from {a.checkpoints[0]}: {task}')
+        mismatch += [f'{lab}: {k} {v0!r} (vs {labels[0]} {v!r})'
+                     for k, (v, v0) in setting_diff(args0, args).items()]
+    if mismatch:
+        warn_unmatched(mismatch, labels[0])
 
     batches = T.data(args0, a.device, eval_batches=a.batches, batch=64)['held_out']
     gen = torch.Generator().manual_seed(0)
@@ -100,6 +134,8 @@ def main():
            else ('prediction', '|error|'))
     group_gap, cap = 22, 18                      # gap between groups; caption height
     label_w, header = 200, 92
+    banner = 26 + 16 * len(mismatch) if mismatch else 0   # the not-matched warning
+    header += banner
     big, mid, small = _font(16), _font(13), _font(12)
     base_w = 2 * (cell + GAP)
     group_w = len(sub) * (cell + GAP)
@@ -110,8 +146,14 @@ def main():
     # mean mse per model over ALL filtered queries, not just the drawn rows
     means = [np.mean([float((r[2][m] - r[1]).pow(2).mean()) for r in rows]) for m in range(len(labels))]
     kind_txt = a.kind or 'all'
-    d.text((8, 6), f"{' vs '.join(labels)}  —  {kind_txt} queries", fill=255, font=big)
-    d.text((8, 30), f"mean mse over all {len(rows)} {kind_txt} queries: " +
+    if mismatch:      # inverted banner across the full width, above the title
+        d.rectangle([0, 0, width, banner - 4], fill=255)
+        d.text((8, 4), 'WARNING: NOT MATCHED. Task settings differ; every model sees '
+               f'{labels[0]}\'s inputs:', fill=0, font=big)
+        for i, line in enumerate(mismatch):
+            d.text((16, 24 + 16 * i), line, fill=0, font=mid)
+    d.text((8, banner + 6), f"{' vs '.join(labels)}  —  {kind_txt} queries", fill=255, font=big)
+    d.text((8, banner + 30), f"mean mse over all {len(rows)} {kind_txt} queries: " +
            "   ".join(f"{lab} {mu:.4f}" for lab, mu in zip(labels, means)) +
            f"     (rows shown: {len(pick)}, {'farthest first' if a.sort == 'dist' else 'random sample'})",
            fill=225, font=mid)
