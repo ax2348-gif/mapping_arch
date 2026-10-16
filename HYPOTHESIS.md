@@ -471,3 +471,37 @@ All run through Hydra (run.py) from the exp/causal branch on Torch.
 **Caveats, registered:**
 - One seed and one size (s), 100k steps. vanilla4c s is barely trained at 100k even bidirectionally, so its penalty may be hard to read; a 400k WSD follow-up is the natural next step.
 - Local runs (the RTX PRO 4000) against Torch references. The code is bitwise-equivalent across both trees.
+
+### 2026-10-16: H1f, the capacity needed for a free causal model grows with walk length, faster for vanilla4 (REGISTERED before any run)
+
+**Claim.** For each model, define the causal-capacity threshold at walk length T as the smallest size, among xs, s and m, at which the causal penalty (H1c's metric and resolution guard) is ≤ 1.2. Prediction:
+- the threshold grows with T for vanilla4;
+- it grows more slowly, or not at all, for hybrid4.
+
+This is the length × capacity form of H1d: the exponent story stated as a threshold.
+
+**Design.**
+- se2d, 400k WSD, seed 0, uniform query times.
+- Sizes xs, s, m × T ∈ {32, 64, 128} × {hybrid4, vanilla4} × {causal, bidirectional}.
+- Existing or queued cells:
+  - T = 32 s and m (H1c);
+  - T = 32 xs bidirectional;
+  - T = 64 xs and s bidirectional (scaling study);
+  - s at T = 64 causal (H1c) and s at T = 128 (H1d).
+- New (16 runs):
+  - xs T = 32 causal (both models);
+  - xs T = 64 causal (both);
+  - xs T = 128 (all four);
+  - m T = 64 (all four);
+  - m T = 128 (all four).
+
+**Verdict:**
+- **Supported:** vanilla4's threshold at T = 128 is strictly larger than at T = 32, AND hybrid4's threshold grows by fewer size steps than vanilla4's over the same range.
+- **Refuted:** vanilla4's threshold does not grow with T, or hybrid4's grows at least as fast.
+- Cells where the BIDIRECTIONAL model fails "solved" are excluded (thresholds are read over interpretable cells only). If no size is free at some T, the threshold is "> m", and ordered as larger.
+
+**Caveats, registered.**
+- One seed.
+- Only three sizes, so thresholds are coarse.
+- m at T = 128 is expensive (~1,361 tokens per episode).
+- xs runs are packed four per GPU, against low-utilisation kills, which may slow them but doesn't change results.
