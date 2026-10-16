@@ -453,3 +453,20 @@ All run through Hydra (run.py) from the exp/causal branch on Torch.
 - One seed. Seeds 1-2 are added if the result is borderline.
 - At T = 128, s may not solve even bidirectionally; those cells are then excluded, as above.
 - Attention cost grows with T (~1,361 tokens per episode at T = 128), so the T = 128 runs are slower. Wall-clock is reported but not part of the verdict.
+
+### 2026-10-16: H1e, H1c on the continuous task (REGISTERED before any run)
+
+**Claim.** H1c's pattern holds on continuous SE(2) (se2c, default decoupled walk, continuous turns): making hybrid4c causal costs little at s, and making vanilla4c causal costs a lot.
+
+**Design.**
+- Size s, seed 0, 100k steps cosine, uniform query times: the recipe of the existing bidirectional se2c s runs.
+- New runs: hybrid4c_causal and vanilla4c_causal, matched shapes, with the odometry INPUT form and the default interleave (before_next_obs), which is correct for causal input.
+- References (bidirectional, same recipe): hybrid4c s 100k (all 0.0260, far 0.0447) and vanilla4c s 100k (all 0.0633, far 0.1082).
+
+**Metric.** H1c's: penalty = causal ÷ bidirectional final LAST-STEP error, with the same resolution guard; also overall and the far-query bin.
+
+**Prediction (relative):** the hybrid4c penalty ≤ 1.2; the vanilla4c penalty ≥ 1.5.
+
+**Caveats, registered:**
+- One seed and one size (s), 100k steps. vanilla4c s is barely trained at 100k even bidirectionally, so its penalty may be hard to read; a 400k WSD follow-up is the natural next step.
+- Local runs (the RTX PRO 4000) against Torch references. The code is bitwise-equivalent across both trees.
