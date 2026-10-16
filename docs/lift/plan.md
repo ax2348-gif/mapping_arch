@@ -136,9 +136,12 @@ work. Iterate locally first.
     - Its label is exactly what the input token would have carried: the step's body-frame move and turn, step-local, in the same egocentric convention.
     - No multi-lag targets. The query token is a learned constant.
     - Only change (a loss choice, not a label change): regress the turn as (cos, sin), to avoid the ±π wrap.
-  - **Still open:**
-    - the odometry-label loss weight against the render loss;
-    - prototype on discrete SE(2) or se2c m.
+  - **Prototype directly on continuous SE(2) (se2c), size m** (user).
+  - **LANDMINE (user), and the toggle for it:**
+    - In the default interleave, obs t, odometry slot t, obs t+1, a CAUSAL odometry query cannot see obs t+1 and so cannot infer the t -> t+1 motion. Bidirectional is fine.
+    - Odometry INPUT tokens are right before the next obs; odometry QUERIES need to come after it.
+    - Add a toggle for the interleave order: `before_next_obs` (the current default) or `after_next_obs` (obs t, obs t+1, odometry query t). The causal query variant must use `after_next_obs`.
+  - **Still open:** the odometry-label loss weight against the render loss.
   - **Comparison set:**
     - odometry given: hybrid4c m se2c, 400k WSD, final 0.0045 / far 0.0074;
     - basic VO;
