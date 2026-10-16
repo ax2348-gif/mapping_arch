@@ -304,8 +304,10 @@ def calibration(phi, w, ep, episodes):
 
 
 def main(runs):
-    for run in runs:
-        model, cfg = load(run)
+    for arg in runs:
+        run, ckpt = (arg.split(':') + ['final.pt'])[:2]
+        suffix = '' if ckpt == 'final.pt' else '_' + ckpt[:-3]
+        model, cfg = load(run, ckpt)
         if cfg['kind'] in ('gdn', 'gdn_b1'):
             res = probe_gdn(model)
         elif cfg['kind'] == 'cdiag':
@@ -342,9 +344,9 @@ def main(runs):
                 elif key == 'comp':
                     for lag, arr in val.items():
                         flat[f'{tag}__comp{lag}'] = arr
-        np.savez_compressed(f'{run}/probe.npz', **flat)
-        json.dump(summary, open(f'{run}/probe.json', 'w'), indent=1)
-        print(run)
+        np.savez_compressed(f'{run}/probe{suffix}.npz', **flat)
+        json.dump(summary, open(f'{run}/probe{suffix}.json', 'w'), indent=1)
+        print(arg)
         print(json.dumps({t: {k: v for k, v in s.items() if 'by_turn' not in k} for t, s in summary.items()}, indent=1))
 
 

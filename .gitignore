@@ -11,3 +11,4 @@ data/imagenette_raw/
 jobs/
 quarantine/
 data/imagenette64_hp.npz
+experiments/lift_blind_probe/runs/
