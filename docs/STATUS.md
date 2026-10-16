@@ -75,6 +75,7 @@ docs/scaling_study_design.md.
 | hybrid4 results report | https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti |
 | primer | https://claude.ai/artifact/9jFX4Cr2761JFTCBytKPQ3 |
 | Z² scaling | https://claude.ai/artifact/8mjpJKB9LUMMKipyHtkRNK |
+| se2d scaling report (preliminary, 2026-10-16) | https://claude.ai/artifact/KGG23hvdWGZ7pDpiPQ7qbc |
 | theory review | https://claude.ai/artifact/DJ4WFQ5V7ArJrDV31EQ8bN |
 | applications review | https://claude.ai/artifact/WnVhdCjzUtq1VRo6mySS8A |
 | literature synthesis | https://claude.ai/artifact/MSr6KNebLT7Rttep2nnU1H |
@@ -211,3 +212,10 @@ docs/scaling_study_design.md.
     | far | 0.0010 | 0.159 |
   - So m solves the bridge essentially exactly. The size trend on the bridge: xs far 0.79 of floor at 100k; s 0.0111 at 47.5k; m 0.0010 at 65k.
 - **torch-gpu (~/torch-gpu):** found that `tmux capture-pane` crashes the tmux server on Torch's tmux next-3.4, on the login node too. That explains the earlier failed tests. The tool now reads session output from its pipe-pane log; retest pending.
+- **2026-10-16, se2d scaling report (preliminary) published:** https://claude.ai/artifact/KGG23hvdWGZ7pDpiPQ7qbc
+  - **S1 supported:** the T=32 compute multiplier at matched loss is 2.8-5.3x from 0.02 to 5e-4, and 7-10x from 0.07 to 0.04.
+  - **S2 not supported:** the multiplier shrinks as loss falls.
+  - **S3 supported at s only:** at T=64 hybrid4 s reaches 0.0011, while vanilla4 s ends at 0.037.
+  - **S4 untestable:** the reference branch was cancelled.
+  - Audits pass (hybrid4 l, vanilla4 xl, hybrid4 s T=64).
+  - A draft HYPOTHESIS amendment is in the report, NOT applied: it needs user approval.
