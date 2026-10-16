@@ -3,12 +3,15 @@ __pycache__/
 *.pt
 results/
 shelved/results/
+# jobs/ is tracked (launchers, next to conf/experiment/); job output logs are
+# not: new jobs write them under results/jobs/logs/. jobs/logs/ holds older logs,
+# jobs/legacy/ the pre-Hydra argparse launchers (local records only).
 jobs/logs/
+jobs/legacy/
 data/mnist.npz
 data/imagenette64.npz
 data/imagenette_raw/
 *.egg-info/
-jobs/
 quarantine/
 data/imagenette64_hp.npz
 experiments/lift_blind_probe/runs/

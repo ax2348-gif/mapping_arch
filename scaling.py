@@ -41,7 +41,7 @@ SBATCH = """#!/bin/bash
 #SBATCH --mem={mem}
 #SBATCH --time={time}
 #SBATCH --array=0-{last}%{max_concurrent}
-#SBATCH --output={workdir}/jobs/logs/{task}-{model}-%A_%a.out
+#SBATCH --output={workdir}/results/jobs/logs/{task}-{model}-%A_%a.out
 set -euo pipefail
 SIZES=({sizes})
 LRS=({lrs})
@@ -127,7 +127,7 @@ def main():
                 subprocess.run(cmd, check=True)
 
     if args.slurm:
-        os.makedirs('jobs/logs', exist_ok=True)
+        os.makedirs('results/jobs/logs', exist_ok=True)   # for a local sbatch; the cluster's is made by scripts/remote_setup.sh
         path = (f'jobs/{args.model}{args.tag}.sbatch' if args.task == 'z2'
                 else f'jobs/{args.task}_{args.model}{args.tag}.sbatch')
         with open(path, 'w') as f:

@@ -28,7 +28,7 @@ TEMPLATE = """#!/bin/bash
 #SBATCH --mem=64G
 #SBATCH --time={time}
 #SBATCH --array=0-{last}%{concurrent}
-#SBATCH --output=/scratch/ax2348/mapping/jobs/logs/{task}-{model}-cd-%A_%a.out
+#SBATCH --output=/scratch/ax2348/mapping/results/jobs/logs/{task}-{model}-cd-%A_%a.out
 set -euo pipefail
 SIZES=({sizes})
 BUDGETS=({budgets})

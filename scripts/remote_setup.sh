@@ -3,7 +3,7 @@
 #   ssh torch 'bash -s' < scripts/remote_setup.sh
 set -euo pipefail
 VENV=/scratch/ax2348/venvs/mapping
-mkdir -p /scratch/ax2348/mapping/jobs/logs
+mkdir -p /scratch/ax2348/mapping/jobs/logs /scratch/ax2348/mapping/results/jobs/logs
 python3 -m venv "$VENV"
 source "$VENV/bin/activate"
 pip install --upgrade pip
