@@ -167,3 +167,13 @@ docs/scaling_study_design.md.
   - Reading: pose composition works; assembling a novel view from stored content is the bottleneck at xs. The user suspects visual capacity: the continuous texture plus 3x tokens per view is too much for xs.
   - Next: the s bridge on the Torch worker (20038588), and m (20038403).
   - To make room, every pending scaling task was cancelled and one running lr check (20028844_1) was stopped. All are recorded in docs/scaling_study_design.md.
+- **2026-10-16, capacity was the bottleneck: the s bridge breaks away.** Torch worker 20038588, at 37.5k: far 0.0192 (0.15 of floor; shuffled 0.164), all 0.0142. xs ended at 0.79 of floor on far. The local m bridge is at 10k: far 0.51 of floor.
+  - **Plan, made official by the user:** the moment the s bridge ends, launch hybrid4c s on the default continuous task (`dec_100k_qt`, jobs/lift/launch_dec_s.sh on the cluster) into the same worker. Then analyse the bridge (final split, grouped grid) and intervene if needed.
+- **2026-10-16, Hydra refactor started** in ~/code/mapping-hydra, branch refactor/hydra (background agent). Design approved by the user:
+  - no unconsumed config fields (defaults-list composition, instantiate);
+  - se2 renamed se2d;
+  - model configs per task, size ladders as groups;
+  - experiment yamls (`+experiment`, `--exp path`);
+  - a resolved config.yaml per run, rerun with `--from`;
+  - legacy flat `args` kept as an output;
+  - bitwise behaviour tests.
