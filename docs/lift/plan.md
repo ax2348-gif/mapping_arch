@@ -131,12 +131,14 @@ work. Iterate locally first.
 - **The user's design: ODOMETRY QUERY TOKENS (2026-10-16).**
   - Replace each odometry INPUT token with an odometry QUERY token; the model predicts the step's pose change, supervised. There is no odometry input.
   - Odometry queries give DENSE LOCAL supervision (learn local integration, i.e. visual odometry). The render queries enforce GLOBAL consistency and loop closure when revisits occur: learned SLAM, with the belief in activations, removing the odometry seam.
-  - **Open design points (the user's):**
-    1. local (t-1 -> t) only, or also multi-lag (t-k -> t);
-    2. target (dy, dx, cos, sin) and the loss weight against rendering;
-    3. placement where the odometry token was, visibility in the causal or prefix regime;
-    4. the query token's content (a learned constant, plus lag k);
-    5. prototype on discrete SE(2) or se2c m.
+  - **Settled by the user: a PURE INVERSION, conditioning to label.**
+    - The odometry query token sits exactly in the odometry input token's slot (between observations t and t+1, so it sees both views it inverts).
+    - Its label is exactly what the input token would have carried: the step's body-frame move and turn, step-local, in the same egocentric convention.
+    - No multi-lag targets. The query token is a learned constant.
+    - Only change (a loss choice, not a label change): regress the turn as (cos, sin), to avoid the ±π wrap.
+  - **Still open:**
+    - the odometry-label loss weight against the render loss;
+    - prototype on discrete SE(2) or se2c m.
   - **Comparison set:**
     - odometry given: hybrid4c m se2c, 400k WSD, final 0.0045 / far 0.0074;
     - basic VO;
