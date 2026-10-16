@@ -102,8 +102,10 @@ CONSUMED_CASES = (
 
 
 # fields that are not settings of the run, so have no place in the args
-# record (it must stay what train.py --flags gives): config.yaml has them
-NOT_IN_RECORD = {'run.overwrite'}
+# record (it must stay what train.py --flags gives): config.yaml has them.
+# run.root and run.dir say where the run is written (the args record keeps
+# train.py's ``out``, null for a default directory, as before them).
+NOT_IN_RECORD = {'run.overwrite', 'run.root', 'run.dir'}
 
 
 def trainer_inputs(e):
@@ -175,7 +177,7 @@ def test_the_trainer_reads_every_field(tmp_path, monkeypatch, case):
     skip = {'legacy_args', '__post_init__', '__repr__', '__eq__', '__hash__', '__init__'}
     cfg = compose(*TRACKED_RUNS[case], 'run.device=cpu', 'run.steps=2', 'run.save_every=1',
                   'eval.every=1', 'eval.log_every=1', 'eval.batches=1', 'optim.batch=2',
-                  'schedule.warmup=1', f'run.out={tmp_path}/run')
+                  'schedule.warmup=1', f'run.root={tmp_path}')   # run.out unset: the template is read
     exp = run.build(cfg)
     reads = set()
     for cls in NODES:
@@ -410,11 +412,14 @@ def test_from_recomposes_from_the_saved_sources(tmp_path):
 
 def test_from_an_older_run_takes_value_overrides_only(tmp_path):
     cfg = compose('+experiment=se2c_bridge', 'model.size=s')
-    del cfg.run['overwrite']                     # saved before the field existed
+    for k in ('overwrite', 'root', 'dir'):       # saved before these fields existed
+        del cfg.run[k]
     path = tmp_path / 'config.yaml'
     OmegaConf.save(cfg, path)
-    again, _ = run.rerun(str(path), ['run.seed=7'])
+    again, _ = run.rerun(str(path), ['run.seed=7', 'run.name=again'])
     assert run.build(again).legacy_args().seed == 7 and again.run.overwrite is False
+    # the run directory template is added, over the saved run's own values
+    assert again.run.dir == 'results/se2c/hybrid4c/s/again'
     for bad, match in (['schedule=wsd', 'a group choice cannot be recomposed'],
                        ['model/size=s', 'not group choices'],
                        ['run.sed=1', "no key 'run.sed'"],

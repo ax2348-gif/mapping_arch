@@ -3,6 +3,8 @@
 # <host>:<task>/<model>/<size>/<run> as in runs.csv (task se2 is written se2d).
 # commit: an exact sha only where one was recorded at launch; "inferred:<sha>" otherwise;
 # no run anywhere records whether its tree was dirty.
+# Local z2 paths moved to results/z2/ on 2026-10-16 (experiments/audit/z2_results_migration.tsv);
+# Torch paths are where the runs are on Torch (old layout, not moved).
 # Scoring (brief): MAJOR if hypothesis (H) or downstream dependency (P), or documented (D) and > ~1 GPU-h.
 
 experiments:
@@ -320,18 +322,18 @@ experiments:
     commits: {"inferred:d0744b9": 4, "unknown": 4, "inferred:eb7d880": 2, "inferred:27e112f": 1, "inferred:6fcbd99": 1}
     run_status: {completed: 12}
     runs:
-      - {id: "erid-2:z2/hybrid/xs/seed0", path: "/home/adrianna/code/mapping/results/hybrid/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
-      - {id: "erid-2:z2/hybrid/xs/seed0_20k_qt_placed", path: "/home/adrianna/code/mapping/results/hybrid/xs/seed0_20k_qt_placed", commit: "inferred:27e112f", status: "completed"}
-      - {id: "erid-2:z2/hybrid/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/hybrid/xs/seed0_8k", commit: "unknown", status: "completed"}
-      - {id: "erid-2:z2/hybrid2/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/hybrid2/xs/seed0_20k", commit: "inferred:eb7d880", status: "completed"}
-      - {id: "erid-2:z2/hybrid2/xs/seed0_20k_qt", path: "/home/adrianna/code/mapping/results/hybrid2/xs/seed0_20k_qt", commit: "inferred:eb7d880", status: "completed"}
-      - {id: "erid-2:z2/lstm/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/lstm/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
-      - {id: "erid-2:z2/lstm/xs/seed0_20k_nodecay_hh", path: "/home/adrianna/code/mapping/results/lstm/xs/seed0_20k_nodecay_hh", commit: "inferred:6fcbd99", status: "completed"}
-      - {id: "erid-2:z2/lstm/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/lstm/xs/seed0_8k", commit: "unknown", status: "completed"}
-      - {id: "erid-2:z2/vanilla/xs/seed0", path: "/home/adrianna/code/mapping/results/vanilla/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
-      - {id: "erid-2:z2/vanilla/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/vanilla/xs/seed0_8k", commit: "unknown", status: "completed"}
-      - {id: "erid-2:z2/vanilla2/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/vanilla2/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
-      - {id: "erid-2:z2/vanilla2/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/vanilla2/xs/seed0_8k", commit: "unknown", status: "completed"}
+      - {id: "erid-2:z2/hybrid/xs/seed0", path: "/home/adrianna/code/mapping/results/z2/hybrid/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
+      - {id: "erid-2:z2/hybrid/xs/seed0_20k_qt_placed", path: "/home/adrianna/code/mapping/results/z2/hybrid/xs/seed0_20k_qt_placed", commit: "inferred:27e112f", status: "completed"}
+      - {id: "erid-2:z2/hybrid/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/z2/hybrid/xs/seed0_8k", commit: "unknown", status: "completed"}
+      - {id: "erid-2:z2/hybrid2/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/z2/hybrid2/xs/seed0_20k", commit: "inferred:eb7d880", status: "completed"}
+      - {id: "erid-2:z2/hybrid2/xs/seed0_20k_qt", path: "/home/adrianna/code/mapping/results/z2/hybrid2/xs/seed0_20k_qt", commit: "inferred:eb7d880", status: "completed"}
+      - {id: "erid-2:z2/lstm/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/z2/lstm/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
+      - {id: "erid-2:z2/lstm/xs/seed0_20k_nodecay_hh", path: "/home/adrianna/code/mapping/results/z2/lstm/xs/seed0_20k_nodecay_hh", commit: "inferred:6fcbd99", status: "completed"}
+      - {id: "erid-2:z2/lstm/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/z2/lstm/xs/seed0_8k", commit: "unknown", status: "completed"}
+      - {id: "erid-2:z2/vanilla/xs/seed0", path: "/home/adrianna/code/mapping/results/z2/vanilla/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
+      - {id: "erid-2:z2/vanilla/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/z2/vanilla/xs/seed0_8k", commit: "unknown", status: "completed"}
+      - {id: "erid-2:z2/vanilla2/xs/seed0_20k", path: "/home/adrianna/code/mapping/results/z2/vanilla2/xs/seed0_20k", commit: "inferred:d0744b9", status: "completed"}
+      - {id: "erid-2:z2/vanilla2/xs/seed0_8k", path: "/home/adrianna/code/mapping/results/z2/vanilla2/xs/seed0_8k", commit: "unknown", status: "completed"}
 
 # Pending: registered and submitted, no run directory exists yet.
 pending:

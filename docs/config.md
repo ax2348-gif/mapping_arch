@@ -63,7 +63,7 @@ python run.py ... --print                             # resolved config, and the
 | `generator` (chosen by the task; `generator=<variant>` overrides) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
 | `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` (`Schedule.lr(step, steps, peak)`) | `warmup` (+ `cooldown` for wsd) |
 | `optim` | in `config.yaml` | `AdamW` | `lr` (default: the model's, via `${model_lr:...}`), `weight_decay`, `clip`, `batch` |
-| `run` | in `config.yaml` | `Run` | `name out steps seed save_every branch device bf16 compile overwrite` |
+| `run` | in `config.yaml` | `Run` | `name out root dir steps seed save_every branch device bf16 compile overwrite` |
 | `eval` | in `config.yaml` | `Eval` | `batches every log_every` |
 | `experiment` | `se2c_bridge`, `se2d_scaling_wsd`, or any file via `--exp` | none: it only sets the fields above | |
 
@@ -262,7 +262,7 @@ the field's comment.
 
 `run.py` launches one run; a sweep is one command per point.
 - **Distinct outputs.** A run directory is `results/<task>/<model>/<size>/<run.name>`
-  (z2: `results/<model>/...`), and a non-empty one is refused. Points that
+  (`run.dir`, below), and a non-empty one is refused. Points that
   differ only in a value need distinct names. An interpolated name does
   it: `'run.name=lr${optim.lr}_s${run.seed}'` (quoted for the shell).
 - **Cluster arrays.** `python scaling.py --task <t> --model <m> --slurm
@@ -282,6 +282,47 @@ which need CUDA; on CPU they are refused before anything is written
 (`mapping.models.cuda_only` names the module). The other models train on
 CPU (`run.device=cpu`), and the bit-identical rerun guarantee is for CPU.
 `run.bf16` applies on CUDA only.
+
+## Run directories
+
+Where a run writes is two config fields, the same for every task:
+
+```yaml
+run:
+  root: results
+  dir: ${run.root}/${task.name}/${model.name}/${model.size}/${run_name:${run.name},${run.seed}}
+  out: null            # the explicit override; wins over dir when set
+```
+
+- `run_name` is `run.name`, or `seed<seed>` when the name is null (the
+  trainer's default name, as before).
+- `run.out` stays the explicit override (`train.py --out`); the
+  equivalence tests and `--reproduce` write through it.
+- `run.root=/elsewhere` moves every run under another root; a preset may
+  restructure `run.dir` (`${run.root}/campaigns/h1c/${model.name}/...`).
+- `run.root` and `run.dir` say where a run is written, never what it
+  trains, so they are not in the legacy `args` record (as `run.overwrite`).
+- `mapping.config.Run.location()` gives `{dir, root, rel}`, the resolved
+  directory and its path under the root. Tools that need a task's runs use
+  `mapping.tasks.results_dir(task)` (`results/<task>`), never a per-task
+  root: `mapping/tasks.py` has none any more.
+
+**z2 moved (2026-10-16).** Before the template, z2 runs were written to
+`results/<model>/...` with no task segment, the only task without one. All
+local z2 runs were moved to `results/z2/<model>/...` (a plain move;
+`results/` is untracked). The manifest of every moved entry and run is
+`experiments/audit/z2_results_migration.tsv` (a copy is
+`results/z2/MIGRATION.tsv`), made by `experiments/audit/z2_results_migration.py`.
+Nothing reads the old z2 layout any more. Two read-only allowances remain,
+for old records only:
+- `scripts/sync.sh pull` maps a remote tree that still has the old layout
+  (Torch's `/scratch/ax2348/mapping`) into `results/z2/`, so a pull never
+  re-creates it here;
+- `run.py --from` on a config.yaml saved before `run.root`/`run.dir`
+  existed adds them with today's defaults, without counting them as drift.
+
+Paths recorded inside old `final.json`/`log.jsonl` files (`args.out`, null
+for default directories) are unchanged; the files were moved, not edited.
 
 ## Outputs and reruns
 
@@ -341,6 +382,15 @@ parents without `config.yaml` get the old check of their `args`
 
 The discrete SE(2) task was renamed `se2d` (2026-10-16).
 - New runs go to `results/se2d/`.
+- **Old se2 runs stay in `results/se2/`, not moved (decided with the run
+  directory template, 2026-10-16).** Their path already is the template,
+  `${run.root}/${task.name}/...`, applied to the task name they were
+  recorded with (`se2` in their `final.json`, checkpoints and log). The
+  registry, the audit and published reports cite these paths, and the
+  Torch trees hold the same layout. So a run's directory is always the
+  template over its *recorded* task name, and only z2, whose old path had
+  no task segment at all, had to move. `mapping.tasks.results_dir('se2')`
+  is `results/se2`.
 - `se2` remains a read-only alias (`mapping.tasks.ALIASES`). Old
   checkpoints and `final.json` files load, and `load_checkpoint` gives
   their task as `se2d`, so the se2d tools (probe_gdn, read_beta, ...)

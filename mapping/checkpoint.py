@@ -1,6 +1,6 @@
 """Checkpoints: what a run saves and how to get a model back from it.
 
-A run directory ``results/<model>/<size>/<run>/`` holds
+A run directory ``results/<task>/<model>/<size>/<run>/`` (``run.dir``) holds
 
     final.pt      model weights plus the arguments, the task spec and
                   the architecture (class and constructor arguments)

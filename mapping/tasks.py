@@ -2,7 +2,6 @@
 
     models   the model registry for the task
     task     the module with TaskSpec, prepare, loss_fn, metrics, floor
-    root     where its runs live
     heading  the generator switch (mapping.data.Config)
     odometry the TaskSpec field that sizes a model's odometry table
 
@@ -20,7 +19,15 @@ window; it does not touch the spec, so models are sized exactly as before.
 
 ``z2`` is the default everywhere, so code written before ``se2d`` existed
 behaves as it did. Checkpoints record their task; ones without it are z2.
+
+Where runs live is not a property of the task: a run's directory is the
+config's ``run.dir``, ``${run.root}/<task>/<model>/<size>/<run>``
+(docs/config.md, "Run directories"), the same template for every task.
+``results_dir`` gives a task's directory under a root, for the tools that
+read runs back.
 """
+import os
+
 import mapping.models
 import mapping.models.se2d
 import mapping.models.se2c
@@ -30,10 +37,10 @@ import mapping.task_se2c
 from mapping.data import VOCAB, Config, texture_settings
 
 TASKS = {
-    'z2': dict(models=mapping.models, task=mapping.task, root='results',
+    'z2': dict(models=mapping.models, task=mapping.task,
                heading=False, odometry='directions'),
     'se2d': dict(models=mapping.models.se2d, task=mapping.task_se2d,
-                root='results/se2d', heading=True, odometry='odometry'),
+                heading=True, odometry='odometry'),
 }
 
 # Tasks with their own GPU generator (batches made inside the training
@@ -42,32 +49,42 @@ TASKS = {
 # se2c: continuous SE(2), CONTRACT_SE2C.md.
 GPU_TASKS = {
     'se2c': dict(models=mapping.models.se2c, task=mapping.task_se2c,
-                 root='results/se2c', gpu_data=True),
+                 gpu_data=True),
 }
 ALL = {**TASKS, **GPU_TASKS}
 
 
 # Read-only aliases: names old checkpoints, final.json files and results
 # directories carry. ``se2`` is the discrete SE(2) task, renamed ``se2d``
-# (2026-10-16); its old runs stay under results/se2/. New runs cannot use
-# an alias (train.py offers ``ALL`` only).
-ALIASES = {'se2': ('se2d', 'results/se2')}
+# (2026-10-16). Its old runs stay under results/se2/, which is the run
+# directory template applied to the name they were recorded with, so they
+# are not moved (docs/config.md, "se2 is now se2d"). New runs cannot use an
+# alias (train.py offers ``ALL`` only).
+ALIASES = {'se2': 'se2d'}
+
+RESULTS = 'results'          # the default run.root (conf/config.yaml)
 
 
 def canonical(name):
     """The current name of a task, resolving read-only aliases."""
-    return ALIASES[name][0] if name in ALIASES else name
+    return ALIASES.get(name, name)
 
 
 def get(name='z2'):
-    """A task row. An alias gives the current task with the root its old
-    runs live under, so tools reading old results find them."""
-    if name in ALIASES:
-        current, root = ALIASES[name]
-        return {**ALL[current], 'root': root}
+    """A task row; an alias gives the current task's."""
+    name = canonical(name)
     if name not in ALL:
         raise KeyError(f'unknown task {name!r}; have {sorted(ALL)}')
     return ALL[name]
+
+
+def results_dir(name, root=RESULTS):
+    """Where a task's runs live under ``root``: ``<root>/<name>``, the
+    first segment of the ``run.dir`` template. An alias keeps its own name
+    (``se2`` -> ``results/se2``, its old runs)."""
+    if name not in ALL and name not in ALIASES:
+        raise KeyError(f'unknown task {name!r}; have {sorted(ALL) + sorted(ALIASES)}')
+    return os.path.join(root, name)
 
 
 def config_and_spec(name, steps, queries, seed, query_times='last',

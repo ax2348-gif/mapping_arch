@@ -1,6 +1,6 @@
-"""Every run under results/ as one table, and power-law fits per model.
+"""Every run of a task as one table, and power-law fits per model.
 
-    python summarize.py                 all z2 runs
+    python summarize.py                 all z2 runs, under results/z2/
     python summarize.py --task se2d      all se2d runs (se2c likewise)
     python summarize.py --task se2       the old se2 runs, under results/se2/
     python summarize.py --model lstm    one model
@@ -18,10 +18,11 @@ def main():
                    choices=sorted(tasks.ALL) + sorted(tasks.ALIASES),
                    help="which task's results root; an alias (se2) reads its old runs")
     p.add_argument('--model', default=None)
-    p.add_argument('--root', default=None, help="default: the task's")
+    p.add_argument('--root', default=None,
+                   help="the task's run directories; default results/<task> (tasks.results_dir)")
     p.add_argument('--fit', action='store_true')
     a = p.parse_args()
-    a.root = a.root or tasks.get(a.task)['root']
+    a.root = a.root or tasks.results_dir(a.task)
     rows = load_runs(a.root, a.model)
     if not rows:
         print('no runs found')

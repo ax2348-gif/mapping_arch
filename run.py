@@ -143,6 +143,18 @@ def differences(a, b, prefix=''):
     return out
 
 
+# run.* fields added after runs were saved, so absent from older config.yaml
+# files: the run directory template (2026-10-16). They say where a run is
+# written, never what it trains, so recomposing an older run may add them
+# (the current defaults) without that counting as drift.
+ADDED_RUN_FIELDS = ('run.root', 'run.dir')
+
+
+def _added_since(saved):
+    return [k for k in ADDED_RUN_FIELDS
+            if OmegaConf.select(OmegaConf.create(saved), k, default='<missing>') == '<missing>']
+
+
 def rerun(frm, overrides):
     """``(config, sources)`` to rerun the run whose ``config.yaml`` is
     ``frm``, with ``overrides`` applied.
@@ -164,7 +176,8 @@ def rerun(frm, overrides):
         rec = OmegaConf.to_container(OmegaConf.load(src))
         exp = os.path.join(d, rec['experiment']) if rec.get('experiment') else None
         again = OmegaConf.to_container(resolved(load(rec['overrides'], exp)))
-        drift = [k for k in differences(again, saved) if k != 'run.overwrite']
+        drift = [k for k in differences(again, saved)
+                 if k != 'run.overwrite' and k not in _added_since(saved)]
         if drift:
             raise SystemExit(f'{frm}: composing its sources ({src}) with the current '
                              f'conf/ no longer gives its saved config; changed: '
@@ -173,7 +186,12 @@ def rerun(frm, overrides):
                              f'commit it was made at, or write a new experiment (--exp)')
         merged = merge_overrides(rec['overrides'], overrides)
         return resolved(load(merged, exp)), {'overrides': merged, 'experiment': exp}
+    added = _added_since(saved)
     cfg = OmegaConf.create(saved)
+    if added:                                # saved before the run.dir template
+        base = OmegaConf.to_container(OmegaConf.load(os.path.join(CONF, 'config.yaml')))
+        for k in added:                      # the template itself, resolved below
+            OmegaConf.update(cfg, k, base['run'][k.split('.', 1)[1]], force_add=True)
     for o in overrides:
         key = _key(o)
         if '=' not in o or o[0] in '+~' or '/' in key:
@@ -189,7 +207,7 @@ def rerun(frm, overrides):
     cfg.merge_with(OmegaConf.from_dotlist(overrides))
     if OmegaConf.select(cfg, 'run.overwrite', default=None) is None:
         cfg.run.overwrite = False            # runs saved before the field existed
-    return cfg, {'overrides': list(overrides), 'experiment': None}
+    return resolved(cfg), {'overrides': list(overrides), 'experiment': None}
 
 
 def flags_equivalent(cfg, experiment):

@@ -35,7 +35,7 @@ BUDGETS=({budgets})
 SIZE=${{SIZES[$(( SLURM_ARRAY_TASK_ID / ${{#BUDGETS[@]}} ))]}}
 S=${{BUDGETS[$(( SLURM_ARRAY_TASK_ID % ${{#BUDGETS[@]}} ))]}}
 K=$(( S * 4 / 5 ))
-PARENT=results/{root}/{model}/$SIZE/{parent}
+PARENT={root}/{model}/$SIZE/{parent}
 source /scratch/ax2348/venvs/mapping/bin/activate
 cd /scratch/ax2348/mapping
 python -c "import hydra, omegaconf; print('hydra-core', hydra.__version__, 'omegaconf', omegaconf.__version__)" \\
@@ -67,14 +67,13 @@ def main():
         raise SystemExit(f'--extra {a.extra!r}: jobs launch run.py, so --extra takes '
                          f'Hydra overrides (task.query_times=uniform), not train.py flags')
     task = tasks.get(a.task)
-    root = task['root'][len('results'):].strip('/')
+    root = tasks.results_dir(a.task)          # results/<task>, the run.dir template
     workers = '' if task.get('gpu_data') else 'task.generator.workers=14'
     text = TEMPLATE.format(task=a.task, model=a.model, sizes=' '.join(a.sizes),
                            budgets=' '.join(map(str, a.budgets)),
                            last=len(a.sizes) * len(a.budgets) - 1,
                            concurrent=a.concurrent, time=a.time, parent=a.parent,
                            root=root, seed=a.seed, extra=a.extra, workers=workers)
-    text = text.replace('results//', 'results/')
     open(a.out, 'w').write(text)
     print(f'wrote {a.out}: {len(a.sizes) * len(a.budgets)} branches')
 

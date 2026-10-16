@@ -24,6 +24,7 @@ at train.py's defaults.
 import functools
 import inspect
 import math
+import os
 from dataclasses import dataclass, fields, is_dataclass
 from typing import Optional
 
@@ -52,6 +53,14 @@ def ladder_rung(name, size):
     return dict(rungs[size])
 
 
+def run_name(name, seed):
+    """A run's directory name: ``run.name``, or ``seed<seed>`` when it is
+    null (as the trainer always named it). Resolver for ``run.dir``."""
+    return name if name is not None else f'seed{seed}'
+
+
+if not OmegaConf.has_resolver('run_name'):
+    OmegaConf.register_new_resolver('run_name', run_name)
 if not OmegaConf.has_resolver('model_lr'):
     OmegaConf.register_new_resolver('model_lr', model_lr)
 if not OmegaConf.has_resolver('ladder'):
@@ -77,7 +86,9 @@ class Node:
 class Run(Node):
     """Where the run goes, how long, and on what."""
     name: Optional[str]          # run directory name; None: seed<seed>
-    out: Optional[str]           # explicit run directory, overriding name
+    out: Optional[str]           # explicit run directory; wins over dir
+    root: str                    # where run directories live
+    dir: str                     # the run directory: ${root}/<task>/<model>/<size>/<name>
     steps: int
     seed: int
     save_every: int              # write step<k>.pt every k steps; 0: never
@@ -86,6 +97,16 @@ class Run(Node):
     bf16: bool                   # bf16 autocast (CUDA only; ignored on CPU)
     compile: bool
     overwrite: bool              # write into a non-empty run directory
+
+    def location(self):
+        """Where this run writes: ``{'dir', 'root', 'rel'}``. ``dir`` is
+        ``out`` when set, else the template ``dir``; ``rel`` is its path
+        under ``root`` (None when it lies outside, as an explicit ``out``
+        may). Tools look runs up by this, not by re-deriving paths."""
+        d = self.out or self.dir
+        rel = os.path.relpath(os.path.abspath(d), os.path.abspath(self.root))
+        return {'dir': d, 'root': self.root,
+                'rel': None if rel == os.pardir or rel.startswith(os.pardir + os.sep) else rel}
 
 
 @dataclass(frozen=True)

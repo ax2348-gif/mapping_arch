@@ -48,6 +48,6 @@ def test_permute_steps_matches_gather_for_symbols():
 
 def test_registry_entry():
     t = tasks.get('se2c')
-    assert t['root'] == 'results/se2c' and t['gpu_data']
+    assert tasks.results_dir('se2c') == 'results/se2c' and t['gpu_data']
     config, spec = tasks.config_and_spec('se2c', 32, 8, 0)
     assert spec == task_se2c.TaskSpec() and config.view == 15

@@ -1,0 +1,78 @@
+# z2 results migration, 2026-10-16T20:30:00Z, host erid-2, ~/code/mapping
+# plain os.rename of each entry (results/ is untracked); runs moved with their entry
+kind	old	new	files
+entry	results/hybrid	results/z2/hybrid	56
+run	results/hybrid/m/seed0_lr1e-3	results/z2/hybrid/m/seed0_lr1e-3	
+run	results/hybrid/s/seed0_lr1e-3	results/z2/hybrid/s/seed0_lr1e-3	
+run	results/hybrid/s/seed0_lr1e-4	results/z2/hybrid/s/seed0_lr1e-4	
+run	results/hybrid/s/seed0_lr3e-4	results/z2/hybrid/s/seed0_lr3e-4	
+run	results/hybrid/xs/seed0	results/z2/hybrid/xs/seed0	
+run	results/hybrid/xs/seed0_20k	results/z2/hybrid/xs/seed0_20k	
+run	results/hybrid/xs/seed0_20k_qt_placed	results/z2/hybrid/xs/seed0_20k_qt_placed	
+run	results/hybrid/xs/seed0_8k	results/z2/hybrid/xs/seed0_8k	
+run	results/hybrid/xs/seed0_lr1e-3	results/z2/hybrid/xs/seed0_lr1e-3	
+run	results/hybrid/xs/seed0_lr1e-4	results/z2/hybrid/xs/seed0_lr1e-4	
+run	results/hybrid/xs/seed0_lr3e-4	results/z2/hybrid/xs/seed0_lr3e-4	
+entry	results/hybrid2	results/z2/hybrid2	12
+run	results/hybrid2/xs/seed0_20k	results/z2/hybrid2/xs/seed0_20k	
+run	results/hybrid2/xs/seed0_20k_qt	results/z2/hybrid2/xs/seed0_20k_qt	
+entry	results/hybrid3	results/z2/hybrid3	0
+entry	results/hybrid3_5	results/z2/hybrid3_5	0
+entry	results/hybrid4	results/z2/hybrid4	0
+entry	results/lstm	results/z2/lstm	64
+run	results/lstm/m/seed0_lr1e-3	results/z2/lstm/m/seed0_lr1e-3	
+run	results/lstm/m/seed0_lr1e-4	results/z2/lstm/m/seed0_lr1e-4	
+run	results/lstm/m/seed0_lr3e-4	results/z2/lstm/m/seed0_lr3e-4	
+run	results/lstm/s/seed0_lr1e-3	results/z2/lstm/s/seed0_lr1e-3	
+run	results/lstm/s/seed0_lr1e-4	results/z2/lstm/s/seed0_lr1e-4	
+run	results/lstm/s/seed0_lr3e-4	results/z2/lstm/s/seed0_lr3e-4	
+run	results/lstm/xs/seed0	results/z2/lstm/xs/seed0	
+run	results/lstm/xs/seed0_20k	results/z2/lstm/xs/seed0_20k	
+run	results/lstm/xs/seed0_20k_nodecay_hh	results/z2/lstm/xs/seed0_20k_nodecay_hh	
+run	results/lstm/xs/seed0_8k	results/z2/lstm/xs/seed0_8k	
+run	results/lstm/xs/seed0_lr1e-3	results/z2/lstm/xs/seed0_lr1e-3	
+run	results/lstm/xs/seed0_lr1e-4	results/z2/lstm/xs/seed0_lr1e-4	
+run	results/lstm/xs/seed0_lr3e-4	results/z2/lstm/xs/seed0_lr3e-4	
+entry	results/mlp	results/z2/mlp	14
+run	results/mlp/xs/cluster_check	results/z2/mlp/xs/cluster_check	
+run	results/mlp/xs/seed0	results/z2/mlp/xs/seed0	
+run	results/mlp/xs/t_lock	results/z2/mlp/xs/t_lock	
+entry	results/vanilla	results/z2/vanilla	81
+run	results/vanilla/l/seed0_lr1e-3	results/z2/vanilla/l/seed0_lr1e-3	
+run	results/vanilla/l/seed0_lr3e-4	results/z2/vanilla/l/seed0_lr3e-4	
+run	results/vanilla/m/seed0_300k	results/z2/vanilla/m/seed0_300k	
+run	results/vanilla/m/seed0_lr1e-3	results/z2/vanilla/m/seed0_lr1e-3	
+run	results/vanilla/m/seed0_lr1e-4	results/z2/vanilla/m/seed0_lr1e-4	
+run	results/vanilla/m/seed0_lr3e-4	results/z2/vanilla/m/seed0_lr3e-4	
+run	results/vanilla/s/seed0_lr1e-3	results/z2/vanilla/s/seed0_lr1e-3	
+run	results/vanilla/s/seed0_lr1e-4	results/z2/vanilla/s/seed0_lr1e-4	
+run	results/vanilla/s/seed0_lr3e-4	results/z2/vanilla/s/seed0_lr3e-4	
+run	results/vanilla/xs/seed0	results/z2/vanilla/xs/seed0	
+run	results/vanilla/xs/seed0_20k	results/z2/vanilla/xs/seed0_20k	
+run	results/vanilla/xs/seed0_300k	results/z2/vanilla/xs/seed0_300k	
+run	results/vanilla/xs/seed0_8k	results/z2/vanilla/xs/seed0_8k	
+run	results/vanilla/xs/seed0_lr1e-3	results/z2/vanilla/xs/seed0_lr1e-3	
+run	results/vanilla/xs/seed0_lr1e-4	results/z2/vanilla/xs/seed0_lr1e-4	
+run	results/vanilla/xs/seed0_lr3e-4	results/z2/vanilla/xs/seed0_lr3e-4	
+entry	results/vanilla2	results/z2/vanilla2	68
+run	results/vanilla2/m/seed0_lr1e-3	results/z2/vanilla2/m/seed0_lr1e-3	
+run	results/vanilla2/m/seed0_lr1e-4	results/z2/vanilla2/m/seed0_lr1e-4	
+run	results/vanilla2/m/seed0_lr3e-4	results/z2/vanilla2/m/seed0_lr3e-4	
+run	results/vanilla2/m/seed0_smoke	results/z2/vanilla2/m/seed0_smoke	
+run	results/vanilla2/s/seed0_lr1e-3	results/z2/vanilla2/s/seed0_lr1e-3	
+run	results/vanilla2/s/seed0_lr1e-4	results/z2/vanilla2/s/seed0_lr1e-4	
+run	results/vanilla2/s/seed0_lr3e-4	results/z2/vanilla2/s/seed0_lr3e-4	
+run	results/vanilla2/xl/seed0_smoke	results/z2/vanilla2/xl/seed0_smoke	
+run	results/vanilla2/xs/seed0	results/z2/vanilla2/xs/seed0	
+run	results/vanilla2/xs/seed0_20k	results/z2/vanilla2/xs/seed0_20k	
+run	results/vanilla2/xs/seed0_8k	results/z2/vanilla2/xs/seed0_8k	
+run	results/vanilla2/xs/seed0_lr1e-3	results/z2/vanilla2/xs/seed0_lr1e-3	
+run	results/vanilla2/xs/seed0_lr1e-4	results/z2/vanilla2/xs/seed0_lr1e-4	
+run	results/vanilla2/xs/seed0_lr3e-4	results/z2/vanilla2/xs/seed0_lr3e-4	
+run	results/vanilla2/xs/seed0_smoke3000	results/z2/vanilla2/xs/seed0_smoke3000	
+entry	results/vanilla_depth	results/z2/vanilla_depth	20
+run	results/vanilla_depth/d16/seed0	results/z2/vanilla_depth/d16/seed0	
+run	results/vanilla_depth/d32/seed0	results/z2/vanilla_depth/d32/seed0	
+run	results/vanilla_depth/d4/seed0	results/z2/vanilla_depth/d4/seed0	
+run	results/vanilla_depth/d8/seed0	results/z2/vanilla_depth/d8/seed0	
+entry	results/curves.png	results/z2/curves.png	1

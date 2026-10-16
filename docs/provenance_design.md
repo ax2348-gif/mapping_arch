@@ -930,3 +930,56 @@ from training: it never imports `mapping.train` or torch.
   - committing the audit scripts (archived in results/session_archive_2026-10-16/audit_scripts/);
   - reports citing run ids;
   - the model-block refactor.
+
+## 15. Implementation log
+
+Each phase is one commit on master, with the full suite green against
+`MAPPING_REF` = a worktree of `ref/pre-merge`.
+
+### Phase 1: the run-directory template and the z2 path refactor
+
+- **Template.** `conf/config.yaml` has `run.root: results` and
+  `run.dir: ${run.root}/${task.name}/${model.name}/${model.size}/${run_name:${run.name},${run.seed}}`.
+  The only difference from §4's text is the last segment: `run.name` is
+  null by default and the trainer has always named such a run
+  `seed<seed>`, so a resolver (`mapping.config.run_name`) gives that name;
+  a plain `${run.name}` would give the directory `None`. `run.out` stays the
+  explicit override and wins. `Run.location()` returns `{dir, root, rel}`.
+- **Not in the args record.** `run.root` and `run.dir` say where a run is
+  written, like `run.overwrite`; the legacy `args` keeps `out` (null for a
+  default directory), so every record and the bitwise equivalence are
+  unchanged (`tests/test_config.py::NOT_IN_RECORD` lists them, with that
+  reason).
+- **No per-task root.** `root` is gone from `mapping/tasks.py`; readers
+  (summarize.py, plot_curves.py, scaling.py `--fit`, tools/branch_jobs.py)
+  use `tasks.results_dir(task)` = `results/<task>`.
+- **z2 moved, no special case** (§14). The 64 local z2 run directories (11
+  top-level entries, including `curves.png` and three empty model
+  directories) moved from `results/<model>/` to `results/z2/<model>/` by
+  `os.rename` (results/ is untracked; same filesystem). Manifest:
+  `experiments/audit/z2_results_migration.tsv` (copy in
+  `results/z2/MIGRATION.tsv`), script `experiments/audit/z2_results_migration.py`,
+  which first checked that every run in a moved entry records task z2 (or
+  no task: those predate tasks and were z2). `experiments/registry.yaml`'s 12
+  local z2 paths now point at results/z2/. `experiments/audit/runs.csv` is
+  left as the dated audit snapshot it is; the manifest maps its old paths.
+  Torch paths are unchanged (Torch is not touched).
+- **se2 -> se2d results path: not moved.** Old se2 runs stay in
+  `results/se2/`. Their path already is the template over the task name
+  they were recorded with (`se2`), they are cited by the registry, the
+  audit and published reports, and the Torch trees hold the same layout.
+  So the rule is "a run's directory is the template over its recorded task
+  name", and only z2, whose old path had no task segment, had to move.
+  `tasks.results_dir('se2')` is `results/se2`; documented in docs/config.md,
+  "se2 is now se2d".
+- **Read-only allowances for old records only:** `scripts/sync.sh pull`
+  maps a remote tree that still has the old z2 layout into `results/z2/`
+  (`MAPPING_REMOTE` points it at a fake remote in the test), and
+  `run.py --from` on a config.yaml saved before `run.root`/`run.dir` adds
+  them with today's defaults without counting them as drift.
+- **Equivalence.** The existing cases write through `run.out`, so their
+  bitwise comparison is untouched. The path change is compared explicitly
+  in `test_default_run_directory_is_the_reference_one_with_the_task_segment`:
+  the reference `train.py` and this `run.py` each write a default
+  directory, and the new relative path must be the reference's with the
+  stated change (z2: `z2/` prefixed; se2 -> se2d; se2c: identical).

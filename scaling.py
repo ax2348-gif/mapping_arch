@@ -12,7 +12,7 @@ Add ``--lr-grid 1e-3 3e-4 1e-4`` to any run mode to train every rung at
 each learning rate; ``--fit`` then takes the best learning rate per rung,
 which is the standard treatment for a scaling comparison and removes the
 confound of one rate suiting one width. Runs are named
-``seed<seed>`` or ``seed<seed>_lr<lr>`` under ``results/<model>/<size>/``.
+``seed<seed>`` or ``seed<seed>_lr<lr>`` under ``results/<task>/<model>/<size>/``.
 
 The first pass is a parameter sweep at fixed steps and batch, so every
 rung sees the same episodes. A compute-matched sweep is a later variant
@@ -147,7 +147,7 @@ def main():
               f'{path}"')
 
     if args.fit:
-        rows = best_per_size(load_runs(task['root'], args.model))
+        rows = best_per_size(load_runs(tasks.results_dir(args.task), args.model))
         if not rows:
             print('no runs found')
             return

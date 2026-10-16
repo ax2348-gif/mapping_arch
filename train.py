@@ -6,8 +6,8 @@ Streams training episodes from the train split of the tile bank (MNIST
 by default; ``--texture imagenette`` for natural images, see
 ``mapping.data.TEXTURES``), evaluates on a fixed set from its test split,
 and writes the run directory
-``results/<model>/<size>/<run>/`` (see ``mapping/checkpoint.py`` for its
-contents). Every number a scaling fit needs is in ``final.json``, and
+``results/<task>/<model>/<size>/<run>/`` (``run.dir``; see
+``mapping/checkpoint.py`` for its contents). Every number a scaling fit needs is in ``final.json``, and
 ``grid.png`` shows sampled predictions beside their targets.
 
 Evaluation is reported twice at every interval: on the held-out set, and
@@ -58,7 +58,7 @@ def build_parser():
     p.add_argument('--task', default='z2', choices=sorted(tasks.ALL),
                    help='which contract: z2 (CONTRACT.md), se2d '
                         '(CONTRACT_SE2D.md) or se2c (CONTRACT_SE2C.md); picks the model registry, the '
-                        'batch layout and the results root')
+                        'batch layout and the results directory')
     p.add_argument('--model', required=True)
     p.add_argument('--size', required=True)
     p.add_argument('--run', default=None,
@@ -289,7 +289,8 @@ def main(experiment, config=None, sources=None):
     loss_fn, metrics = task['task'].loss_fn, task['task'].metrics
     constant_floor = task['task'].constant_floor
     run = r.name or f'seed{r.seed}'
-    out = r.out or os.path.join(task['root'], e.model.name, e.model.size, run)
+    where = r.location()                    # run.out, else the run.dir template
+    out = where['dir']
     if not r.overwrite and os.path.isdir(out) and os.listdir(out):
         raise SystemExit(f'{out} is not empty (an earlier run). Write elsewhere: '
                          f'run.name=<new name> (or run.out=<dir> when the run sets '
@@ -402,7 +403,9 @@ def main(experiment, config=None, sources=None):
     os.makedirs(out, exist_ok=True)
     write_sources(out, config, sources)
 
-    print(f'{t.name} {e.model.name}/{e.model.size} -> {out}: {params:,} params, '
+    print(f'{t.name} {e.model.name}/{e.model.size} -> {out} '
+          f'({"under " + where["root"] if where["rel"] else "outside run.root " + where["root"]}): '
+          f'{params:,} params, '
           f'lr {lr:.2g}; floor mse {floor["mse"]:.4f}, '
           f'floor fg_mae {floor["fg_mae"]:.4f}, floor c-mse '
           f'{floor["mse_centered"]:.4f}; step_px {args.step_px}, '

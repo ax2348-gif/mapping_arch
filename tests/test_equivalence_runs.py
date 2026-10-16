@@ -26,6 +26,7 @@ against either.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -71,6 +72,7 @@ def ref_has_se2c_dropout():
 GPU_CASE = (['--task', 'se2d', '--model', 'hybrid4', '--size', 'xs', '--workers', '2'],
             ['model=se2d/hybrid4', 'task.generator.workers=2'])
 TIMING = ('elapsed_s', 'steps_per_s')
+NOTE = []          # run.py launch arguments every run needs besides its overrides
 
 
 def launch(cwd, script, argv, out):
@@ -203,3 +205,57 @@ def test_gpu_run_matches_within_noise(tmp_path):
         # count metrics (within_0.1) move in steps of one pixel's share; a
         # single old pair underestimates the noise, so allow 3x it, or 1e-3
         assert gap(log, old_log) <= max(3 * noise, 1e-3), (k, gap(log, old_log), noise)
+
+
+# Default run directories, against the reference. Every case above writes
+# through an explicit run.out / --out, so the path is compared here, and
+# the one change is stated, not normalised away: the run directory
+# template (docs/config.md, "Run directories") puts z2 runs under a task
+# segment, results/z2/, where the reference wrote results/<model>/. The
+# reference's se2 is se2d (the rename); se2c is unchanged.
+PATH_CHANGE = {
+    'z2': lambda old: os.path.join('z2', old),
+    'se2d_wsd': lambda old: 'se2d' + old[len('se2'):] if old.startswith('se2' + os.sep) else None,
+    'se2c': lambda old: old,
+}
+
+
+def _run_dir_under(root):
+    found = [dp for dp, _, fs in os.walk(root) if 'final.json' in fs]
+    assert len(found) == 1, found
+    return os.path.relpath(found[0], root)
+
+
+@pytest.mark.parametrize('case', sorted(PATH_CHANGE))
+def test_default_run_directory_is_the_reference_one_with_the_task_segment(tmp_path, case):
+    if case.startswith('se2c') and not ref_has_se2c_dropout():
+        pytest.skip('MAPPING_REF predates the se2c odometry-dropout knob (master 038f19c)')
+    flags, overrides = CASES[case]
+    name = f'equiv_path_{os.getpid()}_{case}'
+    ref_results = os.path.join(REF, 'results')
+    before, existed = set(), os.path.isdir(ref_results)
+    if existed:
+        before = {os.path.join(dp, d) for dp, ds, _ in os.walk(ref_results) for d in ds}
+    old_flags = ['se2' if f == 'se2d' else f for f in flags]
+    r = subprocess.run([sys.executable, 'train.py', *old_flags, *COMMON, '--run', name],
+                       cwd=REF, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr[-3000:]
+    try:
+        old_rel = next(os.path.relpath(dp, ref_results) for dp, _, fs in os.walk(ref_results)
+                       if os.path.basename(dp) == name and 'final.json' in fs)
+    finally:
+        for dp, ds, _ in sorted(os.walk(ref_results), reverse=True):
+            if os.path.basename(dp) == name:
+                shutil.rmtree(dp)
+        for d in sorted({os.path.join(dp, d) for dp, ds, _ in os.walk(ref_results) for d in ds}
+                        - before, reverse=True):
+            if os.path.isdir(d) and not os.listdir(d):
+                os.rmdir(d)
+        if not existed and os.path.isdir(ref_results) and not os.listdir(ref_results):
+            os.rmdir(ref_results)
+    root = tmp_path / 'root'
+    r = subprocess.run([sys.executable, 'run.py', *overrides, *COMMON_RUN, f'run.root={root}',
+                        f'run.name={name}', *NOTE], cwd=HERE, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr[-3000:]
+    new_rel = _run_dir_under(root)
+    assert new_rel == PATH_CHANGE[case](old_rel), (old_rel, new_rel)

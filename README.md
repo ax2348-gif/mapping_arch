@@ -76,20 +76,25 @@ mapping/se2c/          continuous SE(2) (se2c): geometry, procedural texture,
                        coverage, GPU generator, oracle, shared pose encoding
 mapping/task_se2c.py   the se2c task as a model sees it; its harness data path
 mapping/models/se2c/   the se2c registry (hybrid4c, vanilla4c)
-mapping/tasks.py       task name -> registry, spec, batch layout, results root
+mapping/tasks.py       task name -> registry, spec, batch layout
 tools/                 analysis: audit, probes, registrability, benchmark
 docs/models/           one page per architecture
 docs/                  reviews and design notes (see "Research documents")
 HYPOTHESIS.md          the frozen hypothesis and its dated amendments
-results/               run directories (not in git); se2d runs under results/se2d/
-                       (the discrete SE(2) task was called se2 until 2026-10-16; its
-                       older runs stay under results/se2/, and every loader and
-                       `summarize.py --task se2` still reads them)
+results/               run directories (not in git): results/<task>/<model>/<size>/<run>/
+                       for every task (results/z2/, results/se2d/, results/se2c/). z2
+                       runs moved from results/<model>/ to results/z2/ on 2026-10-16
+                       (experiments/audit/z2_results_migration.tsv). The discrete SE(2)
+                       task was called se2 until 2026-10-16; its older runs stay under
+                       results/se2/, and every loader and `summarize.py --task se2`
+                       still reads them
 quarantine/            outputs of a stale launcher, kept out of results/
 shelved/               variants set aside, with a README on resuming
 ```
 
-A run directory is `results/<model>/<size>/<run>/` and always holds
+A run directory is `results/<task>/<model>/<size>/<run>/` (the config's
+`run.dir`, `${run.root}/${task.name}/...`; docs/config.md, "Run
+directories") and always holds
 `final.json` (every number a fit needs), `final.pt` (rebuilds the model
 by itself), `log.jsonl`, and `grid.png` (sampled predictions beside their
 targets). Runs are named `seed<seed>` by default, `seed<seed>_lr<lr>`
@@ -122,7 +127,7 @@ from a learning-rate grid; name one anything with `--run`.
    Read three things from the output: eval mse against the constant floor
    printed at the start; `dirs shuffled mse`, which must eventually rise
    above eval mse or the model is not using the odometry; and
-   `results/<name>/xs/seed0/grid.png`. Around this task, 500 steps shows
+   `results/z2/<name>/xs/seed0/grid.png`. Around this task, 500 steps shows
    only that it runs; 8000 steps at xs is where models have been seen to
    leave the plateau.
 5. **Write `docs/models/<name>.md`**: the architecture, which inductive
@@ -141,7 +146,7 @@ the same thing.
 ```bash
 python train.py --model vanilla --size m --steps 20000          # one run
 python train.py --model vanilla --size m --steps 20000 --lr 1e-3 --run seed0_lr1e-3
-python render.py results/vanilla/m/seed0/final.pt --rows 24     # redraw
+python render.py results/z2/vanilla/m/seed0/final.pt --rows 24  # redraw
 # generator settings (same tasks, CONTRACT.md "Generator settings"):
 python train.py --task se2d --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --run seed0_vo  # visual odometry
@@ -159,7 +164,7 @@ python train.py --task se2c --model hybrid4c --size xs --query-times uniform \
     --steps 20000 --run seed0                      # results/se2c/...
 python tools/se2c_sheets.py                        # texture contact sheets
 python tools/se2c_bench.py --sizes xs s            # se2c throughput
-python summarize.py                                             # all runs
+python summarize.py                                             # all z2 runs
 python summarize.py --fit                                       # best per rung + fits
 ```
 
@@ -175,7 +180,7 @@ reports `mse_centered` (`c-mse`): per query, the MSE after removing the
 prediction's own mean and the target's own mean, averaged over queries,
 so per-query brightness earns nothing; a report only, the loss is plain
 MSE. `summarize.py` reads
-every `final.json` under `results/`.
+every `final.json` under `results/<task>/` (`--task`, default z2).
 
 ## Analysis tools
 

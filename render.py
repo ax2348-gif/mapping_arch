@@ -1,6 +1,6 @@
 """Draw the prediction grid for any checkpoint.
 
-    python render.py results/vanilla/xs/seed0/final.pt [--out grid.png]
+    python render.py results/z2/vanilla/xs/seed0/final.pt [--out grid.png]
 
 ``train.py`` already writes ``grid.png`` next to every checkpoint; this
 redraws one, for instance with more rows or a different sample.

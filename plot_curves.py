@@ -10,7 +10,7 @@ line per size, on one chart.
 
 Writes <root>/<model>/curves.png for each model and <root>/curves.png
 with every model on one figure, where <root> is the task's results
-directory (results/ for z2, results/se2d/ for se2d). When a size has several runs (a
+directory (results/<task>/: results/z2/, results/se2d/, ...). When a size has several runs (a
 learning-rate grid, or different step budgets) the run with the lowest
 final eval mse is drawn, which is how the sweep is read. Every run also
 has its own curve.png, written by train.py.
@@ -33,7 +33,7 @@ def main():
     p.add_argument('--shuffled', action='store_true')
     p.add_argument('--free-axis', action='store_true')
     a = p.parse_args()
-    a.root = a.root or tasks.get(a.task)['root']
+    a.root = a.root or tasks.results_dir(a.task)
     preset = not a.free_axis
 
     rows = best_per_size(load_runs(a.root, a.model))

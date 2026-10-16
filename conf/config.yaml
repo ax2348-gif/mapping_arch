@@ -29,7 +29,10 @@ optim:
 run:
   _target_: mapping.config.Run
   name: null            # run directory name; null: seed<seed>
-  out: null             # explicit run directory, overriding name
+  out: null             # explicit run directory; wins over dir when set
+  root: results         # where run directories live (docs/config.md, "Run directories")
+  # the run directory, the same template for every task; a preset may restructure it
+  dir: ${run.root}/${task.name}/${model.name}/${model.size}/${run_name:${run.name},${run.seed}}
   steps: 2000
   seed: 0
   save_every: 0         # write step<k>.pt (with optimizer) every k steps

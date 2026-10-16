@@ -235,7 +235,7 @@ sweep needs no extra flags.
    trainer also reports `dirs shuffled mse`: the same evaluation with each
    episode's directions permuted in time. If it equals the unshuffled
    number, the model is not using the odometry yet; report both. The run
-   directory `results/<name>/xs/seed0/` also gets `grid.png`, sampled
+   directory `results/z2/<name>/xs/seed0/` also gets `grid.png`, sampled
    predictions beside targets; look at it. See README.md for the full
    workflow and `python summarize.py` for every run.
 4. `python scaling.py --model <name> --dry` output in the doc.
