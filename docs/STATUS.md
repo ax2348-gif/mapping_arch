@@ -253,3 +253,14 @@ docs/scaling_study_design.md.
   2. **Causal, NEXT, after 1 finishes:** a fully causal hybrid4 (forward-only GDN, causal attention, matched shape) plus a causal vanilla4 control.
      - Key question: the rotation was found in the RIGHT-TO-LEFT head (P5 on left-to-right failed), so can it form in the forward direction?
      - Probe the forward heads.
+- **2026-10-16, symmetry pair (discrete, xs, Hydra branch exp/time-recurrence): both fail.**
+  | model | eval at 100k | shuffled |
+  | --- | --- | --- |
+  | hybrid4_time | 0.0526 | 0.0916 |
+  | hybrid4_time_full | 0.0487 | 0.1071 |
+  | hybrid4 | 0.0180 | |
+  - The time-only scan in hybrid4_time DOES learn the exact rotation from odometry alone: an eigenpair within 10° of the turn on 100% of quarter- and half-turn steps, β median 1.69.
+  - Reading: what's missing is the associative content memory the rotation carries in hybrid4.
+  - Caveat: at xs (2 layers) the _full variant has no attention at all. The clean A/B (last layer only) needs s, which is deferred.
+  - Write-up: docs/time_recurrence.md on that branch.
+- **Causal experiment started (user chose it before the s A/B pair):** branch exp/causal off refactor/hydra; hybrid4_causal and vanilla4_causal at xs; sequential, local.
