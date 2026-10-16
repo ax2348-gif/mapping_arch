@@ -28,17 +28,35 @@ their anchor; `docs/lift/sheets/episode_arc.png`). It remains available
 as `--motion arc`. The decoupled walk ends a median 40 px from its start,
 with queries a median 15 px from their anchor (`episode_decoupled.png`).
 
-**The odometry is the relative pose, canonical.** Step t's odometry is
-pose t+1 seen from pose t: the move as a body-frame (dy, dx) in the
-heading BEFORE the step, then the turn, wrapped to the minimal angle in
-[-π, π) (a half turn is -π; on the n-lattice the angle is snapped to
-2πk/n exactly). This is the discrete contract's convention: move
-relative to the pre-step heading, then turn. Since the motion is
-move-then-turn, this relative pose is the exact increment. A Lie-algebra
-twist (the log map) would describe an arc instead, and is not what is
-given. The shared encoding uses cos and sin of mθ, so the choice of
-representative changes nothing a model sees. It matters only to raw-angle
-consumers: held-out bands, probes and metrics.
+**The odometry is the relative pose, in an egocentric parameterisation.**
+The walk is a sequence of poses g_0 ... g_32 in SE(2); nothing happens
+between them. There is no path, so no parameterisation of a step is more
+"physical" than another. What the model needs is the relative pose
+g_t^-1 g_(t+1), the next pose seen from the current one. Any egocentric
+parameterisation of it carries the same information and is fair game:
+
+- move-then-turn, (body-frame translation in pose t's frame, turn);
+- turn-then-move, the translation in pose t+1's frame;
+- the twist, log(g_t^-1 g_(t+1)), the constant-velocity arc between the two poses.
+
+None of these is allowed to be allocentric: no world-frame direction, no
+absolute heading, nothing integrated across steps (the earlier rules).
+
+**This task uses move-then-turn** (`mapping.se2c.geometry.odometry`): the
+body-frame (dy, dx) of pose t+1 in pose t's frame, then the turn wrapped
+to the minimal angle in [-π, π). A half turn is -π; on the n-lattice the
+turn is snapped to 2πk/n exactly. This is the discrete contract's
+convention, and its parts are plausibly the easiest to predict from:
+the translation reads off pose t's view directly. The generator also
+DRAWS the walk this way (move, then turn). That is a sampling choice
+about which pose sequences occur, not a claim about motion between poses.
+
+The shared encoding feeds the model cos and sin of mθ, so the choice of
+angle representative changes nothing a model sees. It matters only to
+code that reads the raw angle: held-out bands, probes and metrics. A
+different parameterisation, such as the twist, would be a task variant:
+the same episodes and targets, a different odometry input, documented
+here before use.
 
 At each of the 33 poses it sees a 15 x 15 view rotated so that its
 heading is image-up, rendered EXACTLY from a procedural texture (white
@@ -90,13 +108,59 @@ earlier rules apply, read with "odometry" for "directions":
 - `poses`, `query_world`, `texture_params`, `stats` and `raster` are in
   the batch for diagnostics only (`mapping.task_se2c.FORBIDDEN_KEYS`).
 
+## Turn granularity n (the curriculum)
+
+`--turn-n n` puts every ANGLE in the episode on the lattice 2πk/n and
+leaves every TRANSLATION continuous. n = 0 (the default) is the continuous
+task.
+
+| on the lattice when n > 0 | not on the lattice |
+| --- | --- |
+| every turn ω (so every heading, relative to the first) | move lengths v ~ U[4.5, 9] |
+| the first heading | move directions (`persistent`: continuous at every n) |
+| each query's heading change from its anchor | query centres (anywhere covered) |
+
+- **The group is C_n ⋉ R².** Only the rotation part is discretised. Even
+  at n = 4 the default task is not the discrete task: the translations
+  are continuous, so sub-pixel interpolation is needed at every n. The
+  **bridge** (`--directions lattice --turn-n 4 --v-min 9 --v-max 9`) also
+  puts the translations on the 9 px grid. It is the discrete task's walk
+  with the new renderer, texture and encoding.
+- **The walk does not change with n.** For the same seed, the positions
+  are identical at every n; the move directions are drawn before, and
+  separately from, the turns. So the curriculum varies the rotation group
+  alone.
+- **What changes for the model.**
+  - At n = 4, a view and its quarter-turned twin share a pixel grid, so
+    rotation is a pixel permutation.
+  - At n >= 8, rotated views relate by resampling. Rendering is analytic,
+    so no interpolation artefacts are in the data.
+  - The angle encoding (cos and sin of mθ, m = 1..4) separates every
+    lattice angle at every n; at n = 4, m = 4 is constant.
+- **Why it is the lever for the seam.** A turn by θ, made exactly as a
+  product of delta-rule reflections, needs keys whose pair is set by θ/2.
+  - On a finite lattice, the n required key settings are isolated
+    inputs, so a network can fit them exactly at any n.
+  - On the continuum, keys continuous in θ cannot do it over the whole
+    circle: the full turn is the nontrivial loop of SO(d), and it does
+    not lift to a closed loop of reflection products (docs/STATUS.md,
+    session log).
+  - Between those limits, the key map must flip sign across one gap of
+    width 2π/n, so its steepness grows with n.
+  - Expected, not yet frozen: the learning breakaway comes later as n
+    grows, and the error concentrates in one band of turn angles (the
+    seam), visible in `mse_turnA_B` and in the transition probe.
+- **Fallback queries.** These re-render an observation at a quarter turn,
+  which is on every lattice in the curriculum (n = 4, 8, 16, 32).
+- **Held-out bands** (`--holdout`) are bands of |ω|. With n > 0 they
+  remove lattice angles, so a band must contain at least one of them.
+
 ## Generator settings (not new tasks)
 
 `train.py --task se2c` takes (`mapping.task_se2c.add_args`):
 
-- `--turn-n n` (n in 4, 8, 16, 32; default 0, continuous): turns, the
-  first heading and query heading changes on the lattice 2πk/n. The
-  granularity curriculum.
+- `--turn-n n` (n in 4, 8, 16, 32; default 0, continuous): the
+  granularity curriculum, above.
 - `--motion decoupled|arc` (default decoupled) and `--directions
   persistent|lattice` (default persistent). `lattice` takes move
   directions on the n-lattice with no immediate reversal; with `--turn-n
