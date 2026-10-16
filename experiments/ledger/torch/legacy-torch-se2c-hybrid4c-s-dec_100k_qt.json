@@ -1,0 +1,152 @@
+{
+ "schema": 1,
+ "run_id": "legacy-torch-se2c-hybrid4c-s-dec_100k_qt",
+ "host": "torch",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "completed",
+ "status_as_found": "completed",
+ "created": "2026-10-16T11:36:53Z",
+ "created_as_found": "2026-10-16T07:36:53",
+ "updated": null,
+ "ended": "2026-10-16T12:21:00Z",
+ "ended_as_found": "2026-10-16T08:21",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "8837c28",
+  "recorded": "8837c28",
+  "inferred": null,
+  "resolved": "8837c28c682f406044c91fcd31e4857c9fc1f52a",
+  "basis": "recorded: LIFT_COMMIT echoed into the job log (export of a possibly dirty tree)",
+  "tree": "/scratch/ax2348/mapping_lift (rsync export, no .git)",
+  "tree_verified": null,
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "legacy train.py",
+  "job_script": "/scratch/ax2348/mapping_lift/jobs/lift/*.sbatch (local: jobs/lift/)"
+ },
+ "config": {
+  "source": "legacy: args in final.json/log.jsonl (train.py flags)",
+  "resolved": null,
+  "overrides": null,
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": {
+   "task": "se2c",
+   "model": "hybrid4c",
+   "size": "s",
+   "run": "dec_100k_qt",
+   "out": null,
+   "steps": 100000,
+   "batch": 64,
+   "lr": 0.0003,
+   "warmup": 100,
+   "schedule": "cosine",
+   "cooldown": 0.2,
+   "save_every": 5000,
+   "branch": null,
+   "weight_decay": 0.1,
+   "clip": 1.0,
+   "eval_batches": 16,
+   "eval_every": 2500,
+   "log_every": 500,
+   "workers": 4,
+   "seed": 0,
+   "texture": "mnist",
+   "bank": null,
+   "no_bf16": false,
+   "compile": false,
+   "device": "cuda",
+   "episode_steps": 32,
+   "queries": 8,
+   "query_times": "uniform",
+   "step_px": 9,
+   "odometry_dropout": 0.0,
+   "se2c_texture": "procedural",
+   "turn_n": 0,
+   "motion": "decoupled",
+   "directions": "persistent",
+   "v_min": 4.5,
+   "v_max": 9.0,
+   "omega_max": 3.141592653589793,
+   "holdout": null,
+   "holdout_mode": "exclude",
+   "query_coverage": "causal"
+  },
+  "read_from": "/home/adrianna/code/mapping/results/se2c/hybrid4c/s/dec_100k_qt/log.jsonl",
+  "missing": null
+ },
+ "run": {
+  "task": "se2c",
+  "model": "hybrid4c",
+  "size": "s",
+  "name": "dec_100k_qt",
+  "seed": 0,
+  "steps": 100000,
+  "note": "se2c default task: hybrid4c vs vanilla4c at s, m, l (100k cosine, 400k / 200k WSD)",
+  "tags": [
+   "major",
+   "se2c-matched-dec"
+  ],
+  "task_recorded": "se2c"
+ },
+ "results": {
+  "dir": "/scratch/ax2348/mapping_lift/results/se2c/hybrid4c/s/dec_100k_qt",
+  "root": "/scratch/ax2348/mapping_lift/results",
+  "rel": "se2c/hybrid4c/s/dec_100k_qt",
+  "local_mirror": "/home/adrianna/code/mapping/results/se2c/hybrid4c/s/dec_100k_qt",
+  "path_at_audit": null
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "H200",
+  "node": "gh132"
+ },
+ "slurm": {
+  "job_id": "20041129",
+  "state": "CANCELLED",
+  "log": "/scratch/ax2348/mapping_lift/jobs/logs/worker-20041129.out"
+ },
+ "submit": null,
+ "gpu_hours": 0.74,
+ "gpu_hours_basis": "elapsed_s (task inside a multi-task worker job)",
+ "progress": {
+  "last_step": 100000,
+  "checkpoints": null,
+  "n_checkpoints": 20
+ },
+ "end": {
+  "exit_status": null,
+  "reason": "completed",
+  "error": null,
+  "elapsed_s": null,
+  "final_metrics": {
+   "mse": 0.026019232347607613,
+   "mse_last": 0.05499298498034477,
+   "shuffled_mse": null,
+   "floor_mse": null,
+   "best_step": null,
+   "best_mse": null
+  },
+  "metrics_basis": "the audit (final.json, or the last logged eval of a run without one), as of 2026-10-16T16:05 America/New_York"
+ },
+ "audit": {
+  "row": "torch:se2c/hybrid4c/s/dec_100k_qt",
+  "experiment": "se2c-matched-dec",
+  "gaps": "dirty-unknown;config-legacy-flags",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}

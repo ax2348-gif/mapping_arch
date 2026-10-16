@@ -1,0 +1,128 @@
+{
+ "schema": 1,
+ "run_id": "legacy-erid-2-z2-hybrid-xs-seed0_8k",
+ "host": "erid-2",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "completed",
+ "status_as_found": "completed",
+ "created": "2026-10-15T20:56:00Z",
+ "created_as_found": "2026-10-15T16:56 (est. = last write - elapsed)",
+ "updated": null,
+ "ended": "2026-10-15T20:57:00Z",
+ "ended_as_found": "2026-10-15T16:57",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "unknown",
+  "recorded": null,
+  "inferred": null,
+  "resolved": null,
+  "basis": "last master commit before estimated start; launched from a working tree, dirty state unknown; run predates the first commit (fd4613e, 2026-10-15 17:06)",
+  "tree": "~/code/mapping (git)",
+  "tree_verified": null,
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "legacy train.py",
+  "job_script": "none (launched by hand/agent; launch logs in session scratchpad if any)"
+ },
+ "config": {
+  "source": "legacy: args in final.json/log.jsonl (train.py flags)",
+  "resolved": null,
+  "overrides": null,
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": {
+   "model": "hybrid",
+   "size": "xs",
+   "steps": 8000,
+   "batch": 64,
+   "lr": 0.0003,
+   "warmup": 100,
+   "weight_decay": 0.1,
+   "clip": 1.0,
+   "eval_batches": 16,
+   "eval_every": 1000,
+   "log_every": 500,
+   "workers": 4,
+   "seed": 0,
+   "bank": "data/mnist.npz",
+   "out": "results/hybrid/xs/seed0_8k",
+   "no_bf16": false,
+   "compile": false,
+   "device": "cuda",
+   "episode_steps": 32,
+   "queries": 8
+  },
+  "read_from": "/home/adrianna/code/mapping/results/z2/hybrid/xs/seed0_8k/final.json",
+  "missing": null
+ },
+ "run": {
+  "task": "z2",
+  "model": "hybrid",
+  "size": "xs",
+  "name": "seed0_8k",
+  "seed": 0,
+  "steps": 8000,
+  "note": "day-1 local Z2 runs (hybrid, hybrid2, vanilla, vanilla2, lstm, mlp at xs)",
+  "tags": [
+   "major",
+   "z2-day1-local"
+  ],
+  "task_recorded": "z2"
+ },
+ "results": {
+  "dir": "/home/adrianna/code/mapping/results/z2/hybrid/xs/seed0_8k",
+  "root": "/home/adrianna/code/mapping/results",
+  "rel": "z2/hybrid/xs/seed0_8k",
+  "local_mirror": null,
+  "path_at_audit": "/home/adrianna/code/mapping/results/hybrid/xs/seed0_8k"
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "RTX PRO 4000 Blackwell",
+  "node": null
+ },
+ "slurm": null,
+ "submit": null,
+ "gpu_hours": 0.02,
+ "gpu_hours_basis": "elapsed_s (wall clock, local)",
+ "progress": {
+  "last_step": 8000,
+  "checkpoints": null,
+  "n_checkpoints": 1
+ },
+ "end": {
+  "exit_status": null,
+  "reason": "completed",
+  "error": null,
+  "elapsed_s": null,
+  "final_metrics": {
+   "mse": 0.08047237247228622,
+   "mse_last": null,
+   "shuffled_mse": null,
+   "floor_mse": null,
+   "best_step": null,
+   "best_mse": null
+  },
+  "metrics_basis": "the audit (final.json, or the last logged eval of a run without one), as of 2026-10-16T16:05 America/New_York"
+ },
+ "audit": {
+  "row": "erid-2:z2/hybrid/xs/seed0_8k",
+  "experiment": "z2-day1-local",
+  "gaps": "no-commit;dirty-unknown;config-legacy-flags;no-job-record",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}

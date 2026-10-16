@@ -1,0 +1,97 @@
+{
+ "schema": 1,
+ "run_id": "legacy-torch-se2d-vanilla4_causal-l-seed0_400k_qt_wsd",
+ "host": "torch",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "running",
+ "status_as_found": "running",
+ "created": "2026-10-16T19:03:28Z",
+ "created_as_found": "2026-10-16T15:03:28",
+ "updated": null,
+ "ended": null,
+ "ended_as_found": "2026-10-16T15:58",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "50341e4",
+  "recorded": "50341e4",
+  "inferred": null,
+  "resolved": "50341e406ff00195b80953bd3d44f316d4ba15fa",
+  "basis": "recorded: LIFT_COMMIT echoed into the job log (export of a possibly dirty tree)",
+  "tree": "/scratch/ax2348/mapping_hydra (rsync export, no .git)",
+  "tree_verified": "2026-10-16 audit: every file of /scratch/ax2348/mapping_hydra hash-identical to 50341e4 (checked after launch; says nothing about edits between launch and the check)",
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "run.py",
+  "job_script": "/scratch/ax2348/mapping_hydra/jobs/{h1c,h1d}_grid.sbatch, hydra_causal_400k.sbatch (local: jobs/lift/)"
+ },
+ "config": {
+  "source": "hydra: config.yaml + overrides.yaml",
+  "resolved": null,
+  "overrides": null,
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": null,
+  "read_from": null,
+  "missing": "on Torch and not mirrored here (the import reads nothing on Torch)"
+ },
+ "run": {
+  "task": "se2d",
+  "model": "vanilla4_causal",
+  "size": "l",
+  "name": "seed0_400k_qt_wsd",
+  "seed": 0,
+  "steps": 400000,
+  "note": "H1c: causal penalty grid, hybrid4 / vanilla4 x causal / bidirectional x s, m, l x seeds 0-2, 400k WSD",
+  "tags": [
+   "major",
+   "se2d-h1c-causal-grid"
+  ],
+  "task_recorded": "se2d"
+ },
+ "results": {
+  "dir": "/scratch/ax2348/mapping_hydra/results/se2d/vanilla4_causal/l/seed0_400k_qt_wsd",
+  "root": "/scratch/ax2348/mapping_hydra/results",
+  "rel": "se2d/vanilla4_causal/l/seed0_400k_qt_wsd",
+  "local_mirror": null,
+  "path_at_audit": null
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "H200",
+  "node": "gh104"
+ },
+ "slurm": {
+  "job_id": "20070043_1",
+  "state": "RUNNING",
+  "log": "/scratch/ax2348/mapping_hydra/jobs/logs/se2d-causal-400k-20070043_1.out"
+ },
+ "submit": null,
+ "gpu_hours": 0.92,
+ "gpu_hours_basis": "sacct ElapsedRaw",
+ "progress": {
+  "last_step": 168000,
+  "checkpoints": null,
+  "n_checkpoints": 3
+ },
+ "end": null,
+ "audit": {
+  "row": "torch:se2d/vanilla4_causal/l/seed0_400k_qt_wsd",
+  "experiment": "se2d-h1c-causal-grid",
+  "gaps": "dirty-unknown",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}

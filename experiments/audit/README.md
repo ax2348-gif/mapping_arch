@@ -106,6 +106,14 @@ from them. Whether to keep them is open question 9 of the design.
 
 ## Borderline, for the user's review
 
+**Decided (the user, 2026-10-16):** the pre-freeze ablations and the
+time-recurrence pair are major (moved into the registry's `experiments:`),
+the original `hybrid` sweep is major, the blind probe is not. The proving run
+and the VO worker had no call and stay borderline. The major runs (153) are
+in the ledger as retroactive records (`tools/import_retro.py`;
+docs/provenance_design.md §15, phase 3). Local z2 paths below moved to
+`results/z2/` (`z2_results_migration.tsv`).
+
 These are documented but cheap, or similar. None is counted as major; the registry's
 `borderline:` block lists each group's runs.
 

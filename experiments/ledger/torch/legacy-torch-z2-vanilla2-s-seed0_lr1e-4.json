@@ -1,0 +1,139 @@
+{
+ "schema": 1,
+ "run_id": "legacy-torch-z2-vanilla2-s-seed0_lr1e-4",
+ "host": "torch",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "completed",
+ "status_as_found": "completed",
+ "created": "2026-10-16T00:51:19Z",
+ "created_as_found": "2026-10-15T20:51:19",
+ "updated": null,
+ "ended": "2026-10-16T00:59:00Z",
+ "ended_as_found": "2026-10-15T20:59",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "inferred:7c1f827",
+  "recorded": null,
+  "inferred": "7c1f827",
+  "resolved": "7c1f827b8a462c7e5cbb5e97ca537f9af60bd1f2",
+  "basis": "last master commit before submit; tree rsynced from a working copy, dirty state unknown",
+  "tree": "/scratch/ax2348/mapping (rsync export, no .git)",
+  "tree_verified": null,
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "legacy train.py",
+  "job_script": "jobs/legacy/*.sbatch (local copy) = /scratch/ax2348/mapping/jobs/"
+ },
+ "config": {
+  "source": "legacy: args in final.json/log.jsonl (train.py flags)",
+  "resolved": null,
+  "overrides": null,
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": {
+   "task": "z2",
+   "model": "vanilla2",
+   "size": "s",
+   "run": "seed0_lr1e-4",
+   "out": null,
+   "steps": 40000,
+   "batch": 64,
+   "lr": 0.0001,
+   "warmup": 100,
+   "schedule": "cosine",
+   "cooldown": 0.2,
+   "save_every": 0,
+   "branch": null,
+   "weight_decay": 0.1,
+   "clip": 1.0,
+   "eval_batches": 16,
+   "eval_every": 250,
+   "log_every": 50,
+   "workers": 4,
+   "seed": 0,
+   "bank": "data/mnist.npz",
+   "no_bf16": false,
+   "compile": false,
+   "device": "cuda",
+   "episode_steps": 32,
+   "queries": 8,
+   "query_times": "last"
+  },
+  "read_from": "/home/adrianna/code/mapping/results/z2/vanilla2/s/seed0_lr1e-4/final.json",
+  "missing": null
+ },
+ "run": {
+  "task": "z2",
+  "model": "vanilla2",
+  "size": "s",
+  "name": "seed0_lr1e-4",
+  "seed": 0,
+  "steps": 40000,
+  "note": "Z2 40k lr grid: hybrid, vanilla, vanilla2, lstm at xs..l",
+  "tags": [
+   "major",
+   "z2-lr-grid"
+  ],
+  "task_recorded": "z2"
+ },
+ "results": {
+  "dir": "/scratch/ax2348/mapping/results/vanilla2/s/seed0_lr1e-4",
+  "root": "/scratch/ax2348/mapping/results",
+  "rel": "vanilla2/s/seed0_lr1e-4",
+  "local_mirror": "/home/adrianna/code/mapping/results/z2/vanilla2/s/seed0_lr1e-4",
+  "path_at_audit": null
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "H200",
+  "node": "gh119"
+ },
+ "slurm": {
+  "job_id": "19991398_5",
+  "state": "COMPLETED",
+  "log": "/scratch/ax2348/mapping/jobs/logs/vanilla2-19991398_5.out"
+ },
+ "submit": null,
+ "gpu_hours": 0.14,
+ "gpu_hours_basis": "sacct ElapsedRaw",
+ "progress": {
+  "last_step": 40000,
+  "checkpoints": null,
+  "n_checkpoints": 1
+ },
+ "end": {
+  "exit_status": null,
+  "reason": "completed",
+  "error": null,
+  "elapsed_s": null,
+  "final_metrics": {
+   "mse": 0.018748411908745766,
+   "mse_last": 0.018748411908745766,
+   "shuffled_mse": null,
+   "floor_mse": null,
+   "best_step": null,
+   "best_mse": null
+  },
+  "metrics_basis": "the audit (final.json, or the last logged eval of a run without one), as of 2026-10-16T16:05 America/New_York"
+ },
+ "audit": {
+  "row": "torch:z2/vanilla2/s/seed0_lr1e-4",
+  "experiment": "z2-lr-grid",
+  "gaps": "commit-inferred;config-legacy-flags",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}

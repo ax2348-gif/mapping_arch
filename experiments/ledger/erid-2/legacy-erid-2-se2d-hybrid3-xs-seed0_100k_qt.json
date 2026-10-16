@@ -1,0 +1,135 @@
+{
+ "schema": 1,
+ "run_id": "legacy-erid-2-se2d-hybrid3-xs-seed0_100k_qt",
+ "host": "erid-2",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "completed",
+ "status_as_found": "completed",
+ "created": "2026-10-16T00:47:00Z",
+ "created_as_found": "2026-10-15T20:47 (est. = last write - elapsed)",
+ "updated": null,
+ "ended": "2026-10-16T01:02:00Z",
+ "ended_as_found": "2026-10-15T21:02",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "inferred:0ebd7df",
+  "recorded": null,
+  "inferred": "0ebd7df",
+  "resolved": "0ebd7df3f19fa37081cfbef954d7b1213ed280f7",
+  "basis": "last master commit before estimated start; launched from a working tree, dirty state unknown",
+  "tree": "~/code/mapping (git)",
+  "tree_verified": null,
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "legacy train.py",
+  "job_script": "none (launched by hand/agent; launch logs in session scratchpad if any)"
+ },
+ "config": {
+  "source": "legacy: args in final.json/log.jsonl (train.py flags)",
+  "resolved": null,
+  "overrides": null,
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": {
+   "task": "se2",
+   "model": "hybrid3",
+   "size": "xs",
+   "run": "seed0_100k_qt",
+   "out": null,
+   "steps": 100000,
+   "batch": 64,
+   "lr": 0.0003,
+   "warmup": 100,
+   "schedule": "cosine",
+   "cooldown": 0.2,
+   "save_every": 0,
+   "branch": null,
+   "weight_decay": 0.1,
+   "clip": 1.0,
+   "eval_batches": 16,
+   "eval_every": 5000,
+   "log_every": 1000,
+   "workers": 4,
+   "seed": 0,
+   "bank": "data/mnist.npz",
+   "no_bf16": false,
+   "compile": false,
+   "device": "cuda",
+   "episode_steps": 32,
+   "queries": 8,
+   "query_times": "uniform"
+  },
+  "read_from": "/home/adrianna/code/mapping/results/se2/hybrid3/xs/seed0_100k_qt/final.json",
+  "missing": null
+ },
+ "run": {
+  "task": "se2d",
+  "model": "hybrid3",
+  "size": "xs",
+  "name": "seed0_100k_qt",
+  "seed": 0,
+  "steps": 100000,
+  "note": "hybrid -> hybrid4 lineage on discrete SE(2), xs, and the hybrid4 seed replication",
+  "tags": [
+   "major",
+   "se2d-hybrid-lineage"
+  ],
+  "task_recorded": "se2"
+ },
+ "results": {
+  "dir": "/home/adrianna/code/mapping/results/se2/hybrid3/xs/seed0_100k_qt",
+  "root": "/home/adrianna/code/mapping/results",
+  "rel": "se2/hybrid3/xs/seed0_100k_qt",
+  "local_mirror": null,
+  "path_at_audit": null
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "RTX PRO 4000 Blackwell",
+  "node": null
+ },
+ "slurm": null,
+ "submit": null,
+ "gpu_hours": 0.24,
+ "gpu_hours_basis": "elapsed_s (wall clock, local)",
+ "progress": {
+  "last_step": 100000,
+  "checkpoints": null,
+  "n_checkpoints": 1
+ },
+ "end": {
+  "exit_status": null,
+  "reason": "completed",
+  "error": null,
+  "elapsed_s": null,
+  "final_metrics": {
+   "mse": 0.05491270124912262,
+   "mse_last": 0.07309489697217941,
+   "shuffled_mse": null,
+   "floor_mse": null,
+   "best_step": null,
+   "best_mse": null
+  },
+  "metrics_basis": "the audit (final.json, or the last logged eval of a run without one), as of 2026-10-16T16:05 America/New_York"
+ },
+ "audit": {
+  "row": "erid-2:se2d/hybrid3/xs/seed0_100k_qt",
+  "experiment": "se2d-hybrid-lineage",
+  "gaps": "commit-inferred;config-legacy-flags;no-job-record",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}

@@ -1,0 +1,172 @@
+{
+ "schema": 1,
+ "run_id": "legacy-erid-2-se2d-vanilla4_causal-s-seed0_400k_qt_wsd",
+ "host": "erid-2",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "completed",
+ "status_as_found": "completed",
+ "created": "2026-10-16T17:33:00Z",
+ "created_as_found": "2026-10-16T13:33 (est. = last write - elapsed)",
+ "updated": null,
+ "ended": "2026-10-16T18:58:00Z",
+ "ended_as_found": "2026-10-16T14:58",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "inferred:23973e0",
+  "recorded": null,
+  "inferred": "23973e0",
+  "resolved": "23973e09cc764cbc712ec93d09fe24df50862369",
+  "basis": "last exp/causal commit before estimated start; launched from a working tree, dirty state unknown",
+  "tree": "~/code/mapping-hydra (git worktree)",
+  "tree_verified": null,
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "run.py",
+  "job_script": "none (launched by hand/agent; launch logs in session scratchpad if any)"
+ },
+ "config": {
+  "source": "hydra: config.yaml + overrides.yaml",
+  "resolved": {
+   "task": {
+    "generator": {
+     "_target_": "mapping.config.BankGenerator",
+     "texture": "mnist",
+     "bank": null,
+     "step_px": 9,
+     "odometry_dropout": 0.0,
+     "workers": 14
+    },
+    "episode_steps": 32,
+    "queries": 8,
+    "query_times": "uniform",
+    "_target_": "mapping.config.Task",
+    "name": "se2d"
+   },
+   "model": {
+    "name": "vanilla4_causal",
+    "ladder": "width",
+    "size": "s",
+    "arch": {
+     "_target_": "mapping.models.se2d.vanilla4_causal.Vanilla4Causal",
+     "_partial_": true
+    },
+    "_target_": "mapping.config.Model",
+    "size_kwargs": {
+     "width": 128
+    }
+   },
+   "schedule": {
+    "_target_": "mapping.config.WSD",
+    "warmup": 100,
+    "cooldown": 0.2
+   },
+   "_target_": "mapping.config.Experiment",
+   "optim": {
+    "_target_": "mapping.config.AdamW",
+    "lr": 0.0003,
+    "weight_decay": 0.1,
+    "clip": 1.0,
+    "batch": 64
+   },
+   "run": {
+    "_target_": "mapping.config.Run",
+    "name": "seed0_400k_qt_wsd",
+    "out": null,
+    "steps": 400000,
+    "seed": 0,
+    "save_every": 50000,
+    "branch": null,
+    "device": null,
+    "bf16": true,
+    "compile": false,
+    "overwrite": false
+   },
+   "eval": {
+    "_target_": "mapping.config.Eval",
+    "batches": 16,
+    "every": 10000,
+    "log_every": 2000
+   }
+  },
+  "overrides": [
+   "+experiment=se2d_scaling_wsd",
+   "model=se2d/vanilla4_causal",
+   "model.size=s"
+  ],
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": null,
+  "read_from": "/home/adrianna/code/mapping-hydra/results/se2d/vanilla4_causal/s/seed0_400k_qt_wsd/config.yaml",
+  "missing": null
+ },
+ "run": {
+  "task": "se2d",
+  "model": "vanilla4_causal",
+  "size": "s",
+  "name": "seed0_400k_qt_wsd",
+  "seed": 0,
+  "steps": 400000,
+  "note": "H1c: causal penalty grid, hybrid4 / vanilla4 x causal / bidirectional x s, m, l x seeds 0-2, 400k WSD",
+  "tags": [
+   "major",
+   "se2d-h1c-causal-grid"
+  ],
+  "task_recorded": "se2d"
+ },
+ "results": {
+  "dir": "/home/adrianna/code/mapping-hydra/results/se2d/vanilla4_causal/s/seed0_400k_qt_wsd",
+  "root": "/home/adrianna/code/mapping-hydra/results",
+  "rel": "se2d/vanilla4_causal/s/seed0_400k_qt_wsd",
+  "local_mirror": null,
+  "path_at_audit": null
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "RTX PRO 4000 Blackwell",
+  "node": null
+ },
+ "slurm": null,
+ "submit": null,
+ "gpu_hours": 1.43,
+ "gpu_hours_basis": "elapsed_s (wall clock, local)",
+ "progress": {
+  "last_step": 400000,
+  "checkpoints": null,
+  "n_checkpoints": 8
+ },
+ "end": {
+  "exit_status": null,
+  "reason": "completed",
+  "error": null,
+  "elapsed_s": null,
+  "final_metrics": {
+   "mse": 0.022941790521144867,
+   "mse_last": 0.047914594411849976,
+   "shuffled_mse": null,
+   "floor_mse": null,
+   "best_step": null,
+   "best_mse": null
+  },
+  "metrics_basis": "the audit (final.json, or the last logged eval of a run without one), as of 2026-10-16T16:05 America/New_York"
+ },
+ "audit": {
+  "row": "erid-2:se2d/vanilla4_causal/s/seed0_400k_qt_wsd",
+  "experiment": "se2d-h1c-causal-grid",
+  "gaps": "commit-inferred;code-only-on-branch-at-launch(now merged);no-job-record",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}

@@ -1,0 +1,142 @@
+{
+ "schema": 1,
+ "run_id": "legacy-torch-se2d-hybrid-xxl-seed0_lr3e-4",
+ "host": "torch",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "completed",
+ "status_as_found": "completed",
+ "created": "2026-10-16T11:42:46Z",
+ "created_as_found": "2026-10-16T07:42:46",
+ "updated": null,
+ "ended": "2026-10-16T13:14:00Z",
+ "ended_as_found": "2026-10-16T09:14",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "inferred:7c1f827",
+  "recorded": null,
+  "inferred": "7c1f827",
+  "resolved": "7c1f827b8a462c7e5cbb5e97ca537f9af60bd1f2",
+  "basis": "last master commit before submit; tree rsynced from a working copy, dirty state unknown",
+  "tree": "/scratch/ax2348/mapping (rsync export, no .git)",
+  "tree_verified": null,
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "legacy train.py",
+  "job_script": "jobs/legacy/*.sbatch (local copy) = /scratch/ax2348/mapping/jobs/"
+ },
+ "config": {
+  "source": "legacy: args in final.json/log.jsonl (train.py flags)",
+  "resolved": null,
+  "overrides": null,
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": {
+   "task": "se2",
+   "model": "hybrid",
+   "size": "xxl",
+   "run": "seed0_lr3e-4",
+   "out": null,
+   "steps": 40000,
+   "batch": 64,
+   "lr": 0.0003,
+   "warmup": 100,
+   "schedule": "cosine",
+   "cooldown": 0.2,
+   "save_every": 0,
+   "branch": null,
+   "weight_decay": 0.1,
+   "clip": 1.0,
+   "eval_batches": 16,
+   "eval_every": 250,
+   "log_every": 50,
+   "workers": 4,
+   "seed": 0,
+   "texture": "mnist",
+   "bank": "data/mnist.npz",
+   "no_bf16": false,
+   "compile": false,
+   "device": "cuda",
+   "episode_steps": 32,
+   "queries": 8,
+   "query_times": "last",
+   "step_px": 9,
+   "odometry_dropout": 0.0
+  },
+  "read_from": "/home/adrianna/code/mapping/results/se2/hybrid/xxl/seed0_lr3e-4/log.jsonl",
+  "missing": null
+ },
+ "run": {
+  "task": "se2d",
+  "model": "hybrid",
+  "size": "xxl",
+  "name": "seed0_lr3e-4",
+  "seed": 0,
+  "steps": 40000,
+  "note": "original `hybrid` on discrete SE(2): 40k lr ladder xs..xxl (19991387), 100k / b256 / 400k cosine / 400k WSD",
+  "tags": [
+   "major",
+   "se2d-hybrid-original-sweep"
+  ],
+  "task_recorded": "se2"
+ },
+ "results": {
+  "dir": "/scratch/ax2348/mapping/results/se2/hybrid/xxl/seed0_lr3e-4",
+  "root": "/scratch/ax2348/mapping/results",
+  "rel": "se2/hybrid/xxl/seed0_lr3e-4",
+  "local_mirror": "/home/adrianna/code/mapping/results/se2/hybrid/xxl/seed0_lr3e-4",
+  "path_at_audit": null
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "H200",
+  "node": "gh103"
+ },
+ "slurm": {
+  "job_id": "19991387_16",
+  "state": "COMPLETED",
+  "log": "/scratch/ax2348/mapping/jobs/logs/se2-hybrid-19991387_16.out"
+ },
+ "submit": null,
+ "gpu_hours": 1.52,
+ "gpu_hours_basis": "sacct ElapsedRaw",
+ "progress": {
+  "last_step": 40000,
+  "checkpoints": null,
+  "n_checkpoints": 1
+ },
+ "end": {
+  "exit_status": null,
+  "reason": "completed",
+  "error": null,
+  "elapsed_s": null,
+  "final_metrics": {
+   "mse": 0.08040914684534073,
+   "mse_last": 0.08040913939476013,
+   "shuffled_mse": null,
+   "floor_mse": null,
+   "best_step": null,
+   "best_mse": null
+  },
+  "metrics_basis": "the audit (final.json, or the last logged eval of a run without one), as of 2026-10-16T16:05 America/New_York"
+ },
+ "audit": {
+  "row": "torch:se2d/hybrid/xxl/seed0_lr3e-4",
+  "experiment": "se2d-hybrid-original-sweep",
+  "gaps": "commit-inferred;config-legacy-flags",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}

@@ -1049,3 +1049,35 @@ Each phase is one commit on master, with the full suite green against
   equivalence test pops it and checks it names the run that wrote it (its
   RUN_ID, provenance.json and completed ledger record). Everything else is
   compared as before.
+
+### Phase 3: the retroactive import (major experiments only)
+
+- **Scope (§14).** The runs of every experiment with `status: major` in
+  experiments/registry.yaml: the 13 the audit scored major (147 runs; the
+  original `hybrid` sweep among them, now marked "confirmed") plus the
+  pre-freeze ablations (4) and the time-recurrence pair (2), moved from
+  `borderline:` into `experiments:` with the user's call recorded as
+  `decision:`. 153 records. The blind probe stays in `borderline:` with
+  `decision: NOT major`. The se2c proving run and the se2c VO worker had no
+  call; they stay borderline and are not imported (flagged in the report).
+- **Records.** `experiments/ledger/<host>/legacy-<host>-<task>-<model>-<size>-<run>.json`
+  (`#local` -> `-local`), written by `tools/import_retro.py`, their only
+  writer (`--check` verifies they are current). Each is `"retroactive": true`
+  and carries no more than the audit found: `code.snapshot`/`ref` null and
+  no `refs/runs/` ref (a ref would claim an exactness that does not exist);
+  `code.commit` the audit's string verbatim (19 recorded, 130 `inferred:`,
+  4 `unknown`), with `recorded`/`inferred` split out, `resolved` the full
+  sha where git resolves the short one, `basis` the audit's words,
+  `dirty: null`; `tree_verified` only for the 10 mapping_hydra runs whose
+  recorded 50341e4 the audit's blob-hash check matched (with the caveat that
+  the check came after launch). Status, last step, metrics, Slurm job,
+  node, GPU and GPU-h are the audit's, as of 2026-10-16 16:05 EDT; the 10
+  runs then running stay `running` with `as_of`. Times keep the audit's
+  strings and add UTC conversions assuming America/New_York (`time_basis`).
+  Config: the saved config.yaml/overrides.yaml where readable on this
+  machine (7), else the legacy `args` record verbatim (124), else
+  `missing` with the reason (22, on Torch and not mirrored; nothing on
+  Torch was read). No config is recomposed with today's conf/. The note
+  is the experiment's registry title; tags `major` and the experiment id.
+- **Not done:** §6 step 1's `refs/archive/torch/*` commits (they need the
+  Torch trees; Torch is out of scope until the runbook is approved).

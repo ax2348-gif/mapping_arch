@@ -1,0 +1,138 @@
+{
+ "schema": 1,
+ "run_id": "legacy-erid-2-se2d-hybrid4_convrace-xs-seed0_100k_qt",
+ "host": "erid-2",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "terminated",
+ "status_as_found": "stopped",
+ "created": "2026-10-16T09:52:00Z",
+ "created_as_found": "2026-10-16T05:52 (est. = last write - elapsed)",
+ "updated": null,
+ "ended": "2026-10-16T10:12:00Z",
+ "ended_as_found": "2026-10-16T06:12",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "inferred:bec1828",
+  "recorded": null,
+  "inferred": "bec1828",
+  "resolved": "bec1828112241b1b6d778e87812b4464a4bc4f3e",
+  "basis": "last master commit before estimated start; launched from a working tree, dirty state unknown",
+  "tree": "~/code/mapping (git)",
+  "tree_verified": null,
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "legacy train.py",
+  "job_script": "none (launched by hand/agent; launch logs in session scratchpad if any)"
+ },
+ "config": {
+  "source": "legacy: args in final.json/log.jsonl (train.py flags)",
+  "resolved": null,
+  "overrides": null,
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": {
+   "task": "se2",
+   "model": "hybrid4_convrace",
+   "size": "xs",
+   "run": "seed0_100k_qt",
+   "out": "/home/adrianna/code/mapping/results/se2/hybrid4_convrace/xs/seed0_100k_qt",
+   "steps": 100000,
+   "batch": 64,
+   "lr": 0.0003,
+   "warmup": 100,
+   "schedule": "cosine",
+   "cooldown": 0.2,
+   "save_every": 5000,
+   "branch": null,
+   "weight_decay": 0.1,
+   "clip": 1.0,
+   "eval_batches": 16,
+   "eval_every": 1000,
+   "log_every": 1000,
+   "workers": 4,
+   "seed": 0,
+   "texture": "mnist",
+   "bank": "data/mnist.npz",
+   "no_bf16": false,
+   "compile": false,
+   "device": "cuda",
+   "episode_steps": 32,
+   "queries": 8,
+   "query_times": "uniform",
+   "step_px": 9,
+   "odometry_dropout": 0.0
+  },
+  "read_from": "/home/adrianna/code/mapping/results/se2/hybrid4_convrace/xs/seed0_100k_qt/log.jsonl",
+  "missing": null
+ },
+ "run": {
+  "task": "se2d",
+  "model": "hybrid4_convrace",
+  "size": "xs",
+  "name": "seed0_100k_qt",
+  "seed": 0,
+  "steps": 100000,
+  "note": "pre-freeze ablations: conv muP init, conv-width race (paused at 78k), hybrid4.5b and its last-layer variant at s",
+  "tags": [
+   "major",
+   "se2d-prefreeze-ablations"
+  ],
+  "task_recorded": "se2"
+ },
+ "results": {
+  "dir": "/home/adrianna/code/mapping/results/se2/hybrid4_convrace/xs/seed0_100k_qt",
+  "root": "/home/adrianna/code/mapping/results",
+  "rel": "se2/hybrid4_convrace/xs/seed0_100k_qt",
+  "local_mirror": null,
+  "path_at_audit": null
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "RTX PRO 4000 Blackwell",
+  "node": null
+ },
+ "slurm": null,
+ "submit": null,
+ "gpu_hours": 0.34,
+ "gpu_hours_basis": "elapsed_s (wall clock, local)",
+ "progress": {
+  "last_step": 78000,
+  "checkpoints": null,
+  "n_checkpoints": 15
+ },
+ "end": {
+  "exit_status": null,
+  "reason": "stopped",
+  "error": null,
+  "elapsed_s": null,
+  "final_metrics": {
+   "mse": 0.04544511437416077,
+   "mse_last": null,
+   "shuffled_mse": null,
+   "floor_mse": null,
+   "best_step": null,
+   "best_mse": null
+  },
+  "metrics_basis": "the audit (final.json, or the last logged eval of a run without one), as of 2026-10-16T16:05 America/New_York"
+ },
+ "audit": {
+  "row": "erid-2:se2d/hybrid4_convrace/xs/seed0_100k_qt",
+  "experiment": "se2d-prefreeze-ablations",
+  "gaps": "commit-inferred;config-legacy-flags;no-job-record",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}

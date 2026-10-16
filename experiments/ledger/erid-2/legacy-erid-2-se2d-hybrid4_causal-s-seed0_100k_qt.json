@@ -1,0 +1,170 @@
+{
+ "schema": 1,
+ "run_id": "legacy-erid-2-se2d-hybrid4_causal-s-seed0_100k_qt",
+ "host": "erid-2",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "completed",
+ "status_as_found": "completed",
+ "created": "2026-10-16T16:21:00Z",
+ "created_as_found": "2026-10-16T12:21 (est. = last write - elapsed)",
+ "updated": null,
+ "ended": "2026-10-16T16:56:00Z",
+ "ended_as_found": "2026-10-16T12:56",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "inferred:50341e4",
+  "recorded": null,
+  "inferred": "50341e4",
+  "resolved": "50341e406ff00195b80953bd3d44f316d4ba15fa",
+  "basis": "last exp/causal commit before estimated start; launched from a working tree, dirty state unknown",
+  "tree": "~/code/mapping-hydra (git worktree)",
+  "tree_verified": null,
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "run.py",
+  "job_script": "none (launched by hand/agent; launch logs in session scratchpad if any)"
+ },
+ "config": {
+  "source": "hydra: config.yaml + overrides.yaml",
+  "resolved": {
+   "task": {
+    "generator": {
+     "_target_": "mapping.config.BankGenerator",
+     "texture": "mnist",
+     "bank": null,
+     "step_px": 9,
+     "odometry_dropout": 0.0,
+     "workers": 4
+    },
+    "episode_steps": 32,
+    "queries": 8,
+    "query_times": "uniform",
+    "_target_": "mapping.config.Task",
+    "name": "se2d"
+   },
+   "model": {
+    "name": "hybrid4_causal",
+    "ladder": "width",
+    "size": "s",
+    "arch": {
+     "_target_": "mapping.models.se2d.hybrid4_causal.Hybrid4Causal",
+     "_partial_": true
+    },
+    "_target_": "mapping.config.Model",
+    "size_kwargs": {
+     "width": 128
+    }
+   },
+   "schedule": {
+    "_target_": "mapping.config.Cosine",
+    "warmup": 100
+   },
+   "_target_": "mapping.config.Experiment",
+   "optim": {
+    "_target_": "mapping.config.AdamW",
+    "lr": 0.0003,
+    "weight_decay": 0.1,
+    "clip": 1.0,
+    "batch": 64
+   },
+   "run": {
+    "_target_": "mapping.config.Run",
+    "name": "seed0_100k_qt",
+    "out": null,
+    "steps": 100000,
+    "seed": 0,
+    "save_every": 5000,
+    "branch": null,
+    "device": null,
+    "bf16": true,
+    "compile": false,
+    "overwrite": false
+   },
+   "eval": {
+    "_target_": "mapping.config.Eval",
+    "batches": 16,
+    "every": 5000,
+    "log_every": 1000
+   }
+  },
+  "overrides": [
+   "+experiment=se2d_causal",
+   "model.size=s"
+  ],
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": null,
+  "read_from": "/home/adrianna/code/mapping-hydra/results/se2d/hybrid4_causal/s/seed0_100k_qt/config.yaml",
+  "missing": null
+ },
+ "run": {
+  "task": "se2d",
+  "model": "hybrid4_causal",
+  "size": "s",
+  "name": "seed0_100k_qt",
+  "seed": 0,
+  "steps": 100000,
+  "note": "causal vs bidirectional hybrid4 / vanilla4 pilot, xs and s, 100k cosine (exp/causal, local)",
+  "tags": [
+   "major",
+   "se2d-causal-pilot"
+  ],
+  "task_recorded": "se2d"
+ },
+ "results": {
+  "dir": "/home/adrianna/code/mapping-hydra/results/se2d/hybrid4_causal/s/seed0_100k_qt",
+  "root": "/home/adrianna/code/mapping-hydra/results",
+  "rel": "se2d/hybrid4_causal/s/seed0_100k_qt",
+  "local_mirror": null,
+  "path_at_audit": null
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "RTX PRO 4000 Blackwell",
+  "node": null
+ },
+ "slurm": null,
+ "submit": null,
+ "gpu_hours": 0.57,
+ "gpu_hours_basis": "elapsed_s (wall clock, local)",
+ "progress": {
+  "last_step": 100000,
+  "checkpoints": null,
+  "n_checkpoints": 20
+ },
+ "end": {
+  "exit_status": null,
+  "reason": "completed",
+  "error": null,
+  "elapsed_s": null,
+  "final_metrics": {
+   "mse": 0.015975840389728546,
+   "mse_last": 0.0347115732729435,
+   "shuffled_mse": null,
+   "floor_mse": null,
+   "best_step": null,
+   "best_mse": null
+  },
+  "metrics_basis": "the audit (final.json, or the last logged eval of a run without one), as of 2026-10-16T16:05 America/New_York"
+ },
+ "audit": {
+  "row": "erid-2:se2d/hybrid4_causal/s/seed0_100k_qt",
+  "experiment": "se2d-causal-pilot",
+  "gaps": "commit-inferred;code-only-on-branch-at-launch(now merged);no-job-record",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}

@@ -1,0 +1,111 @@
+{
+ "schema": 1,
+ "run_id": "legacy-torch-se2c-vanilla4c-l-dec_200k_wsd",
+ "host": "torch",
+ "retroactive": true,
+ "provenance": "retro",
+ "status": "completed",
+ "status_as_found": "completed",
+ "created": "2026-10-16T13:30:51Z",
+ "created_as_found": "2026-10-16T09:30:51",
+ "updated": null,
+ "ended": "2026-10-16T16:09:00Z",
+ "ended_as_found": "2026-10-16T12:09",
+ "time_basis": "the audit's times (sacct on Torch; local: last write minus elapsed_s), read as America/New_York and converted to UTC",
+ "as_of": "2026-10-16T16:05 America/New_York",
+ "code": {
+  "snapshot": null,
+  "ref": null,
+  "commit": "8837c28",
+  "recorded": "8837c28",
+  "inferred": null,
+  "resolved": "8837c28c682f406044c91fcd31e4857c9fc1f52a",
+  "basis": "recorded: LIFT_COMMIT echoed into the job log (export of a possibly dirty tree)",
+  "tree": "/scratch/ax2348/mapping_lift (rsync export, no .git)",
+  "tree_verified": null,
+  "dirty": null
+ },
+ "entry": {
+  "argv": null,
+  "cwd": null,
+  "via": "legacy train.py",
+  "job_script": "/scratch/ax2348/mapping_lift/jobs/lift/*.sbatch (local: jobs/lift/)"
+ },
+ "config": {
+  "source": "legacy: args in final.json/log.jsonl (train.py flags)",
+  "resolved": null,
+  "overrides": null,
+  "experiment_file": null,
+  "experiment_text": null,
+  "legacy_args": null,
+  "read_from": null,
+  "missing": "on Torch and not mirrored here (the import reads nothing on Torch)"
+ },
+ "run": {
+  "task": "se2c",
+  "model": "vanilla4c",
+  "size": "l",
+  "name": "dec_200k_wsd",
+  "seed": 0,
+  "steps": 200000,
+  "note": "se2c default task: hybrid4c vs vanilla4c at s, m, l (100k cosine, 400k / 200k WSD)",
+  "tags": [
+   "major",
+   "se2c-matched-dec"
+  ],
+  "task_recorded": "se2c"
+ },
+ "results": {
+  "dir": "/scratch/ax2348/mapping_lift/results/se2c/vanilla4c/l/dec_200k_wsd",
+  "root": "/scratch/ax2348/mapping_lift/results",
+  "rel": "se2c/vanilla4c/l/dec_200k_wsd",
+  "local_mirror": null,
+  "path_at_audit": null
+ },
+ "parent": {
+  "branch_from": null,
+  "parent_run_id": null
+ },
+ "reproduces": null,
+ "env": null,
+ "data": null,
+ "hardware": {
+  "gpu": "H200",
+  "node": "gh131"
+ },
+ "slurm": {
+  "job_id": "20046841_1",
+  "state": "COMPLETED",
+  "log": "/scratch/ax2348/mapping_lift/jobs/logs/se2c-dec-ladder-20046841_1.out"
+ },
+ "submit": null,
+ "gpu_hours": 2.65,
+ "gpu_hours_basis": "sacct ElapsedRaw",
+ "progress": {
+  "last_step": 200000,
+  "checkpoints": null,
+  "n_checkpoints": 8
+ },
+ "end": {
+  "exit_status": null,
+  "reason": "completed",
+  "error": null,
+  "elapsed_s": null,
+  "final_metrics": {
+   "mse": 0.004712781868875027,
+   "mse_last": 0.013186860829591751,
+   "shuffled_mse": null,
+   "floor_mse": null,
+   "best_step": null,
+   "best_mse": null
+  },
+  "metrics_basis": "the audit (final.json, or the last logged eval of a run without one), as of 2026-10-16T16:05 America/New_York"
+ },
+ "audit": {
+  "row": "torch:se2c/vanilla4c/l/dec_200k_wsd",
+  "experiment": "se2c-matched-dec",
+  "gaps": "dirty-unknown;config-legacy-flags",
+  "notes": null,
+  "source": "experiments/audit/runs.csv"
+ }
+}
