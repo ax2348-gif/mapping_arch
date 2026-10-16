@@ -1,0 +1,22 @@
+# @package _global_
+# Time-only recurrence vs hybrid4 on discrete SE(2) (se2d), xs, the
+# reference recipe of results/se2/hybrid4/xs/seed0_100k_qt: 100k steps,
+# cosine, uniform query times, MNIST, seed 0; checkpoints every 5k.
+#   python run.py +experiment=se2d_time_recurrence                              # variant A
+#   python run.py +experiment=se2d_time_recurrence model=se2d/hybrid4_time_full # variant B
+# (model selects the run directory, so the pair never collide)
+defaults:
+  - override /model: se2d/hybrid4_time
+
+model:
+  size: xs
+run:
+  name: seed0_100k_qt
+  steps: 100000
+  seed: 0
+  save_every: 5000
+eval:
+  every: 5000
+  log_every: 1000
+task:
+  query_times: uniform
