@@ -140,3 +140,13 @@ docs/scaling_study_design.md.
     - the blind probe's cdiag and its n-sweep. Its gdn_b1 was reported solving: long-lag position nmse 0.017 at 68k.
   - The Torch bridge job 20036564 was cancelled. The bridge runs locally now, alone on the GPU.
   - The next run, the new default, is launched by hand after the bridge is read.
+- **2026-10-16, blind probe SHELVED.**
+  - Why: without pixels there is no stored map to transport, so the task loses the pressure that makes an exact state rotation pay off. The user agreed it is "a fairly limited idea in the first place".
+  - Recorded results, 100k steps each, lag 17-32 position nmse:
+    - GDN, beta in (0, 2): 0.0068
+    - GDN, beta capped at 1: 0.0085
+    - attention: 0.091
+  - GDN beta stayed ~0.47 (l2r) and ~0.09 (r2l), flat in the turn, with no rotating plane: no reflection route.
+  - Held-out turn band = control band, so no held-out failure.
+  - L3's calibration and seam questions move to the transition probe on hybrid4c in the real se2c task.
+  - Code and runs stay in experiments/lift_blind_probe/ (uncommitted run outputs are not tracked).
