@@ -346,3 +346,5 @@ docs/scaling_study_design.md.
   - 159 real runs (~125 GPU-h), 13 major experiments; build recommended over adopt.
   - Awaiting the user's decisions (design §13).
   - Session-scratchpad report data and run logs archived to results/session_archive_2026-10-16/ (untracked, 160 MB; see its README).
+
+- **2026-10-16, first ocean BEV run queued on Torch (user):** job 20101203, git clone /scratch/ax2348/mapping_ocean (exp/ocean-task @13df1b3), preset `ocean_bev_l_wsd`: hybrid4c l, 200k WSD, 32 px BEV queries, amp 4 (from the pinned 5; user asked for a slightly gentler sea). Model and budget match the best se2c run (hybrid4c l 200k WSD, 0.0015, 4.3 H200 h). Amp 4 vs 5 (256 episodes): median first valid query step 11 vs 12, redraws 0 vs 5. Behind H1c/H1d/odq/H1f in the queue (per-user GPU cap).
