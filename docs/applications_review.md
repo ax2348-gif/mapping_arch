@@ -25,7 +25,7 @@ narrower than the working belief. Attention learns registration
 (relative pose from pixels) at scale, under 3D supervision. Short-horizon
 control is learned end to end with no geometric module. What nobody
 learns end to end is the composition of ego-motion over a long history.
-We audited 62 systems for an unbroken gradient path from observations
+We audited 63 systems for an unbroken gradient path from observations
 and actions to the decision. Those that are both end to end and
 reliable keep a few seconds of memory or are given pose (GPS+compass,
 ego history, engine poses). Every long-memory end-to-end attempt
@@ -33,15 +33,20 @@ reports drift, forgetting or lost consistency; DD-PPO without
 GPS+compass reaches 0.15 SPL after 2.5B steps. The goal is not rare.
 DeepMind Lab and Habitat agents have pursued it since 2016, and
 reliability was bought with pose inputs or pose supervision. Whether a
-motion-group-capable operator clears the blocker is untested. No study
-we found varies the transition algebra toward rotation on a pose-free
-egocentric task. The one large robotics comparison (RoboTTT) found a
-Gated DeltaNet memory did not scale with context, with its β range not
-stated. The memory-RL literature also documents failures from credit
-assignment, reward sparsity and the RL algorithm, which no operator
-fixes. The cleanest first test is self-supervised: world-model memory
-on revisits, where the failure is benchmarked and today's fix needs
-poses.
+motion-group-capable operator clears the blocker is untested. Studies
+that vary only the memory operator in egocentric tasks exist, and the
+operator matters: in ObjectNav, DeltaNet and Gated DeltaNet beat a
+transformer and a GRU with everything else fixed (LANav, 2026). But
+none of them includes an operator that can apply an input-dependent
+rotation; those delta rules use β in (0, 1). The failures usually
+blamed on credit assignment, the RL algorithm or reward were shown
+either on tasks with no rotation or with memories that cannot rotate,
+so for ego-motion tasks they are confounded with memory capability.
+Recency bias in long-context embodied models fits the same reading.
+Two risks remain independent of the operator: imitation shortcuts
+(copycat, causal confusion) and reward sparsity early in training. The
+cleanest first tests are world-model memory on revisits, and a
+one-flag change (β to (0, 2)) in the LANav ObjectNav setup.
 
 ## 2. Map of geometric junctions
 
@@ -188,65 +193,138 @@ without pose, except the RGB-only Habitat setting and Memory Maze.
 
 ### 3.2 Does anyone vary the algebra of the state update?
 
-Mostly no. Studies compare memory families with the rest held fixed:
-POPGym (13 models), Lu et al. 2023 (S5 against LSTM and GRU), Ni et
-al. 2022 (LSTM against GRU, "a minor effect"), Ni et al. 2023 (LSTM
-against GPT-2), Memory Gym (GRU against Transformer-XL). R2I swaps GRU
-for an SSM but also changes the representation model and policy inputs.
-Three works come closer to the algebra itself:
+Several studies vary only the memory operator in an egocentric task,
+with the encoder, objective, data and algorithm held fixed. None of them
+includes an operator whose transition can apply an input-dependent
+rotation to stored state.
 
-- **FFM** (Morad et al. 2023) uses a complex decay, γ = exp(−α)exp(−iω),
-  so each state channel can rotate. Removing forgetting makes it
-  worse than a GRU.
+| Study | Task | Operators compared (held fixed) | Result | Input-dependent rotation in the set? |
+| --- | --- | --- | --- | --- |
+| LANav (Zhang et al. 2026) | HM3D-OVON ObjectNav, egocentric RGB | GRU, transformer (context 500), linear transformer, DeltaNet, Gated DeltaNet, WSLA (frozen SigLIP, DAgger then PPO, 4 layers, width 512) | Average SR 26.7, 30.1, 31.3, 33.9, 34.6, 36.4. "Transformer policies do not benefit from larger training contexts"; linear-attention backbones "improve consistently" | No. DeltaNet and Gated DeltaNet use β = sigmoid, in (0, 1) |
+| GTrXL (Parisotto et al. 2020) | DMLab-30, first person | LSTM, TrXL, TrXL-I, GTrXL (V-MPO) | 99.3, 5.0, 107.0, 117.6 | No |
+| Po et al. 2025 | Memory Maze world model | Mamba2, Mamba2 plus local attention, windowed and full causal attention, block-SSM (same objective, about 200M parameters) | Retrieval PSNR 20.4, 19.3, 26.4, 32.6 (full), 30.8 (block-SSM) | No. Mamba2 decays are real and positive |
+| SPOC; PoliFormer | ProcTHOR navigation | transformer decoder against GRU | Transformer ahead (49.9 vs 43.6; 80.4 vs 73.6) | No |
+| SRU (Yang et al. 2025) | mapless navigation, egocentric depth, PPO | GRU, LSTM, SRU variants | SR 61.0, 63.5, up to 78.9 | No. Real element-wise gates |
+| TransDreamer (Chen et al. 2022) | 3D Hidden Order Discovery, first person | transformer vs GRU state-space model in Dreamer | transformer ahead; not strictly one change | No |
+| AGaLiTe (Pramanik et al. 2024) | Memory Maze | GTrXL vs gated linear transformer | parity; AGaLiTe faster | No, as far as we can tell |
+| RoboTTT (2026) | manipulation, egocentric and fixed cameras | TTT fast weights vs Gated DeltaNet | 79% vs 56% | β range not stated |
+
+Three non-embodied RL works come closer to the algebra itself, and they
+show how rarely rotation is input-dependent:
+
+- **FFM** (Morad et al. 2023) uses a complex decay,
+  γ = exp(−α)exp(−iω). α and ω are trained parameters, not functions
+  of the input, so the rotation is fixed per channel.
 - **SHM** (Le et al. 2025) writes the update as
-  M_t = M_{t−1} ⊙ C_t + U_t and casts Hebbian, NTM, linear-transformer,
-  mLSTM and FFM memories as instances, with "the baselines differ[ing]
-  only in their memory components".
-- **Complex-valued memories** (Bhethanabhotla et al. 2026) swap the GRU
-  in PPO for unitary recurrences built from Householder reflections and
-  2×2 rotations, with up to 2 to 3 times the reward on RockSample and
-  Craftax. The complex parameters get their own learning rate and
-  rollouts are longer, so the comparison is not single-variable.
+  M_t = M_{t−1} ⊙ C_t + U_t with an input-dependent C_t in (0, 2):
+  real and positive, so no rotation.
+- **Complex-valued memories** (Bhethanabhotla et al. 2026) test unitary
+  RNNs. Most are fixed unitary maps; one variant, IC-uRNN, makes the
+  Householder vectors and phases functions of the input, which is an
+  input-dependent rotation. It was not tested on navigation.
 
-None of these is run on egocentric navigation or mapping without pose.
-We found no RL or embodied use of negative-eigenvalue delta rules or
-DeltaProduct. A one-change test of the transition class on an
-egocentric pose-free task is therefore open.
+The complex-eigenvalue models used in RL (S4D and LMU in POPGym, S5 in
+Lu et al., the SSM in R2I, FFM, fixed uRNNs) all rotate by angles that do
+not depend on the input. Mamba, mLSTM, SHM, DNC and fast-weight models
+cannot rotate at all. A one-change test of an input-dependent rotation
+on an egocentric pose-free task is therefore open. LANav is the natural
+base for it: its DeltaNet and Gated DeltaNet already beat the
+transformer, and switching β to (0, 2) is one flag in the
+flash-linear-attention library.
 
-### 3.3 Failures that are not about the sequence operator
+### 3.3 Risks to the thesis, separated from memory capability
 
-These are a direct risk to the thesis, and the evidence is substantial.
+The earlier version of this section listed credit assignment, the RL
+algorithm and reward sparsity as failure causes unrelated to the
+operator. That needs a correction. A failure can only be attributed to a
+non-architectural cause if some memory in the comparison could have
+represented what the task needs. We checked which memories each source
+tested. None tested a memory with input-dependent rotation, and most
+tested tasks that do not need ego-motion composition.
 
-- **Credit assignment.** Ni et al. 2023 find transformers extend memory
-  to about 1,500 steps but "do not improve long-term credit
-  assignment"; both LSTM and transformer fail at length 250 on
-  credit-assignment tasks. MERLIN attributes RL-only memory failure to
-  credit assignment over the truncation window.
-- **The RL algorithm and optimisation.** POPGym finds "all thirteen
-  models converge to the nearly same reward", possibly "due to issues
-  with PPO", and an MLP scored highest on almost all navigation tasks.
-  Ni et al. 2022 find a shared actor-critic encoder hurts more than the
-  choice of RNN. GTrXL's gain over TrXL is an optimisation fix.
-- **Reward sparsity.** MIKASA-Robo: under sparse reward, both MLP and
-  LSTM policies fail even the easiest variant. Mirowski et al. 2018
-  needed shaping and a curriculum.
-- **Missing ego-motion, not memory capacity.** DD-PPO drops from near
-  perfect to 0.15 SPL when GPS+compass is removed. Partsey et al. name
-  visual odometry as the limiting factor. EgoMap fails under ego-motion
-  noise. Our reading: this is the one failure class the thesis
-  predicts, since composing ego-motion is what a rotation-capable
-  operator would add.
-- **Learning problems in imitation.** Copycat behaviour and causal
-  confusion (section 2.3).
+| Source | Memories tested | Task needs rotation composition? | Failure cause claimed | Separable from memory capability? |
+| --- | --- | --- | --- | --- |
+| Ni et al. 2023 | LSTM, GPT-2 | No (T-mazes, key-to-door) | Transformers do not improve long-term credit assignment | Yes for those tasks; says nothing about ego-motion tasks |
+| Ni et al. 2022 | LSTM, GRU | No | Shared actor-critic encoder, RL algorithm | Yes for those tasks |
+| POPGym | 13 models incl. S4D, LMU (fixed rotation) | No. Labyrinth tasks use absolute moves, no heading | All models converge to similar reward; PPO limits | Yes for those tasks |
+| MIKASA-Robo | MLP, LSTM, transformers, Mamba, VLAs | No (tabletop) | Sparse reward | Yes. Dense reward lets PPO-LSTM solve the easy task |
+| Memory Gym | GRU, Transformer-XL | No for the verified task (absolute moves) | Advantage normalisation, weak signal | Yes for that task |
+| Wen et al. 2020; de Haan et al. 2019; Torne et al. 2025 | MLP, RNN, transformer | No | Copycat, causal confusion, under-use of history in imitation | Yes. These are properties of the imitation objective |
+| MERLIN | LSTM, LSTM plus content memory, MERLIN | Partly (DMLab navigation; velocity input) | Credit assignment; RL alone cannot train memory | Partly. The predictive loss helped, but all three memories cannot rotate |
+| GTrXL | LSTM and transformer variants | Partly (DMLab navigation levels) | Transformer optimisation | The TrXL fix is real; residual navigation failures are confounded |
+| R2I | GRU, LTI complex SSM | Yes (Memory Maze turns) | Vanishing gradients | Confounded |
+| Mirowski et al. 2018 | LSTM | Partly (Street View turns, landmarks) | Sparse reward, needed shaping | Partly confounded |
+| DD-PPO; Partsey et al. 2022 | LSTM | Yes (PointNav without GPS) | None stated (DD-PPO); "visual odometry" (Partsey) | Confounded. Partsey's fix composes ego-motion outside the network |
 
-Counter-evidence that the operator matters: Memory Maze's authors name
-long-term memory as the bottleneck; Memory Gym finds GRU beats
-Transformer-XL on endless tasks; FFM and the complex-valued memories
-gain from changing the update. Our reading: an RL test of the thesis is
-confounded by credit assignment and reward. A self-supervised test
-(next-frame or view prediction, as in our toy task and in world
-models) removes those confounds, which is one reason opportunity 1
-ranks first.
+**Risks that stay independent of the operator.**
+
+- **Imitation-learning shortcuts.** Copycat behaviour and causal
+  confusion come from the objective and appear with stateless and
+  recurrent models alike. A better memory may make them worse, by
+  making past actions easier to read.
+- **Reward sparsity early in training.** With no reward signal, no
+  memory gets a gradient. MIKASA-Robo shows dense reward rescues the
+  same LSTM. This is a property of the task and objective.
+- **Long-term credit assignment.** Ni et al. show it on tasks that need
+  no rotation, so it is a genuine separate limit.
+- **Optimisation of specific architectures.** TrXL's layer-norm
+  placement and Memory Gym's advantage normalisation are fixable
+  engineering issues, unrelated to rotation.
+- **Positional range.** KV-cache retrieval fails past the trained
+  RoPE range (WorldTrace). This is a property of index-based
+  positions, and a recurrence avoids it by design.
+
+**Risks confounded with memory capability.**
+
+- **Pose-free navigation failures.** DD-PPO without GPS+compass and
+  R2I on the largest Memory Maze fail with memories that cannot apply
+  an input-dependent rotation. The cause cannot be assigned to the
+  algorithm until a rotation-capable memory is tried.
+- **Recency bias in long-context models.** History ablations often find
+  returns flatten after a few frames:
+  - NaVILA is flat from 8 to 64 frames (SR 49.7 to 50.1).
+  - NaVIDA's 8 and 16 frames are equal.
+  - StreamVLN does worse with all frames as memory than with 8 (SR 40.0
+    vs 45.5).
+  - GameNGen's PSNR saturates at about 4 context frames.
+  - Octo sees "diminishing gains beyond the first additional frame".
+  - MemoryVLA peaks at 16 entries (71.9) and falls at 64 (67.7).
+  - LANav's transformer does not improve with longer training context,
+    while its delta-rule backbones do.
+
+  We found no published attention analysis showing that these models
+  attend only to recent frames. The explanations given vary: attention
+  dilution (NaVIDA), training bias from long sequences (StreamVLN),
+  spurious correlations (Torne et al., MemER, RoboTTT) and positional
+  range (WorldTrace, Po et al.). Our reading: when a memory cannot
+  re-express old observations in the current frame, old frames are
+  hard to use, and a model that falls back on recent frames would
+  produce exactly this pattern. So recency bias is evidence that is
+  consistent with a capability limit, not evidence against one.
+- **Counter-cases where long memory is used.** Wijmans et al. (LSTM,
+  given pose: memory matters up to about 1,000 steps), SPOC (context 10
+  to 100 raises average SR from 27.8 to 49.9), Uni-NaVid (VLN SR 9.6
+  with the current frame only, 48.7 with full memory), and Torne et
+  al. with past-token prediction. In the first, pose was given; in the
+  others, the tasks are short or ego-motion is mild. These fit the same
+  reading.
+- **User-reported evidence (unpublished).** The user reports that in
+  their Habitat ObjectNav experiments with multi-turn RL and full
+  context in a KV cache, ablations showed the model used only the most
+  recent observations. They report the same trend when ablating the
+  memory of LightNav-0 (Light Origins, arXiv 2608.30935, 2026). We
+  confirmed that LightNav-0 exists, with paper, code and weights. It
+  keeps an RGB history in context, compressed on a forgetting curve,
+  with no pose input. Its paper contains no history or memory ablation,
+  so the LightNav-0 result is the user's own and is not published.
+
+**What follows for the test design.** Any test of the thesis must
+remove the operator-independent risks before comparing operators. Use
+dense or self-supervised objectives so reward sparsity does not decide
+the outcome. Avoid feeding past actions to imitation policies, or add
+past-token prediction. Run a history ablation (truncate to the last k
+frames) for every operator, since a capability gain should show up as
+the model using older frames, not only as a higher score.
 
 ## 4. Gradient audit of the "end-to-end" systems
 
@@ -280,6 +358,7 @@ mean the task objective does not shape perception.
 | NaVILA | VLA G1; system G3 | Language command parsed into a separately trained locomotion policy | VILA initialisation | No (locomotion uses LiDAR) | 8 to 64 frames |
 | StreamVLN | G1 without pruning; G3 with | Voxel pruning by depth and odometry back-projection | Two stages | Depth and odometry at inference for pruning | 8-turn window plus memory tokens |
 | NavFoM | G1 | Fixed BATS token sampler | Freezing unstated | Camera azimuth only | 1,024 to 2,048 history tokens |
+| LANav | G1 (DAgger then PPO) | none | SigLIP frozen | No | Context 500 (attention) or recurrent state |
 | Wijmans et al. 2023 | G1 (RL) | none | none | GPS+compass | LSTM, 1,000+ steps |
 | Partsey et al. 2022 | G3 + G4 | VO supervised on pose; composed by a fixed update; no gradient between VO and policy | Staged, VO frozen | VO estimate | LSTM |
 | UNREAL, GTrXL, DD-PPO (RGB only), R2I | G1 | none | R2I world model and actor trained by separate losses | No | LSTM, transformer or SSM |
@@ -323,7 +402,7 @@ Robotics 1.5, π0.5). Freezing of pretrained encoders is often unstated.
 
 ### 4.2 What survives
 
-- **Of 62 systems audited, about 41 have a G1 core** (several with
+- **Of 63 systems audited, about 42 have a G1 core** (several with
   caveats about frozen encoders or unstated gradient flow). Twenty are
   G3 or G4, and Genie 3 is undetermined. Alpamayo-R1's GRPO stage is the
   only G2 case; no robot policy in the audit uses G2.
@@ -431,6 +510,7 @@ loss of consistency.
 | Robot policy | Dual-Stream Memory | Gated DeltaNet compresses history to one token | Not stated | arXiv 2610.13262 |
 | Robot policy | RoboTTT (GR00T N1.7) | TTT fast weights; Gated DeltaNet as baseline | Not stated for the baseline | arXiv 2607.15275 |
 | Robot policy | LRAM | xLSTM, sLSTM non-diagonal recurrence | Not rotation-specific | arXiv 2410.22391 |
+| Navigation policy | LANav (HM3D-OVON) | DeltaNet and Gated DeltaNet backbones, beat transformer and GRU | No. β = sigmoid | arXiv 2607.18794 |
 | RL policy (not embodied) | FFM | Complex diagonal decay | Yes, per channel | arXiv 2310.04128 |
 | RL policy (not embodied) | Complex-valued memories | Unitary RNNs from Householder reflections and 2×2 rotations | Yes | arXiv 2609.38598 |
 | World model | Po et al. 2025 | Mamba block-wise scan plus local attention | No (Mamba decays are positive; not discussed in the paper) | arXiv 2505.20171 |
@@ -446,7 +526,11 @@ Points that matter for this study:
   uses it as a drop-in, as RoboTTT does, gets the
   non-rotating version unless they flip it. RoboTTT's paper does not
   say which it used.
-- **The one direct robotics comparison is negative for Gated DeltaNet.**
+- **In navigation, the delta rule already wins without rotation.** LANav
+  holds everything fixed and finds Gated DeltaNet at 34.6 average SR
+  against 30.1 for a transformer and 26.7 for a GRU on HM3D-OVON, with β
+  in (0, 1). Whether β in (0, 2) adds to this is the obvious next test.
+- **The one direct manipulation comparison is negative for Gated DeltaNet.**
   RoboTTT replaces its TTT layers with Gated DeltaNet at matched size:
   56% against 79% average, and "GDN does not benefit from longer
   context". The authors suggest the linear associative update "struggles
@@ -474,7 +558,7 @@ motion group.
 | Rank | Junction to replace | Current fix | Why here | Feasibility |
 | --- | --- | --- | --- | --- |
 | 1 | World-model memory on revisits | Pose-indexed retrieval (C1) or 3D cache (C2) | Failure is documented and benchmarked; fix needs engine poses; predicted poses cost 2.2 dB; real-video poses are noisy | High. Public benchmarks (Memory Maze, LoopNav), about 200M-parameter models, synthetic data |
-| 2 | Navigation path integration without GPS+compass | Learned VO plus explicit SE(3) composition (C3) | Closest to our toy; clean necessity test; strong published baselines | High in simulation |
+| 2 | Navigation memory, then path integration without GPS+compass | Learned VO plus explicit SE(3) composition (C3) | An operator-only ObjectNav comparison already exists (LANav) and delta rules win there; closest to our toy | High in simulation |
 | 3 | VLA memory over base motion in mobile manipulation | None (π0.5), language memory (MEM), or tracking camera plus ESDF (MoManipVLA) | Stated limitation of π0.5; delta-rule memories already exist with β ≤ 1 | Medium. Needs robot data or a new simulated task |
 | 4 | Streaming 3D reconstruction state | CUT3R / TTT3R recurrent state with drift | Drift and forgetting are measured; update is already delta-rule-like | Medium. Still C3 supervision |
 | 5 | Driving BEV temporal fusion | Ego-pose warp (C1 + C2) | Warp is cheap and accurate given localisation; ablations show small NDS effect | High, but low impact |
@@ -494,7 +578,12 @@ existing pose-free baseline. A positive result is: the β-to-2 model
 matches the pose-given ceiling on revisits, the β-to-1 model does not,
 and the gap grows with loop length.
 
-**2. Navigation without GPS+compass.** Habitat PointNav in the 2021
+**2. Navigation: flip β in an existing operator comparison, then remove
+GPS+compass.** The fastest test reuses LANav's HM3D-OVON setup, where
+everything but the backbone is already fixed and Gated DeltaNet already
+beats the transformer. Add Gated DeltaNet with β in (0, 2) and
+DeltaProduct, and report a history ablation (last k frames) for each.
+Then move to Habitat PointNav in the 2021
 challenge setting (RGB-D, actuation and sensor noise, no GPS+compass),
 where the best published approach composes learned VO explicitly (94%
 success, Partsey et al.). Train a single recurrent policy with no VO
@@ -688,6 +777,12 @@ state the venue, the venue is given as "(venue not confirmed)".
 
 **Memory agents and memory benchmarks in reinforcement learning**
 
+- Zhang, Jiahong et al. Beyond Transformers: Linear Attention Policy for Open-Vocabulary Object Goal Navigation (LANav). arXiv 2607.18794, 2026. https://arxiv.org/abs/2607.18794
+- Yang, Fan et al. Spatially-Enhanced Recurrent Memory for Long-Range Mapless Navigation via End-to-End Reinforcement Learning (SRU). arXiv 2506.05997. https://arxiv.org/abs/2506.05997
+- Chen, Chang et al. TransDreamer: Reinforcement Learning with Transformer World Models. arXiv 2202.09481. https://arxiv.org/abs/2202.09481
+- Pramanik, Subhojeet et al. AGaLiTe: Approximate Gated Linear Transformers for Online Reinforcement Learning. TMLR 2024. https://arxiv.org/abs/2310.15719
+- Wang, Shaoan et al. (Light Origins). LightNav-0: Eliciting VLM Spatial Intelligence for Generalist Embodied Navigation. arXiv 2608.30935, 2026. https://arxiv.org/abs/2608.30935 ; code https://github.com/lightorigins/LightNav-0
+
 - Jaderberg, Max et al. Reinforcement Learning with Unsupervised Auxiliary Tasks (UNREAL). arXiv 1611.05397, 2016. https://arxiv.org/abs/1611.05397
 - Mirowski, Piotr et al. Learning to Navigate in Complex Environments. arXiv 1611.03673, 2016. https://arxiv.org/abs/1611.03673
 - Mirowski, Piotr et al. Learning to Navigate in Cities Without a Map. arXiv 1804.00168, 2018. https://arxiv.org/abs/1804.00168
@@ -775,7 +870,9 @@ not used as evidence above.
   whether DreamerV3 actor gradients reach the world model; the Dreamer 4
   method beyond what section 4 reports; AGaLiTe and RLBenchNet methods;
   whether Active Neural SLAM blocks gradients between modules; whether
-  Lu et al.'s S5 transition is complex diagonal.
+  AGaLiTe's oscillatory terms depend on the input.
+- The user's own ObjectNav KV-cache ablation and their LightNav-0
+  memory ablation are user-reported and unpublished.
 - In the gradient audit: whether pretrained encoders are frozen in SPOC,
   NaVid, Uni-NaVid, NavFoM, GameNGen, Matrix-Game 2.0 and Po et al.;
   whether StreamVLN prunes during training; MemoryVLA's gradient path
