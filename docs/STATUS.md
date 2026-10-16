@@ -282,3 +282,11 @@ docs/scaling_study_design.md.
   - s, 400k WSD, both decayed: hybrid4c 0.0078 all / 0.012 far against vanilla4c 0.0224 / 0.039. hybrid4c renders queries 75-90 px away that vanilla4c renders grey.
   - Stable-phase step ratios to the same far error: 2.9-5.8x (s), 2.4-5.2x (m), 2.0-2.7x (l); 1.2-4x in GPU hours.
   - Pending: the decayed hybrid4c m and l endpoints. vanilla4c m and l are decayed at 0.0093 and 0.0047.
+- **2026-10-16, literature on causality and LVSM-type models:** docs/causality_literature_review.md (commit 09ca8e4, first round).
+  - The first round used the wrong criterion ("global map"). The user corrected it to the program's: a belief in activations, readable end to end by a decision or prediction head (Spatial POMDP Program Notes, https://claude.ai/artifact/9cVaS2gpjzbzVx8ch8a6gu).
+  - Re-read under it:
+    - VGGT-style explicit-geometry models are a poor fit; the LVSM/SRT/CUT3R latent-belief family is the right one;
+    - H1 (others come close, limited only by data): mixed, and the gap is architecture and regime, not data;
+    - H2 (free queries vs per-frame outputs is the distinction): better supported than the first round said;
+    - H3 (bidirectionality matters, avoided out of causal bias): holds; bidirectional policies use only 2-6 frames.
+  - A second, narrow round plus a published artifact are in progress with the same agent. The revised doc will be self-contained.
