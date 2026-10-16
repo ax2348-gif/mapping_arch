@@ -227,3 +227,39 @@ This is mechanistic support for H: the solving model represents the
 heading change as a rotation of its state. It is not P5 as written, which
 specifies a linear probe of relative pose. It does not show that the
 rotation is necessary; P2 (beta capped at 1) tests that.
+
+### 2026-10-15: P5 targets the wrong head; P5′ added (post hoc)
+
+P5 as frozen names the left-to-right delta-rule state read at a query
+token. The transition probe (previous amendment) found that in the solving
+hybrid4 models the left-to-right head contracts its state over every walk
+step (no eigenvalue above 0.5), while the right-to-left head carries the
+rotation. A failure of P5 as written would therefore say nothing against H;
+it would only show that the frozen text named the wrong head.
+
+- **P5 stays as written and will still be run,** so the frozen prediction
+  gets its honest verdict.
+- **P5′ is added below.** It was formulated AFTER seeing the transition
+  probe, so it is post hoc and counts as weaker evidence than a frozen
+  prediction.
+
+**P5′. The right-to-left head maintains a consistent rotating frame.** In
+a hybrid4 that solves SE(2) (seeds 0 and 1 at xs), in the right-to-left
+delta-rule head:
+
+- **(a) Consistency.** For step pairs (s, t) with 1 ≤ t − s ≤ 16, the
+  product of the head's state updates from step s to step t, in its scan
+  order, has an eigenvalue pair at the accumulated heading change between
+  the two steps, within ±10 degrees, on at least 95% of pairs. This is
+  stronger than the per-step result: it requires every step to rotate the
+  same two-dimensional subspace, so that the rotations compose into a
+  frame.
+- **(b) Decodability.** A ridge probe from that head's state at
+  observation s to the pose of step s relative to step t (body-frame dy,
+  dx and heading change) reaches R² ≥ 0.8 on held-out episodes, for
+  1 ≤ t − s ≤ 16.
+
+**Falsified if (a) fails.** That is, the eigenpair is not at the
+accumulated angle on at least 95% of pairs. The clean per-step rotation
+would then be local bookkeeping rather than a maintained frame, and the
+report must say so.
