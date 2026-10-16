@@ -91,3 +91,13 @@ exists).
 
 xl at T=64 (about 20+ hours per run; add if the T=64 ladder shows a
 widening gap), the learning-rate grid at every size, and more seeds.
+
+## Submitted (2026-10-16)
+
+| Block | Job ids |
+| --- | --- |
+| A | hybrid4 xl 20028840; already running or queued: vanilla4 l, xl 20014708; hybrid4 l 20014709; vanilla4 xs, s, m 20028595; hybrid4 xs, s, m 20028596 |
+| B | hybrid4 T=64 20028842; vanilla4 T=64 20028843 |
+| C | branches 20028849-20028855, each gated (afterany) on its parent array |
+| D | hybrid4 20028844; vanilla4 20028846 |
+| E | hybrid4 seed 1 20028847; vanilla4 seed 1 20028848 |
