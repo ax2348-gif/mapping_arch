@@ -44,7 +44,8 @@ def run_title(final):
         shuffled = ', dirs shuffled n/a'
     settings = ''.join(
         f', {k} {final[k]}' for k, d in (('step_px', 9),
-                                         ('odometry_dropout', 0.0))
+                                         ('odometry_dropout', 0.0),
+                                         ('texture', 'mnist'))
         if final.get(k, d) != d)
     return (f'{final.get("task", "z2")} {final["model"]}/{final["size"]}/'
             f'{final.get("run", "")}  '

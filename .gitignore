@@ -5,5 +5,7 @@ results/
 shelved/results/
 jobs/logs/
 data/mnist.npz
+data/imagenette64.npz
+data/imagenette_raw/
 *.egg-info/
 jobs/

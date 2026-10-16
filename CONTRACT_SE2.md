@@ -31,9 +31,9 @@ full attention and relative odometry only.
 `mapping.se2` fixes the conventions and `tests/test_se2.py` checks them;
 `python -m pytest` must pass before any model is trained.
 
-## Generator settings: step size and odometry dropout
+## Generator settings: step size, odometry dropout, texture
 
-The two generator settings of `CONTRACT.md` ("Generator settings") apply
+The three generator settings of `CONTRACT.md` ("Generator settings") apply
 here unchanged and do not make a new task. `--step-px` sets the walk step
 (`TaskSpec.step_px`, `offset_max = steps * step_px`); below 9 consecutive
 observations overlap. `--odometry-dropout p` replaces each odometry symbol,
@@ -45,6 +45,16 @@ the batch as `odometry_true`, in `FORBIDDEN_KEYS` beside `positions` and
 frames (move and turn) is recoverable only by registering the overlap of
 consecutive observations; `tools/registrability.py` measures how often
 that is possible at all on MNIST maps, which is the ceiling for any model.
+
+`--texture imagenette` builds the map from 64 x 64 grayscale natural-image
+tiles instead of MNIST digits (no brightness cutoff, start window one
+tile). It exists for the visual-odometry setting: MNIST overlaps are
+often blank and so cannot be registered, natural ones almost never are
+(`tools/registrability.py --texture imagenette`). Observations stay 9 x 9
+single channel and face their heading exactly as before; dihedral tile
+augmentation stays on, so the upright orientation of natural content
+cannot reveal the heading. The interface, the spec and the rules do not
+change.
 
 ## Why this rung
 

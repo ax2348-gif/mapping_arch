@@ -2,8 +2,10 @@
 
     python train.py --model vanilla --size xs --steps 500
 
-Streams training episodes from the MNIST train bank, evaluates on a fixed
-set from the test bank, and writes the run directory
+Streams training episodes from the train split of the tile bank (MNIST
+by default; ``--texture imagenette`` for natural images, see
+``mapping.data.TEXTURES``), evaluates on a fixed set from its test split,
+and writes the run directory
 ``results/<model>/<size>/<run>/`` (see ``mapping/checkpoint.py`` for its
 contents). Every number a scaling fit needs is in ``final.json``, and
 ``grid.png`` shows sampled predictions beside their targets.
@@ -32,6 +34,7 @@ import time
 import torch
 
 import mapping.tasks as tasks
+from mapping.data import TEXTURES
 from mapping.checkpoint import save_checkpoint
 from mapping.loader import eval_set, load_banks, train_loader
 from mapping.plot import plot_run
@@ -73,7 +76,14 @@ def parse():
     p.add_argument('--log-every', type=int, default=50)
     p.add_argument('--workers', type=int, default=4)
     p.add_argument('--seed', type=int, default=0)
-    p.add_argument('--bank', default='data/mnist.npz')
+    p.add_argument('--texture', default='mnist', choices=sorted(TEXTURES),
+                   help='tile bank (generator setting, not a new task): '
+                        'sets the tile side, brightness cutoff and start '
+                        'window together (mapping.data.TEXTURES); the bank '
+                        'file must have that tile side or the run refuses')
+    p.add_argument('--bank', default=None,
+                   help="bank file; default the texture's "
+                        '(data/mnist.npz, data/imagenette64.npz)')
     p.add_argument('--no-bf16', action='store_true')
     p.add_argument('--compile', action='store_true')
     p.add_argument('--device', default='cuda' if torch.cuda.is_available()
@@ -159,14 +169,24 @@ def main():
     out = args.out or os.path.join(task['root'], args.model, args.size, run)
     os.makedirs(out, exist_ok=True)
 
+    if args.bank is None:
+        args.bank = TEXTURES[args.texture]['path']
     config, spec = tasks.config_and_spec(args.task, args.episode_steps,
                                          args.queries, args.seed,
                                          args.query_times, args.step_px,
-                                         args.odometry_dropout)
+                                         args.odometry_dropout, args.texture)
+    # everything the bank fixes, recorded beside the run's numbers
+    texture = {'texture': args.texture, 'bank': args.bank,
+               'tile': config.tile, 'cutoff': config.cutoff,
+               'start_window': config.start_window,
+               'dihedral': config.dihedral}
     # the shuffled-odometry diagnostic permutes the model-facing symbols;
     # with all of them replaced by "unknown" it cannot change anything
     shuffle_informative = args.odometry_dropout < 1.0
-    train_bank, eval_bank = load_banks(args.bank, config)
+    try:
+        train_bank, eval_bank = load_banks(args.bank, config)
+    except ValueError as e:
+        raise SystemExit(f'--texture {args.texture} --bank {args.bank}: {e}')
     start = 0
     branch = None
     if args.branch:
@@ -174,12 +194,13 @@ def main():
                             weights_only=False)
         start = branch['step']
         defaults = {'step_px': 9, 'odometry_dropout': 0.0,
-                    'query_times': 'last'}
+                    'query_times': 'last', 'texture': 'mnist'}
         for key in ('task', 'model', 'size', 'batch', 'seed', 'step_px',
-                    'odometry_dropout', 'query_times'):
+                    'odometry_dropout', 'query_times', 'texture'):
             if branch['args'].get(key, defaults.get(key)) != vars(args)[key]:
                 raise SystemExit(f'--branch {key} mismatch: checkpoint '
-                                 f'{branch["args"][key]!r}, run '
+                                 f'{branch["args"].get(key, defaults.get(key))!r}, '
+                                 f'run '
                                  f'{vars(args)[key]!r}')
         if start >= args.steps:
             raise SystemExit(f'checkpoint step {start} >= --steps {args.steps}')
@@ -227,7 +248,9 @@ def main():
     print(f'{args.task} {args.model}/{args.size} -> {out}: {params:,} params, '
           f'lr {args.lr:.2g}; floor mse {floor["mse"]:.4f}, '
           f'floor fg_mae {floor["fg_mae"]:.4f}; step_px {args.step_px}, '
-          f'odometry_dropout {args.odometry_dropout}', flush=True)
+          f'odometry_dropout {args.odometry_dropout}; texture '
+          f'{args.texture} ({args.bank}, tile {config.tile}, cutoff '
+          f'{config.cutoff})', flush=True)
     if not shuffle_informative:
         print('all odometry is dropped: the "dirs shuffled" number permutes '
               'unknown symbols only and equals eval mse by construction; it '
@@ -241,6 +264,7 @@ def main():
                           'odometry_dropout': args.odometry_dropout,
                           'offset_max': spec.offset_max,
                           'shuffle_informative': shuffle_informative,
+                          **texture,
                           'args': vars(args)}) + '\n')
     log.flush()
     best, best_step = None, -1
@@ -303,6 +327,7 @@ def main():
              'step_px': args.step_px,
              'odometry_dropout': args.odometry_dropout,
              'shuffle_informative': shuffle_informative,
+             **texture,
              'schedule': args.schedule, 'branch': args.branch,
              'start': start,
              'params': params, 'steps': args.steps, 'batch': args.batch,

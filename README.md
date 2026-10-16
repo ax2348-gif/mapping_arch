@@ -15,11 +15,30 @@ pip install torch numpy pillow datasets     # torch with CUDA for training
 pip install --no-deps fla-core==0.5.2 einops # kernels (hybrid4 and later);
                                              # --no-deps keeps torch untouched
 python scripts/get_mnist.py                 # writes data/mnist.npz once
+python -I scripts/get_imagenette.py         # optional natural-image bank:
+                                            # data/imagenette64.npz
 python profile_loader.py                    # optional: data path sanity
 ```
 
 Nothing else is stored. Training batches are generated on the fly from a
-seed; the only data file is the MNIST bank.
+seed; the only data files are the tile banks.
+
+**Textures.** The default bank is MNIST (28 x 28 tiles, near-black
+residue below 32 zeroed). `--texture imagenette` builds maps from natural
+images instead: Imagenette (fast.ai's open 10-class ImageNet subset, 160
+px version), every image converted to ITU-R 601 grayscale, centre-cropped
+square and Lanczos-resized to 64 x 64, train split 9,469 images, test
+split 3,925; 13,394 x 4,096 = 54.86M pixels against MNIST's 70,000 x 784
+= 54.88M. `scripts/get_imagenette.py` downloads the archive (about 99 MB,
+SHA-256 pinned) into `data/imagenette_raw/` (or `--raw DIR`), extracts it
+with tarfile's `data` filter and writes the npz; run it with `python -I`,
+since the archive is untrusted data. The texture fixes the tile side (64),
+the cutoff (0: natural images are not thresholded) and the start window
+(one tile) together (`mapping.data.TEXTURES`); a bank file whose tile side
+disagrees with the texture is refused. Observations stay 9 x 9 single
+channel and the model-facing spec does not change, so every model runs
+unchanged. The ImageNet images keep ImageNet's terms of use
+(non-commercial research).
 
 ## Layout
 
@@ -85,12 +104,19 @@ python render.py results/vanilla/m/seed0/final.pt --rows 24     # redraw
 python train.py --task se2 --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --run seed0_vo  # visual odometry
 python tools/registrability.py --step-px 1 2 3     # ceiling for that run
+python train.py --task se2 --model hybrid4 --size xs --query-times uniform \
+    --step-px 3 --odometry-dropout 1.0 --texture imagenette \
+    --run seed0_vo_imagenette                      # VO on natural images
+python tools/registrability.py --texture imagenette --step-px 1 2 3
 python summarize.py                                             # all runs
 python summarize.py --fit                                       # best per rung + fits
 ```
 
-`train.py` evaluates on a fixed set from the MNIST test split, so no
-evaluation digit instance was seen in training. It reports the error with
+`train.py` evaluates on a fixed set from the bank's test split (MNIST
+test, or Imagenette val), so no evaluation tile instance was seen in
+training. The texture, bank file, tile, cutoff and start window are in the
+log header, `final.json` and the checkpoint arguments; runs that differ
+in texture are never merged by `summarize.py --fit`. It reports the error with
 true directions and with each episode's directions permuted in time; the
 gap between them is the odometry the model is using. `summarize.py` reads
 every `final.json` under `results/`.

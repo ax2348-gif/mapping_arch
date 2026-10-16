@@ -6,7 +6,8 @@ finished contribution consists of.
 
 ## The task
 
-A map is a grid of MNIST tiles. An agent takes 32 steps of 9 pixels in
+A map is a grid of MNIST tiles (or of natural-image tiles, see
+"Generator settings"). An agent takes 32 steps of 9 pixels in
 cardinal directions, observing a 9x9 window at each of the 33 positions.
 Windows never overlap (unless the step is set smaller, see "Generator
 settings" below). The model is then asked to render the 9x9 window at
@@ -38,11 +39,11 @@ determined by the inputs: there is nothing to guess, only to assemble.
 Query offsets fall at arbitrary pixel positions, so a target straddles up
 to four observed windows and is never a single stored one.
 
-## Generator settings: step size and odometry dropout
+## Generator settings: step size, odometry dropout, texture
 
-Two settings of the generator change the episodes without making a new
+Three settings of the generator change the episodes without making a new
 task; the interface, the rules and the batch keys are those above, and
-with both at their defaults every batch is byte-identical to before they
+with all at their defaults every batch is byte-identical to before they
 existed (`tests/test_contract_z2.py`, `tests/test_generator_options.py`).
 
 - **Step size** (`Config.step`, `train.py --step-px`, default 9). Below 9
@@ -63,6 +64,26 @@ existed (`tests/test_contract_z2.py`, `tests/test_generator_options.py`).
   registering overlapping observations (visual odometry); this makes
   sense only with a step below 9. The trainer's shuffled-directions
   number is then a no-op and is reported as n/a.
+- **Texture** (`train.py --texture mnist|imagenette`, default mnist;
+  `mapping.data.TEXTURES`). The tile bank the map is built from. `mnist`
+  is the original: 28 x 28 digits, pixels below 32 zeroed, which leaves
+  maps about 80% black, so with overlapping windows many steps cannot be
+  registered from the pixels (`tools/registrability.py`). `imagenette` is
+  natural images (`scripts/get_imagenette.py`: Imagenette, ITU-R 601
+  grayscale, centre crop, 64 x 64; train 9,469, test 3,925, about MNIST's
+  pixel count). The texture fixes the tile side, the brightness cutoff
+  (0 for natural images: nothing is zeroed) and the start window (one
+  tile, so the phase against the tile grid stays uniform) together, and a
+  bank whose tile side disagrees is refused (`tests/test_texture.py`).
+  What a model receives does not change: observations and targets stay
+  9 x 9 single channel in [0, 1], `TaskSpec` carries no tile size, and
+  query sampling, coverage and `offset_max` are as before. A 64-pixel tile
+  holds about 50 windows to MNIST's 10, so a walk crosses fewer tile
+  boundaries. Dihedral augmentation stays on: each tile gets a random one
+  of its eight symmetries, so on the SE(2) task the orientation of
+  natural content (sky up, gravity) cannot reveal the heading. The
+  reference numbers at the end of this file are for MNIST; the floor on
+  the natural bank is printed per run and is not comparable.
 
 This is the **single offline setting with relative odometry**: full
 attention over the whole episode is allowed, queries are answered at the
@@ -217,8 +238,8 @@ without need. Do not submit cluster jobs.
 
 ## Reference numbers
 
-The harness prints the constant floor per run; on the evaluation set it
-is mse 0.097 and fg_mae 0.63, and a model that draws nothing sits there.
+These are for the MNIST texture. The harness prints the constant floor
+per run; on the evaluation set it is mse 0.097 and fg_mae 0.63, and a model that draws nothing sits there.
 Stroke pixels are 17% of a target, so watch `fg_mae` and `fg_within_0.1`,
 not only `mse`. The reference `mlp` at size xs (402k params) reaches mse
 0.0958 after 300 steps at 145 it/s: barely off the floor, which is the

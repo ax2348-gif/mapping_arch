@@ -24,16 +24,44 @@ MOVES = np.array([[-1, 0], [0, 1], [1, 0], [0, -1]], dtype=np.int64)
 VOCAB = {False: 4, True: 16}           # keyed by Config.heading
 UNKNOWN = dict(VOCAB)
 
+# Textures: the tile banks a map can be built from, a generator setting of
+# both tasks (not a new task). Each fixes everything that depends on the
+# bank, so a run names one texture and gets a consistent combination:
+#   path          default bank file (train/test splits, as data/mnist.npz)
+#   tile          tile side in pixels; must equal the bank's image side
+#                 (``check_bank`` refuses anything else)
+#   cutoff        brightness below this is zeroed at load time; 32 removes
+#                 MNIST's near-black residue, 0 leaves natural images as
+#                 they are
+#   start_window  start-phase window, one tile (Config requires >= tile)
+# 'mnist' is Config's default and the original task.
+TEXTURES = {
+    'mnist': dict(path='data/mnist.npz', tile=28, cutoff=32,
+                  start_window=28),
+    'imagenette': dict(path='data/imagenette64.npz', tile=64, cutoff=0,
+                       start_window=64),
+}
+
+
+def texture_settings(name):
+    """The Config fields a texture fixes: ``tile``, ``cutoff``,
+    ``start_window``."""
+    if name not in TEXTURES:
+        raise ValueError(f'unknown texture {name!r}; have {sorted(TEXTURES)}')
+    t = TEXTURES[name]
+    return {k: t[k] for k in ('tile', 'cutoff', 'start_window')}
+
 
 @dataclass(frozen=True)
 class Config:
-    tile: int = 28          # MNIST tile side, pixels
+    tile: int = 28          # tile side, pixels (TEXTURES; 28 is MNIST)
     obs: int = 9            # observation window side, pixels
     step: int = 9           # walk step, pixels
     steps: int = 32         # transitions T; T + 1 observations
     queries: int = 8        # Q per episode
     start_window: int = 28  # one tile: uniform phase against the tile grid
     cutoff: int = 32        # brightness below this is zeroed in the bank
+                            # (MNIST's; TEXTURES sets it per bank)
     dihedral: bool = True   # each tile gets a random one of its 8 symmetries
     heading: bool = False   # SE(2) task: a heading per step, see mapping.se2
     query_times: str = 'last'   # 'last': every query is asked at the final
@@ -101,16 +129,22 @@ def apply_dihedral(tiles, sym):
 
 
 def load_bank(path, cutoff, split='train', dihedral=False):
-    """MNIST tiles with near-black residue zeroed, ``(N, 28, 28)`` uint8.
+    """Square tiles with pixels below ``cutoff`` zeroed, ``(N, t, t)``
+    uint8 (MNIST: t = 28, cutoff 32 removes near-black residue; a natural
+    texture uses cutoff 0, which changes nothing; see ``TEXTURES``).
 
-    With ``dihedral`` the bank is ``(8, N, 28, 28)``: every tile under each
+    With ``dihedral`` the bank is ``(8, N, t, t)``: every tile under each
     of its eight symmetries, precomputed once so that rendering stays a
-    single gather. Eight copies of MNIST is 360 MiB, and forked loader
-    workers share it copy-on-write.
+    single gather. Eight copies of MNIST is 360 MiB (of the Imagenette
+    train split, 310 MiB), and forked loader workers share it
+    copy-on-write.
     """
     with np.load(path) as f:
         images = f[f'{split}_images']
         labels = f[f'{split}_labels']
+    if images.ndim != 3 or images.shape[1] != images.shape[2]:
+        raise ValueError(f'{path}: {split} images {images.shape}, expected '
+                         f'(N, t, t)')
     images = np.where(images < cutoff, 0, images).astype(np.uint8)
     if dihedral:
         images = np.stack([apply_dihedral(images, np.full(len(images), s,
@@ -121,6 +155,21 @@ def load_bank(path, cutoff, split='train', dihedral=False):
 
 def bank_size(bank):
     return bank.shape[-3]
+
+
+def bank_tile(bank):
+    """The tile side of a loaded bank, ``(N, t, t)`` or ``(8, N, t, t)``."""
+    return bank.shape[-1]
+
+
+def check_bank(bank, config):
+    """Refuse a bank whose tiles are not ``config.tile`` square. A
+    mismatch would otherwise build maps on the wrong grid or fail deep in
+    a reshape; every batch passes through here."""
+    if bank.shape[-2:] != (config.tile, config.tile):
+        raise ValueError(f'bank tiles are {bank.shape[-2:]}, config.tile is '
+                         f'{config.tile}: the texture setting does not match '
+                         f'the bank file (mapping.data.TEXTURES)')
 
 
 # ---------------------------------------------------------------- the walk
@@ -282,6 +331,7 @@ def make_batch(rng, config, bank, batch):
     identical to the p = 0 batch of the same seed.
     """
     c = config
+    check_bank(bank, c)
     directions, displacement = random_walk(rng, batch, c.steps, c.step)
     observations = np.empty((batch, c.steps + 1, c.obs, c.obs), np.uint8)
     targets = np.empty((batch, c.queries, c.obs, c.obs), np.uint8)

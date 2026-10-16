@@ -27,11 +27,14 @@ def load_runs(root=ROOT, model=None):
 
 def best_per_size(rows):
     """Keep, for each (model, size), the run with the lowest final eval
-    mse: the way a learning-rate grid is read."""
+    mse: the way a learning-rate grid is read. Runs that differ in a
+    generator setting (query times, step, odometry dropout, texture) are
+    never merged."""
     best = {}
     for r in rows:
         key = (r['model'], r['size'], r.get('query_times', 'last'),
-               r.get('step_px', 9), r.get('odometry_dropout', 0.0))
+               r.get('step_px', 9), r.get('odometry_dropout', 0.0),
+               r.get('texture', 'mnist'))
         if key not in best or (r['final_eval']['mse']
                                < best[key]['final_eval']['mse']):
             best[key] = r

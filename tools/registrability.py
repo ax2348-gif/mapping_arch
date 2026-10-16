@@ -1,12 +1,14 @@
 """How well-posed is visual odometry on the SE(2) task? With the odometry
 symbols hidden (``--odometry-dropout 1``), the relative pose between two
 consecutive frames can only come from their overlapping pixels, and MNIST
-maps are mostly black. This counts, per consecutive pair, how many of the
+maps are mostly black (``--texture imagenette`` measures the natural-image
+bank instead). This counts, per consecutive pair, how many of the
 16 (move, turn) hypotheses agree with both observations on their overlap,
 and from that how many per-step queries are determined by the
 observations alone. The numbers are a ceiling for any model.
 
     python tools/registrability.py --step-px 1 2 3 --episodes 4000
+    python tools/registrability.py --texture imagenette --step-px 1 2 3
 
 Definitions (all on the TEST bank, dihedral augmentation on, headings as
 the SE(2) generator draws them, per-step queries):
@@ -24,6 +26,11 @@ the SE(2) generator draws them, per-step queries):
   step were known.
 - *Blank overlap*: the true overlap has no stroke pixel (then every
   hypothesis whose overlap is also blank in both frames is consistent).
+- *Residual ambiguity*: a step where some WRONG hypothesis also agrees
+  exactly. On MNIST this is mostly blank overlaps; on a natural texture,
+  whose pixels are rarely exactly 0, it is flat regions (saturated sky,
+  clipped highlights) or symmetric content, and is reported separately for
+  steps whose true overlap is not blank.
 - A query asked at step t is *determined* when every pixel of its target
   was observed by some frame joined to frame t by a chain of uniquely
   registrable steps. Two versions: "offline" lets the chain run forward
@@ -43,7 +50,8 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from mapping.data import MOVES, Config, load_bank, make_batch  # noqa: E402
+from mapping.data import (MOVES, TEXTURES, Config, load_bank,  # noqa: E402
+                          make_batch, texture_settings)
 from mapping.loader import EVAL_SPLIT  # noqa: E402
 
 
@@ -90,8 +98,9 @@ def segments(unique):
     return lo, hi
 
 
-def measure(step, episodes, batch, bank, seed):
-    c = Config(heading=True, step=step, query_times='uniform', dihedral=True)
+def measure(step, episodes, batch, bank, seed, texture='mnist'):
+    c = Config(heading=True, step=step, query_times='uniform', dihedral=True,
+               **texture_settings(texture))
     rng = np.random.default_rng([seed, 2027, step])
     acc = {k: [] for k in ('n_cons', 'n_cons_prior', 'blank', 'det_off',
                            'det_causal', 'anchor', 'tblank', 'qtime',
@@ -153,6 +162,11 @@ def report(step, r):
         f'  uniquely registrable steps      {np.mean(n == 1):.3f}'
         f'   (with no-reversal prior {np.mean(r["n_cons_prior"] == 1):.3f})',
         f'  blank overlap                   {r["blank"].mean():.3f}',
+        f'  residual ambiguity (a wrong hypothesis agrees exactly) '
+        f'{np.mean(n > 1):.3f}; on non-blank overlaps '
+        f'{np.mean(n[~r["blank"]] > 1) if (~r["blank"]).any() else 0:.4f} '
+        f'({int(((n > 1) & ~r["blank"]).sum())} of '
+        f'{int((~r["blank"]).sum())} steps)',
         f'  episodes with every step unique {r["n_ep_all"].mean():.4f}',
         '  consistent hypotheses per step  ' + ', '.join(
             f'{k}: {v:.3f}' for k, v in hist.items()) +
@@ -176,14 +190,21 @@ def main():
     p.add_argument('--episodes', type=int, default=4000)
     p.add_argument('--batch', type=int, default=200)
     p.add_argument('--seed', type=int, default=0)
-    p.add_argument('--bank', default='data/mnist.npz')
+    p.add_argument('--texture', default='mnist', choices=sorted(TEXTURES))
+    p.add_argument('--bank', default=None,
+                   help="default: the texture's bank file")
     a = p.parse_args()
-    bank = load_bank(a.bank, Config().cutoff, EVAL_SPLIT, True)[0]
+    settings = texture_settings(a.texture)
+    path = a.bank or TEXTURES[a.texture]['path']
+    bank = load_bank(path, settings['cutoff'], EVAL_SPLIT, True)[0]
+    print(f'texture {a.texture}: {path} {EVAL_SPLIT} split, '
+          f'{bank.shape[1]} tiles of {bank.shape[-1]} px, {settings}',
+          flush=True)
     for step in a.step_px:
         if not 1 <= step < 9:
             raise SystemExit('step must be in 1..8 for frames to overlap')
-        print(report(step, measure(step, a.episodes, a.batch, bank, a.seed)),
-              flush=True)
+        print(report(step, measure(step, a.episodes, a.batch, bank, a.seed,
+                                   a.texture)), flush=True)
 
 
 if __name__ == '__main__':

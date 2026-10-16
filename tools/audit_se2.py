@@ -27,7 +27,9 @@ _, test_bank = load_banks(args['bank'], config)
 UNKNOWN = DATA_UNKNOWN[True]   # reserved symbol under odometry dropout
 print(f'checkpoint {ckpt}\n  task {task}, query_times {config.query_times}, '
       f'dihedral {config.dihedral}, heading {config.heading}, '
-      f'step_px {config.step}, odometry_dropout {config.odometry_dropout}')
+      f'step_px {config.step}, odometry_dropout {config.odometry_dropout}'
+      f'\n  texture {args.get("texture", "mnist")} ({args["bank"]}, tile '
+      f'{config.tile}, cutoff {config.cutoff})')
 if config.odometry_dropout == 1.0:
     print('  all odometry dropped: the turn/move corruptions in section 4 '
           'leave the unknown symbols alone and are no-ops')
