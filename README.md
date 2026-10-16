@@ -188,7 +188,7 @@ how many array jobs run at once.
 Cluster notes:
 - **Python headers for the kernels.** The Triton kernels (hybrid4 and
   later) compile a helper against `Python.h`, which the cluster's system
-  Python lacks. `jobs/pyhdr.sh` (run once as a CPU job) installs Python
+  Python lacks. `scripts/pyhdr.sh` (run once as a CPU job) installs Python
   3.12 headers from conda-forge (the default Anaconda channels require
   accepting their Terms of Service) and adds `C_INCLUDE_PATH` to the
   venv's activate script.
