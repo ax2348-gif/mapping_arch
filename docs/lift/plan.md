@@ -116,3 +116,39 @@ work. Iterate locally first.
 - episodes-to-threshold against vanilla4c;
 - the patch-size decision;
 - the Hydra branch merged.
+
+## Open threads (2026-10-16, preliminary)
+
+### Visual odometry
+
+- **Discrete SE(2): works and resolves with scale.** Runs used no odometry (dropout 1.0), 3 px steps, high-passed Imagenette, 200k steps:
+  - hybrid4 m: 0.0002;
+  - hybrid4 s: 0.0034 (floor 0.0127);
+  - odometry-given controls: m 0.0000, s 0.0004.
+  
+  High-passing removes the mean-brightness shortcut, which alone takes raw images from 0.072 to 0.046. xs failed at long range (capacity).
+- **Continuous SE(2) (se2c): untested.** The generator has no odometry-dropout option yet, which is a small addition. The geometry favours it: steps of 4.5-9 px against 15 px views keep at least 40% overlap, and the stroke texture is registrable. Natural first run: hybrid4c s or m without odometry.
+- **The user has design ideas for visual odometry,** to be elaborated before any run. Don't design it ahead of them.
+
+### The penultimate lift: a 2.5D "ocean"
+
+- **The user's vision:**
+  - the ego glides on an SE(2) subspace at fixed altitude and pitch above a procedural height field h(x, y) (R²→R) carrying a procedural texture;
+  - a pinhole camera gives perspective, parallax and real self-occlusion;
+  - a step toward robot-POMDP realism (occlusion-unknowns, the near-deterministic doctrine), before full SE(3) plus 3D scenes.
+- **Status:** a renderer prototype is in progress, with no task or trainer integration yet. Branch exp/ocean in ~/code/mapping-hydra, mapping/ocean/. It covers:
+  - the band-limited height field with a slope bound;
+  - the stroke albedo, with optional shading;
+  - exact GPU ray-marching against a float64 reference;
+  - anti-aliasing;
+  - a visibility (depth-test) coverage check;
+  - contact sheets and VIDEOS (the user needs motion to judge parallax).
+- **Open design questions (the user's to decide):**
+  - **Odometry:** SE(2) twist tokens as now, or something else once visual odometry is in play.
+  - **Query poses:** the same altitude and pitch as the ego (pure SE(2) queries), or varied altitude and pitch (an SE(3)-lite readout).
+  - **Coverage:** visibility-based causal coverage, meaning a target pixel counts only if its surface point was seen unoccluded earlier. How to treat partly covered targets: mask the loss on unseen pixels, or reject the query.
+  - **Occlusion-unknowns:** represent "never seen" explicitly in the target or loss (known-unknown flags), or simply exclude it.
+  - **Camera:** field of view, pitch, altitude, resolution and patch size. Token cost grows with resolution.
+  - **Horizon and sky:** whether views see the horizon.
+  - **Texture and relief:** the parameters, picked from the sheets and videos.
+- **The patch-size and sample-efficiency decisions** carry over, since token counts only grow from here.
