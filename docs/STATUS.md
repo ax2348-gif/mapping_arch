@@ -327,3 +327,15 @@ docs/scaling_study_design.md.
   - The penalty by query step: 0-8: 1.9x; 8-16: 4.6x; 16-24: 4.8x; 24-32: 3.4x. It grows with the composition demanded.
   - Causal hybrid4 s forms the exact rotation in a FORWARD head (β = 2.00, a 91° eigenpair on 100% of quarter-turn steps).
   - The matched hybrid4 cell (400k WSD) is on Torch, 20070043_0.
+- **2026-10-16, odometry-query visual odometry submitted:** Torch array 20084102 (/scratch/ax2348/mapping_odq, exp/odq @a353d1e). hybrid4c m, se2c default, 120k cosine, Hydra presets:
+  0. `se2c_odq_after`: odometry queries, after-next-obs order;
+  1. `se2c_odq_before`: odometry queries, before-next-obs order;
+  2. `se2c_vo_dropout`: the basic VO baseline rerun.
+  
+  The first basic VO run died when worker 20041129 was system-cancelled for ~1 h of idle (my fault): 10k of 120k, all 0.0737, far 0.1178.
+- **2026-10-16, merge of Hydra into master in progress (user-approved):**
+  - refactor/hydra, exp/causal, exp/time-recurrence, and exp/ocean code and tests (media outside git);
+  - tags ref/pre-hydra and ref/pre-merge;
+  - seal stage 1; the user's decisions are applied (dropout range check, a visible compare_grid warning, the jobs layout).
+  
+  Review doc: docs/hydra_merge_review.md.
