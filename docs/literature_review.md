@@ -30,12 +30,22 @@ success at about 120k parameters; and a direct measurement that the
 trained delta-rule head implements the faithful 2-D representation of Z4
 (a conjugate eigenvalue pair at exactly 90 degrees on quarter turns, two
 eigenvalues at 180 degrees on turn-arounds, identity otherwise) with no
-geometric prior. The "geometric deep learning smuggled in" framing is
-half right. The trained model does learn a group representation, and
-several prior papers (TEM-t, GTA, Gao et al. on grid cells, PaTH) argue
-the same thesis. But the delta rule adds capacity, not a symmetry
-constraint, and it came from associative memory and formal-language state
-tracking, not geometry. The most decisive pending tests are P2 (β capped
+geometric prior. The user's framing is that general-purpose
+architectures need their hypothesis class expanded with geometric
+principles, such as state transitions that can act as group elements, to
+learn efficiently, or at all, on tasks whose geometric structure has been
+underappreciated. Current evidence supports it in its "efficient" form.
+The delta rule adds capacity, not an equivariance constraint, which is
+what the framing calls for, and the trained model used that capacity as
+the motion group's representation. The closest prior versions of the
+argument are GTA (group representations in attention, poses given),
+TEM-t (action-dependent transitions in a transformer), Gao et al.
+(a group representation is necessary for path integration) and PaTH
+(data-dependent Householder positions, framed for language). Two caveats
+hold. The operator came from state-tracking work, which frames it in
+group-theoretic but not geometric terms. And at bounded length theory
+does not rule out transformers or positive-decay cascades, so the
+evidence supports "much more efficient", not "required". The most decisive pending tests are P2 (β capped
 at 1), P3 at depth, P1 at scale, and length generalisation, which the
 literature predicts will separate recurrent rotation from transformer
 shortcuts.
@@ -103,95 +113,128 @@ Verdict scale: **known**; **reproduces known result in a new setting**;
 | P5 | L→R delta-rule state at a query linearly decodes relative pose (R² ≥ 0.8) | Banino et al. 2018 (metric quantities decodable from path-integrating RNN); Li et al. 2023 (linear probes of world state); Gao et al. 2021 | At risk, from our own data | The transition probe shows the L→R head contracts every step and the R→L head carries the rotation. The prediction names the wrong head. Pose may still be decodable from the R→L state or the residual stream. |
 | P6 | Among vanilla forks, PaTH narrows the SE(2) gap most | Yang et al. 2025 (PaTH: data-dependent Householder products, beyond TC⁰, better on flip-flop and A5); Golovneva et al. 2024 (CoPE); Lin et al. 2025 (FoX) | Plausibly new | PaTH applies the same Householder mechanism inside attention, so the prediction follows from F7. No one has tested PaTH on a spatial task. |
 
-## 4. The "geometric deep learning smuggled in" framing
+## 4. The geometric-principles framing
 
-The claim: delta rules with negative eigenvalues, Householder products and
-data-dependent orthogonal position encodings are group-structured
-inductive biases in disguise, so geometric deep learning returns inside
-general architectures by widening their hypothesis class.
+**The claim, as the user states it.** The hypothesis class of so-called
+general-purpose architectures needs to be expanded with geometric
+principles, for example state transitions that can act as group elements
+such as rotations. Then learning becomes more efficient, or possible at
+all, on a class of tasks whose geometric structure has been
+underappreciated. Whether "efficient" or "possible" holds depends on P1
+and P3. The claim is not that models should be constrained to be
+equivariant. An earlier draft of this review misread it that way.
 
-### Where it holds
+### What the evidence supports
 
-- **The trained model does learn a group representation.** F7 is the
-  strongest evidence available: the per-step transition of the R→L head
-  is the faithful 2-D real representation of Z4, exact to under half a
-  degree, with |λ| 0.998. This is representation theory realised in
-  weights, which is the language of the GDL blueprint (Bronstein et al.
-  2021).
-- **The mechanism is the affine group of a linear recurrence.** Our
-  reading: a recurrence S ← A S + B composes as (A, B) pairs, which is a
-  semidirect product of the transition group with additive writes.
-  SE(2) = SO(2) ⋉ R² has exactly this form. Once A can rotate, the
-  layer's own algebra matches the motion group's. With A a positive
-  scalar, the algebra is scaling ⋉ translation, which cannot rotate.
-- **Prior papers already argue the thesis**, in different words:
-  - Whittington et al. (2022), TEM-t: a transformer whose position
-    encodings are generated recurrently by learnable action-dependent
-    matrices W_a reproduces place and grid cells. This is a general
-    architecture with a path-integrating, action-indexed linear
-    transition. It is the closest prior architecture to hybrid4 on a
-    closely related task (predicting observations along a walk).
-  - Gao et al. (2021): a group-representation condition is necessary for
-    path integration, and the linear case is a matrix Lie group of
-    rotations.
-  - Miyato et al. (2024), GTA: attention should transform queries, keys
-    and values by group representations ρ(g) of each token's pose,
-    including SE(3) and SO(2) × SO(2).
-  - Su et al. (2021), Ostmeier et al. (2025), Schenck et al. (2025):
-    RoPE, LieRE and STRING frame positional encoding as Lie-group
-    rotations. Li et al. (2025), PRoPE, extends this to full camera
-    frustums.
-  - Keurti et al. (2023) and Quessard et al. (2020): agents learn group
-    representations of their actions from observed transitions.
-  - Yang et al. (2025), PaTH, and Grazzi et al. / Siems et al.: state
-    tracking via products of Householder transforms, i.e. learned
-    orthogonal group elements.
+- **Added capacity is what the claim asks for.** The delta rule with
+  β ∈ (0, 2) imposes no symmetry constraint. It widens the set of state
+  transitions from positive scalings to products of reflections, which
+  include rotations. That is an expansion of the hypothesis class by a
+  geometric principle, transitions that can be group elements. In the
+  lineage it is the change that turned failure (F2) into success (F3) at
+  about 120k parameters. So the fact that it "adds capacity, not an
+  equivariance constraint" supports the claim rather than undercutting
+  it.
+- **The trained model uses the expansion as the motion group.** F7: the
+  right-to-left head's per-step transition is the faithful 2-D real
+  representation of Z4, exact to under half a degree, with |λ| 0.998.
+  The new capacity was used as a rotation of the plane, not as some
+  other state-tracking device.
+- **Our reading: a linear recurrence is an affine group.** S ← A S + B
+  composes as (A, B) pairs, a semidirect product of the transition group
+  with additive writes. SE(2) = SO(2) ⋉ R² has exactly this form. Once A
+  can rotate, the layer's algebra matches the motion group's. With A a
+  positive scalar it is scaling ⋉ translation, which cannot rotate.
 
-### Where it overreaches
+### Prior papers closest to the hypothesis-class argument, and how ours differs
 
-- **Capacity is not a constraint.** GDL's core move is equivariance:
-  restricting the function class so that a known symmetry holds by
-  construction. The delta rule restricts nothing. It enlarges the set of
-  transitions to include orthogonal ones, and the network must discover
-  which group to represent. Nothing guarantees the learned map is
-  equivariant off the training distribution. "Group-capable" is accurate;
-  "group-structured inductive bias" is not, unless a bias toward
-  norm-preserving transitions is meant.
-- **The history is different.** The delta rule came from fast-weight
-  associative memory and online regression; β up to 2 came from formal
-  language state tracking (parity, modular counting, permutation
-  groups). "Smuggled" implies geometric intent that the authors did not
-  have. A fairer phrasing: state-tracking research and geometric deep
-  learning converge on the same object, a learned group representation
-  in the state transition.
-- **The theory gap at bounded length.** The impossibility results are for
-  arbitrary length and finite precision. At T = 32 a two-layer
-  positive-decay cascade or a transformer shortcut can represent the
-  task. So the evidence so far supports "rotation-capable transitions
-  make this learnable at small scale", not "general architectures cannot
-  do it". P1 and P3 at depth decide which.
-- **Evidence on scale cuts both ways.** Brehmer et al. (TMLR) find
-  equivariant transformers beat non-equivariant ones at every compute
-  budget tested on rigid-body interactions, though augmentation closes
-  the data-efficiency gap. Gruver et al. (2023) find that larger, more
-  accurate vision models become more equivariant regardless of
-  architecture. Jin et al. (2024), LVSM, reach state-of-the-art novel
-  view synthesis with minimal 3D inductive bias, though with camera poses
-  given as input. None of these test egocentric composition from
-  relative odometry.
-- **Discrete group, exact symbols.** Z4 with 16 odometry symbols lets the
-  network learn an exact rotation per symbol. Continuous headings and
-  noisy odometry require a continuous, approximately orthogonal map from
-  inputs. Nothing yet shows the mechanism survives that.
+- **Miyato et al. (2024), GTA.** Closest in spirit. They argue that
+  position encodings designed for language are suboptimal for 3D vision,
+  and put group representations ρ(g) of each token's pose (SE(3),
+  SO(2) × SO(2)) into attention, improving learning efficiency for novel
+  view synthesis. Difference: GTA is given each token's pose. The group
+  element is computed outside the network. Here only relative odometry
+  is given, and the network must compose the group elements itself; the
+  contract forbids external composition. A GTA model with true poses is
+  therefore a ceiling for this task, not a competitor.
+- **Whittington et al. (2022), TEM-t, and Whittington et al. (2020),
+  TEM.** A transformer whose position codes are generated recurrently by
+  learnable action-dependent matrices W_a (with a nonlinearity)
+  reproduces place and grid cells. This is a general architecture with
+  an action-driven, path-integrating transition, on a closely related
+  task (predict observations along a walk). Difference: their aim is a
+  model of the hippocampal formation, the path-integration module is a
+  dedicated component, and they do not test whether standard sequence
+  operators fail without it.
+- **Gao et al. (2019, 2021).** They argue that a group-representation
+  condition on the self-motion transformation is necessary for path
+  integration, and that the linear case is a matrix Lie group of
+  rotations. Difference: a normative theory of grid cells, with the
+  vector-matrix form built into the model. It argues necessity of the
+  representation, not of an architectural capacity in general-purpose
+  models.
+- **Yang et al. (2025), PaTH; also LieRE, STRING, PRoPE.** PaTH argues
+  that RoPE's input-independent transforms limit transformers, and
+  replaces them with accumulated data-dependent Householder products.
+  It is the closest operator to hybrid4's. Difference: its motivation is
+  state tracking and expressivity in language (flip-flop, A5 word
+  problems, beyond TC⁰), not geometry. LieRE, STRING and PRoPE extend
+  position encodings to Lie groups for vision and robotics, with poses or
+  coordinates given.
+- **Grazzi et al. (2025) and Siems et al. (2025).** They expand
+  linear-RNN transitions with Householder reflections and products of
+  them. DeltaProduct notes that such products can form any orthogonal
+  matrix (Cartan-Dieudonné) and proves results for finite subgroups of
+  O(n) and SO(n). The framing is explicitly group-theoretic, but the
+  groups are those of formal-language word problems, not of physical
+  space.
+- **How ours differs overall.** (i) The task is physical ego-motion with
+  egocentric observations; nothing but relative odometry is given.
+  (ii) The target is the general-purpose architectures used for robot
+  policies and video world models, where this structure is the stated
+  pain point. (iii) There is mechanistic evidence that the added
+  capacity is used as the motion group's representation. None of the
+  papers above combines these.
 
-### A more defensible statement
+### Caveats
 
-Sequence operators whose state transitions can form a matrix group let a
-network learn the task's group representation from data. In this study
-the trained model did exactly that. This is GDL's representation theory
-appearing as a learned object, not GDL's equivariance appearing as a
-constraint. Whether it is needed, rather than merely faster, is open
-until P1, P2 and P3 report.
+- **(a) Provenance.** The negative-eigenvalue delta rule came from
+  state-tracking and formal-language work. DeltaNet itself came from
+  associative recall framed as online regression. Grazzi et al. motivate
+  β ∈ (0, 2) by parity, modular counting and code evaluation. DeltaProduct
+  is motivated by permutation-group word problems. These papers frame the
+  operator as state-tracking expressivity, in group-theoretic but not
+  geometric terms. Provenance does not decide whether the principle is
+  geometric: a rotation of the state is a rotation, and F7 shows the
+  model uses it as one. But "underappreciated" is best stated as
+  "underappreciated for spatial and embodied tasks", since the
+  state-tracking literature already identifies the principle.
+- **(b) Bounded length.** The impossibility results are for arbitrary
+  length. At T = 32, theory does not rule out a transformer shortcut
+  (Liu et al.) or a two-layer positive-decay cascade (section 2). So
+  current evidence supports "much more efficient", not "required".
+  P1 and P3 decide between "efficient" and "possible".
+- **(c) Scale evidence is mixed.** Brehmer et al. find built-in
+  symmetry helps at every compute budget tested on rigid-body
+  interactions, though augmentation closes the data-efficiency gap.
+  Gruver et al. (2023) find larger vision models become more equivariant
+  regardless of architecture. LVSM reaches state-of-the-art view
+  synthesis with minimal 3D bias, with poses given. None tests composition
+  from relative odometry.
+- **(d) Discrete group, exact symbols.** Z4 with 16 odometry symbols
+  allows an exact rotation per symbol. Continuous headings and noisy
+  odometry need a continuous, approximately orthogonal map. Nothing yet
+  shows the mechanism survives that.
+
+### Assessment
+
+On current evidence the framing holds in its "efficient" form: expanding
+the transition class to include rotations made the task learnable at
+120k parameters and 100k steps, where the positive-decay lineage failed,
+and the model used the expansion as the motion group's representation.
+The "possible at all" form is open until P1 and P3 report. The closest
+prior versions of the argument are GTA, for attention with given poses,
+and TEM-t, for action-driven transitions in a transformer.
 
 ## 5. Open questions the literature leaves that this setup can answer
 
