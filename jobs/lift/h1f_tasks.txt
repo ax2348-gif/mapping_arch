@@ -1,0 +1,12 @@
+# H1f grid (HYPOTHESIS.md 2026-10-16): causal-capacity threshold vs walk length, seed 0.
+# Fields: model size seed T ; '|' packs runs onto one GPU (xs: four per GPU).
+hybrid4_causal xs 0 32 | vanilla4_causal xs 0 32 | hybrid4_causal xs 0 64 | vanilla4_causal xs 0 64
+hybrid4 xs 0 128 | hybrid4_causal xs 0 128 | vanilla4 xs 0 128 | vanilla4_causal xs 0 128
+hybrid4 m 0 64
+hybrid4_causal m 0 64
+vanilla4 m 0 64
+vanilla4_causal m 0 64
+hybrid4 m 0 128
+hybrid4_causal m 0 128
+vanilla4 m 0 128
+vanilla4_causal m 0 128
