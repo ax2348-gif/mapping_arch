@@ -1,0 +1,12 @@
+# @package _global_
+# Recurrent baseline: a residual bidirectional LSTM encoder with a state-bridged LSTM decoder for the queries.
+defaults:
+  - /task: z2
+
+model:
+  name: lstm
+  ladder: lstm       # conf/ladders/lstm.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.lstm.RecurrentMapper
+    _partial_: true

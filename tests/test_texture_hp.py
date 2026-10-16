@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 import mapping.tasks as tasks
-from mapping import se2
+from mapping import se2d
 from mapping.data import (TEXTURES, UNKNOWN, apply_dihedral, check_texture,
                           coverage, crop_windows, load_bank, make_batch,
                           render_map, texture_settings)
@@ -143,7 +143,7 @@ def test_kernel_matches_reference():
 
 @need_hp
 def test_mismatched_bank_raises(hp_bank):
-    cfg, _ = tasks.config_and_spec('se2', 32, 8, 0, texture='imagenette_hp')
+    cfg, _ = tasks.config_and_spec('se2d', 32, 8, 0, texture='imagenette_hp')
     train, test = load_banks(HP, cfg, 'imagenette_hp')
     assert train.shape[-2:] == test.shape[-2:] == (64, 64)
     with pytest.raises(ValueError, match='tag'):  # hp file as raw imagenette
@@ -154,7 +154,7 @@ def test_mismatched_bank_raises(hp_bank):
     if os.path.exists(MNIST):
         with pytest.raises(ValueError):
             load_banks(MNIST, cfg, 'imagenette_hp')
-    mnist_cfg, _ = tasks.config_and_spec('se2', 32, 8, 0)
+    mnist_cfg, _ = tasks.config_and_spec('se2d', 32, 8, 0)
     with pytest.raises(ValueError, match='tile'):
         load_banks(HP, mnist_cfg)
     with pytest.raises(ValueError, match='tile'):
@@ -163,28 +163,28 @@ def test_mismatched_bank_raises(hp_bank):
 
 @need_hp
 @pytest.mark.parametrize('qt', ['uniform', 'last'])
-def test_se2_hp_consistent(hp_bank, qt):
-    """As ``test_texture.test_se2_natural_consistent``, on the high-passed
+def test_se2d_hp_consistent(hp_bank, qt):
+    """As ``test_texture.test_se2d_natural_consistent``, on the high-passed
     bank at step 3 with every odometry symbol dropped."""
-    c, spec = tasks.config_and_spec('se2', 32, 8, 0, qt, 3, 1.0,
+    c, spec = tasks.config_and_spec('se2d', 32, 8, 0, qt, 3, 1.0,
                                     'imagenette_hp')
     assert (c.tile, c.cutoff, c.start_window) == (64, 0, 64)
     b = make_batch(np.random.default_rng(3), c, hp_bank, 16)
     assert (b['odometry'] == UNKNOWN[True]).all()
-    disp, hh = se2.compose(b['odometry_true'], c.step, b['headings'][:, 0])
+    disp, hh = se2d.compose(b['odometry_true'], c.step, b['headings'][:, 0])
     assert (hh == b['headings']).all()
     assert (b['positions'][:, 0:1] + disp == b['positions']).all()
     assert (np.abs(b['query_pose'][..., :2]) <= spec.offset_max).all()
     for i, e in enumerate(b['episodes']):
         image = render_map(hp_bank, e.tile_grid, c.tile, e.tile_sym)
         world_obs = crop_windows(image, e.positions, c.obs)
-        assert (se2.face(world_obs, b['headings'][i])
+        assert (se2d.face(world_obs, b['headings'][i])
                 == b['observations'][i]).all()
         q, t = b['query_pose'][i], b['query_time'][i]
-        corners = e.positions[t] + se2.unrotate(q[:, :2], b['headings'][i, t])
+        corners = e.positions[t] + se2d.unrotate(q[:, :2], b['headings'][i, t])
         assert (corners == e.queries).all()
         qh = (q[:, 2] + b['headings'][i, t]) % 4
-        assert (se2.face(crop_windows(image, e.queries, c.obs), qh)
+        assert (se2d.face(crop_windows(image, e.queries, c.obs), qh)
                 == b['target'][i]).all()
         h, w = np.array(e.tile_grid.shape) * c.tile
         seen = coverage(e.positions, c.obs, h, w, first=True)
@@ -198,8 +198,8 @@ def test_se2_hp_consistent(hp_bank, qt):
 
 @need_hp
 def test_config_from_args_hp():
-    _, spec = tasks.config_and_spec('se2', 32, 8, 0)
-    c = tasks.config_from_args('se2', spec, {'seed': 0, 'bank': HP,
+    _, spec = tasks.config_and_spec('se2d', 32, 8, 0)
+    c = tasks.config_from_args('se2d', spec, {'seed': 0, 'bank': HP,
                                              'query_times': 'uniform',
                                              'texture': 'imagenette_hp'})
     assert (c.tile, c.cutoff, c.start_window) == (64, 0, 64)

@@ -1,0 +1,22 @@
+# @package _global_
+# The se2c bridge (2026-10-16): the discrete SE(2) walk (lattice move
+# directions, quarter turns, 9 px steps) with the continuous renderer,
+# texture and encoding. Same as jobs/lift/se2c_bridge_hybrid4c_<size>.sbatch.
+#   python run.py +experiment=se2c_bridge model.size=m
+defaults:
+  - override /model: se2c/hybrid4c
+
+run:
+  name: bridge_n4dec_100k_qt
+  steps: 100000
+  save_every: 5000
+eval:
+  every: 2500
+  log_every: 500
+task:
+  query_times: uniform
+  generator:
+    directions: lattice
+    turn_n: 4
+    v_min: 9.0
+    v_max: 9.0

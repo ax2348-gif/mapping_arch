@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import torch
 
-from mapping import se2
+from mapping import se2d
 from mapping.data import crop_windows, render_map
 from mapping.se2c import bank as tb
 from mapping.se2c import geometry as geo
@@ -66,7 +66,7 @@ def test_bank_quarter_turns_equal_discrete_crop():
         for k in range(2):
             centre = (pos[0, k] - origin[0]).long().cpu().numpy()
             crop = crop_windows(image, (centre - 7)[None], 15)
-            want = se2.face(crop, [h])[0]
+            want = se2d.face(crop, [h])[0]
             got = (v[k] * 255).round().byte().cpu().numpy()
             assert (got == want).all()
     # antialiased views are close to, but smoother than, the point samples

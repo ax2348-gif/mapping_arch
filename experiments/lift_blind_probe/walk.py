@@ -125,7 +125,7 @@ STEP_RMS = step_rms()
 
 # ----------------------------------------------------------------- checks
 
-def _se2(x, y, th):
+def _se2d(x, y, th):
     m = torch.zeros(*x.shape, 3, 3, dtype=x.dtype)
     m[..., 0, 0] = torch.cos(th); m[..., 0, 1] = -torch.sin(th); m[..., 0, 2] = x
     m[..., 1, 0] = torch.sin(th); m[..., 1, 1] = torch.cos(th); m[..., 1, 2] = y
@@ -154,17 +154,17 @@ def check():
     xi = torch.zeros(500, 3, 3, dtype=torch.float64)
     xi[:, 0, 1], xi[:, 1, 0], xi[:, 0, 2] = -w, w, v
     E = torch.linalg.matrix_exp(xi)
-    assert torch.allclose(E, _se2(dx, dy, dth), atol=1e-9), 'exp map mismatch'
+    assert torch.allclose(E, _se2d(dx, dy, dth), atol=1e-9), 'exp map mismatch'
     # 2. walk composition = integrated poses
     for n in (None, 4, 32):
         bt = batch(B, T, Q, n, BAND_DEG, gen, 'cpu')
         odo = bt['odo'].double()
-        steps = _se2(odo[..., 0], odo[..., 1], odo[..., 2])          # (B, T, 3, 3)
+        steps = _se2d(odo[..., 0], odo[..., 1], odo[..., 2])          # (B, T, 3, 3)
         p, th = integrate(odo[..., 0], odo[..., 1], odo[..., 2])
         G = torch.eye(3, dtype=torch.float64).expand(B, 3, 3).clone()
         for i in range(T):                                          # pose i+1
             G = G @ steps[:, i]
-            assert torch.allclose(G, _se2(p[:, i + 1, 0], p[:, i + 1, 1], th[:, i + 1]),
+            assert torch.allclose(G, _se2d(p[:, i + 1, 0], p[:, i + 1, 1], th[:, i + 1]),
                                   atol=1e-9), 'integration mismatch'
         for b in range(8):
             for q in range(Q):

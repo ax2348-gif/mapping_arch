@@ -1,0 +1,13 @@
+# @package task.generator
+# Continuous-SE(2) GPU generator (mapping.se2c.generator, CONTRACT_SE2C.md).
+_target_: mapping.config.Se2cGenerator
+texture: procedural     # procedural | mnist | imagenette | imagenette_hp
+turn_n: 0               # 0: continuous turns; n: multiples of 2 pi / n
+motion: decoupled       # decoupled | arc
+directions: persistent  # persistent | lattice (the discrete walk, with turn_n 4)
+v_min: 4.5              # px per step
+v_max: 9.0
+omega_max: 3.141592653589793
+holdout: null           # [lo, hi]: a band of |turn| (rad) left out of training
+holdout_mode: exclude   # exclude | include | only
+query_coverage: causal  # causal | global (a documented deviation)

@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid3.5: hybrid3 with Gated DeltaNet in place of gated linear attention, scan written by hand in PyTorch.
+defaults:
+  - /task: z2
+
+model:
+  name: hybrid3_5
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.hybrid3_5.Hybrid35
+    _partial_: true

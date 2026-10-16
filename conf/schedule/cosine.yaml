@@ -1,0 +1,4 @@
+# @package schedule
+# Linear warmup, then cosine decay to zero at the last step.
+_target_: mapping.config.Cosine
+warmup: 100

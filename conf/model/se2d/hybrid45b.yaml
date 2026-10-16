@@ -1,0 +1,13 @@
+# @package _global_
+# hybrid4.5b, SE(2): a fixed-size Gated DeltaNet "pose coprocessor" beside a growing attention + SwiGLU trunk.
+defaults:
+  - /task: se2d
+
+model:
+  name: hybrid45b
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.se2d.hybrid45b.Hybrid45b
+    _partial_: true
+    placement: [first]

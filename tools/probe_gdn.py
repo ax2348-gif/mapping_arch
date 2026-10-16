@@ -2,7 +2,7 @@
 SE(2) checkpoint (hybrid4 family, hybrid4.5b coprocessors at any placement,
 hybrid4_convrace's per-head conv widths), from final.pt or a step<k>.pt.
 
-    python tools/probe_gdn.py results/se2/hybrid4_convrace/xs/seed0/final.pt
+    python tools/probe_gdn.py results/se2d/hybrid4_convrace/xs/seed0/final.pt
     python tools/probe_gdn.py <ckpt> --layer 1 --json out.json
 
 The layer's input is captured with a forward pre-hook (the forward stops
@@ -41,6 +41,7 @@ import torch.nn.functional as F
 
 sys.path.insert(0, '.')
 import mapping.tasks as tasks  # noqa: E402
+from mapping.checkpoint import load_checkpoint  # noqa: E402
 from mapping.loader import eval_set, load_banks  # noqa: E402
 
 TURNS = ['none', 'right', 'around', 'left']
@@ -51,21 +52,9 @@ class Stop(Exception):
 
 
 def load_any(path):
-    """(model, args, spec, task) from final.pt or a step<k>.pt."""
-    state = torch.load(path, map_location='cpu', weights_only=False)
-    args = state['args']
-    task = state.get('task', args.get('task', 'z2'))
-    t = tasks.get(task)
-    if 'spec' in state:
-        spec = t['task'].TaskSpec(**state['spec'])
-    else:
-        _, spec = tasks.config_and_spec(
-            task, args['episode_steps'], args['queries'], args['seed'],
-            args.get('query_times', 'last'), args.get('step_px', 9),
-            args.get('odometry_dropout', 0.0), args.get('texture', 'mnist'))
-    model = t['models'].get(args['model']).build(args['size'], spec)
-    model.load_state_dict(state['model'])
-    return model.eval(), args, spec, task
+    """(model, args, spec, task) from final.pt or a step<k>.pt; the task
+    by its current name (an old 'se2' checkpoint is 'se2d')."""
+    return load_checkpoint(path, 'cpu')
 
 
 def gdn_layers(model):
@@ -100,7 +89,7 @@ def quantities(gdn, x):
 
 def probe(path, layer=0, batches=4, seed=4242):
     model, args, spec, task = load_any(path)
-    assert task == 'se2', 'SE(2) checkpoints only'
+    assert task == 'se2d', 'SE(2) checkpoints only'
     t = tasks.get(task)
     config = tasks.config_from_args(task, spec, args)
     _, test_bank = load_banks(args['bank'], config)

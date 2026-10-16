@@ -73,7 +73,7 @@ class Config:
     cutoff: int = 32        # brightness below this is zeroed in the bank
                             # (MNIST's; TEXTURES sets it per bank)
     dihedral: bool = True   # each tile gets a random one of its 8 symmetries
-    heading: bool = False   # SE(2) task: a heading per step, see mapping.se2
+    heading: bool = False   # SE(2) task: a heading per step, see mapping.se2d
     query_times: str = 'last'   # 'last': every query is asked at the final
                                 # step; 'uniform': each query at a step drawn
                                 # uniformly from 0..T and answerable from the
@@ -333,7 +333,7 @@ def make_batch(rng, config, bank, batch):
     target       (b, Q, S, S)     uint8, every pixel observed by that step
     episodes     list of Episode, the stored form
 
-    With ``config.heading`` (the SE(2) task, ``mapping.se2``) the batch is
+    With ``config.heading`` (the SE(2) task, ``mapping.se2d``) the batch is
     instead
 
     observations (b, T + 1, S, S) uint8, each rotated to face its heading
@@ -384,18 +384,18 @@ def make_batch(rng, config, bank, batch):
                    positions=positions, query_offset=offsets,
                    query_time=times, target=targets, episodes=episodes)
         return drop_odometry(rng, c, out, 'directions')
-    from mapping import se2
+    from mapping import se2d
     headings = rng.integers(0, 4, size=(batch, c.steps + 1))
     query_headings = rng.integers(0, 4, size=(batch, c.queries))
     queries = np.stack([e.queries for e in episodes])
     rows = np.arange(batch)[:, None]
-    pose = se2.query_pose(queries, query_headings, positions[rows, times],
+    pose = se2d.query_pose(queries, query_headings, positions[rows, times],
                           headings[rows, times])
-    out = dict(observations=se2.face(observations, headings),
-               odometry=se2.encode(directions, headings),
+    out = dict(observations=se2d.face(observations, headings),
+               odometry=se2d.encode(directions, headings),
                positions=positions, headings=headings,
                query_pose=pose.astype(np.int32), query_time=times,
-               target=se2.face(targets, query_headings), episodes=episodes)
+               target=se2d.face(targets, query_headings), episodes=episodes)
     return drop_odometry(rng, c, out, 'odometry')
 
 

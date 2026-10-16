@@ -18,22 +18,22 @@ window; it does not touch the spec, so models are sized exactly as before.
 ``se2c`` (continuous SE(2)) has its own generator settings
 (``mapping.task_se2c.add_args``) and generates batches on the GPU.
 
-``z2`` is the default everywhere, so code written before ``se2`` existed
+``z2`` is the default everywhere, so code written before ``se2d`` existed
 behaves as it did. Checkpoints record their task; ones without it are z2.
 """
 import mapping.models
-import mapping.models.se2
+import mapping.models.se2d
 import mapping.models.se2c
 import mapping.task
-import mapping.task_se2
+import mapping.task_se2d
 import mapping.task_se2c
 from mapping.data import VOCAB, Config, texture_settings
 
 TASKS = {
     'z2': dict(models=mapping.models, task=mapping.task, root='results',
                heading=False, odometry='directions'),
-    'se2': dict(models=mapping.models.se2, task=mapping.task_se2,
-                root='results/se2', heading=True, odometry='odometry'),
+    'se2d': dict(models=mapping.models.se2d, task=mapping.task_se2d,
+                root='results/se2d', heading=True, odometry='odometry'),
 }
 
 # Tasks with their own GPU generator (batches made inside the training
@@ -47,7 +47,24 @@ GPU_TASKS = {
 ALL = {**TASKS, **GPU_TASKS}
 
 
+# Read-only aliases: names old checkpoints, final.json files and results
+# directories carry. ``se2`` is the discrete SE(2) task, renamed ``se2d``
+# (2026-10-16); its old runs stay under results/se2/. New runs cannot use
+# an alias (train.py offers ``ALL`` only).
+ALIASES = {'se2': ('se2d', 'results/se2')}
+
+
+def canonical(name):
+    """The current name of a task, resolving read-only aliases."""
+    return ALIASES[name][0] if name in ALIASES else name
+
+
 def get(name='z2'):
+    """A task row. An alias gives the current task with the root its old
+    runs live under, so tools reading old results find them."""
+    if name in ALIASES:
+        current, root = ALIASES[name]
+        return {**ALL[current], 'root': root}
     if name not in ALL:
         raise KeyError(f'unknown task {name!r}; have {sorted(ALL)}')
     return ALL[name]

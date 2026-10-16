@@ -3,7 +3,7 @@
 Every model is width 64 (one head of dim 32 per scan direction), two
 token-mixer blocks, each followed by a SwiGLU MLP, pre-norm, with
 hybrid4's muP multipliers and initialisation. The attention, MLP,
-MuLinear and RoPE code is imported from ``mapping/models/se2/hybrid4.py``
+MuLinear and RoPE code is imported from ``mapping/models/se2d/hybrid4.py``
 unchanged; the complex-diagonal mixer from ``hybrid4_cdiag.py``.
 
   gdn     [Gated DeltaNet, beta in (0, 2), short conv 4] -> [attention]
@@ -39,8 +39,8 @@ import torch.nn.functional as F
 from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 
 sys.path.insert(0, '.')
-from mapping.models.se2 import hybrid4 as h4                       # noqa: E402
-from mapping.models.se2.hybrid4_cdiag import ComplexDiagonal        # noqa: E402
+from mapping.models.se2d import hybrid4 as h4                       # noqa: E402
+from mapping.models.se2d.hybrid4_cdiag import ComplexDiagonal        # noqa: E402
 
 HEAD_DIM, DECAY_TAU, BASE_WIDTH = h4.HEAD_DIM, h4.DECAY_TAU, h4.BASE_WIDTH
 KINDS = ('gdn', 'gdn_b1', 'attn', 'cdiag')

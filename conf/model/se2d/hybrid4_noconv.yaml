@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid4_noconv, SE(2) port: ablation of hybrid4 without the short convolution.
+defaults:
+  - /task: se2d
+
+model:
+  name: hybrid4_noconv
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.se2d.hybrid4_noconv.Hybrid4Noconv
+    _partial_: true

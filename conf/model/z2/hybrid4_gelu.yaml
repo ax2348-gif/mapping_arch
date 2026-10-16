@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid4_gelu: ablation of hybrid4 without SwiGLU.
+defaults:
+  - /task: z2
+
+model:
+  name: hybrid4_gelu
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.hybrid4_gelu.Hybrid4Gelu
+    _partial_: true

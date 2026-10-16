@@ -48,11 +48,13 @@ LRS=({lrs})
 SIZE=${{SIZES[$(( SLURM_ARRAY_TASK_ID / ${{#LRS[@]}} ))]}}
 LR=${{LRS[$(( SLURM_ARRAY_TASK_ID % ${{#LRS[@]}} ))]}}
 LRFLAG=""; RUN=seed{seed}{tag}
-if [ "$LR" != "default" ]; then LRFLAG="--lr $LR"; RUN=${{RUN}}_lr$LR; fi
+if [ "$LR" != "default" ]; then LRFLAG="optim.lr=$LR"; RUN=${{RUN}}_lr$LR; fi
 source {venv}/bin/activate
 cd {workdir}
-python train.py --task {task} --model {model} --size $SIZE --run $RUN --steps {steps} \\
-    --batch {batch} --seed {seed} --workers {workers} $LRFLAG {extra}
+python -c "import hydra, omegaconf; print('hydra-core', hydra.__version__, 'omegaconf', omegaconf.__version__)" \\
+    || {{ echo "this venv lacks the config tree's dependencies: pip install -r requirements.txt" >&2; exit 1; }}
+python run.py model={task}/{model} model.size=$SIZE run.name=$RUN run.steps={steps} \\
+    optim.batch={batch} run.seed={seed} {workers} $LRFLAG {extra}
 """
 
 
@@ -63,14 +65,17 @@ def ladder(module, spec):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--task', default='z2', choices=sorted(tasks.TASKS))
+    p.add_argument('--task', default='z2', choices=sorted(tasks.ALL))
     p.add_argument('--model', required=True)
     p.add_argument('--sizes', nargs='*', default=None)
     p.add_argument('--steps', type=int, default=2000)
     p.add_argument('--batch', type=int, default=64)
     p.add_argument('--seed', type=int, default=0)
-    p.add_argument('--workers', type=int, default=4)
-    p.add_argument('--extra', default='', help='passed through to train.py')
+    p.add_argument('--workers', type=int, default=4,
+                   help='loader processes (tile-bank tasks; se2c generates on the GPU)')
+    p.add_argument('--extra', default='',
+                   help='Hydra overrides passed through to run.py, e.g. '
+                        '"task.query_times=uniform schedule=wsd"')
     p.add_argument('--tag', default='',
                    help='appended to run names and the job file, e.g. '
                         '_400k_b256, so budgets never collide')
@@ -84,8 +89,14 @@ def main():
     p.add_argument('--max-concurrent', type=int,
                    default=CLUSTER['max_concurrent'])
     args = p.parse_args()
+    if any(x.startswith('--') for x in args.extra.split()):
+        raise SystemExit(f'--extra {args.extra!r}: jobs launch run.py, so --extra takes '
+                         f'Hydra overrides (task.query_times=uniform), not train.py flags '
+                         f'(docs/config.md has the field map)')
 
     task = tasks.get(args.task)
+    workers = ('' if task.get('gpu_data') else
+               f'task.generator.workers={args.workers}')
     module = task['models'].get(args.model)
     spec = task['task'].TaskSpec()
     sizes = args.sizes or list(module.SIZES)
@@ -104,15 +115,14 @@ def main():
         for size in sizes:
             for lr in lrs:
                 run = f'seed{args.seed}'
-                cmd = [sys.executable, 'train.py', '--task', args.task,
-                       '--model', args.model,
-                       '--size', size, '--steps', str(args.steps),
-                       '--batch', str(args.batch), '--seed', str(args.seed),
-                       '--workers', str(args.workers)]
+                cmd = [sys.executable, 'run.py', f'model={args.task}/{args.model}',
+                       f'model.size={size}', f'run.steps={args.steps}',
+                       f'optim.batch={args.batch}', f'run.seed={args.seed}']
+                cmd += [workers] if workers else []
                 if lr != 'default':
-                    cmd += ['--lr', lr]
+                    cmd += [f'optim.lr={lr}']
                     run += f'_lr{lr}'
-                cmd += ['--run', run + args.tag] + args.extra.split()
+                cmd += [f'run.name={run + args.tag}'] + args.extra.split()
                 print('>>', ' '.join(cmd), flush=True)
                 subprocess.run(cmd, check=True)
 
@@ -126,7 +136,7 @@ def main():
                                   lrs=' '.join(lrs),
                                   last=len(sizes) * len(lrs) - 1,
                                   steps=args.steps, batch=args.batch,
-                                  seed=args.seed, workers=args.workers,
+                                  seed=args.seed, workers=workers,
                                   extra=args.extra,
                                   **{**CLUSTER, 'time': args.time,
                                      'max_concurrent': args.max_concurrent}))

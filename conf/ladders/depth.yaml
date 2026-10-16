@@ -1,0 +1,8 @@
+# vanilla_depth's ladder: fixed width 256, depth only.
+# One rung per line, smallest first: rung name -> the model constructor's
+# size arguments. A model file names its ladder (model.ladder) and picks a
+# rung with model.size; mapping.models.ladder() reads this file in order.
+d4: {width: 256, depth: 4}
+d8: {width: 256, depth: 8}
+d16: {width: 256, depth: 16}
+d32: {width: 256, depth: 32}

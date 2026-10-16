@@ -2,21 +2,21 @@
 fp32).
 
 Everything is on ``(y, x)`` pixel vectors with y down, as in
-``mapping.se2``, and agrees with it at quarter turns
+``mapping.se2d``, and agrees with it at quarter turns
 (``tests/test_se2c_geometry.py``):
 
 - A pose is a world position ``p = (y, x)``, the centre of the view, and
   a heading ``theta`` in radians. Heading 0 faces up (``-y``), pi/2 faces
   right (``+x``): the facing direction is ``(-cos theta, sin theta)``.
   Positive turns are turns to the right, clockwise on screen. At
-  ``theta = h pi/2`` this is ``mapping.se2``'s heading ``h``.
+  ``theta = h pi/2`` this is ``mapping.se2d``'s heading ``h``.
 - ``rotate(v, theta)`` is a world vector seen from heading ``theta``
   (body frame: forward ``-y``, right ``+x``); ``unrotate`` is its inverse.
-  At quarter turns they equal ``mapping.se2.rotate`` / ``unrotate``.
+  At quarter turns they equal ``mapping.se2d.rotate`` / ``unrotate``.
 - A view of side S (odd) at pose ``(p, theta)`` samples the world at
   ``p + unrotate((i - c, j - c), theta)`` for pixel ``(i, j)``, ``c = (S -
   1) / 2``: the view faces its heading, image-up is forward. At quarter
-  turns and integer centres this is ``mapping.se2.face`` of the world
+  turns and integer centres this is ``mapping.se2d.face`` of the world
   crop.
 - The footprint of a view is the convex hull of its sample points: a
   square of half-width ``c`` centred at ``p``, rotated by ``theta``.

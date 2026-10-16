@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid4_convrace, SE(2): hybrid4_muconv with per-head short-convolution widths {1, 4, 10, 11}.
+defaults:
+  - /task: se2d
+
+model:
+  name: hybrid4_convrace
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.se2d.hybrid4_convrace.Hybrid4Convrace
+    _partial_: true

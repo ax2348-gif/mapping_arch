@@ -2,7 +2,7 @@
 line per size, on one chart.
 
     python plot_curves.py                    every z2 model
-    python plot_curves.py --task se2         the se2 runs
+    python plot_curves.py --task se2d         the se2d runs
     python plot_curves.py --model vanilla    one model
     python plot_curves.py --shuffled         add the permuted-direction eval
                                              as a dotted line per size
@@ -10,7 +10,7 @@ line per size, on one chart.
 
 Writes <root>/<model>/curves.png for each model and <root>/curves.png
 with every model on one figure, where <root> is the task's results
-directory (results/ for z2, results/se2/ for se2). When a size has several runs (a
+directory (results/ for z2, results/se2d/ for se2d). When a size has several runs (a
 learning-rate grid, or different step budgets) the run with the lowest
 final eval mse is drawn, which is how the sweep is read. Every run also
 has its own curve.png, written by train.py.

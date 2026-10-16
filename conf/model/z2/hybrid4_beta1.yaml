@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid4_beta1: ablation of hybrid4 with the write strength capped at 1.
+defaults:
+  - /task: z2
+
+model:
+  name: hybrid4_beta1
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.hybrid4_beta1.Hybrid4Beta1
+    _partial_: true

@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid4_cdiag: ablation of hybrid4 with a complex-diagonal transition.
+defaults:
+  - /task: z2
+
+model:
+  name: hybrid4_cdiag
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.hybrid4_cdiag.Hybrid4Cdiag
+    _partial_: true

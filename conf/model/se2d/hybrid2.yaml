@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid2, SE(2) port.
+defaults:
+  - /task: se2d
+
+model:
+  name: hybrid2
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.se2d.hybrid2.Hybrid2
+    _partial_: true

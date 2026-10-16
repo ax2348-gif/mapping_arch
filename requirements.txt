@@ -1,0 +1,5 @@
+# The config tree (conf/, run.py, train.py, mapping/config.py), pinned at
+# the versions it was built and tested with. torch, numpy, pillow, datasets
+# and the kernels (fla-core, einops) are installed as README.md, Setup, says.
+hydra-core==1.3.5
+omegaconf==2.3.1

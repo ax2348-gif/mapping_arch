@@ -1,4 +1,4 @@
-"""hybrid4c: hybrid4 (``mapping/models/se2/hybrid4.py``) ported to the
+"""hybrid4c: hybrid4 (``mapping/models/se2d/hybrid4.py``) ported to the
 continuous SE(2) task (``CONTRACT_SE2C.md``).
 
 What changes, and nothing else:
@@ -100,7 +100,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mapping.models.se2.hybrid4 import (BASE_WIDTH, HEAD_DIM, LR,  # noqa: F401
+from mapping.models.se2d.hybrid4 import (BASE_WIDTH, HEAD_DIM, LR,  # noqa: F401
                                         SCALING_RULE, SIZES, Attention, Block,
                                         GatedDeltaNet, MuLinear, rope_cos_sin)
 from mapping.models.se2c import register

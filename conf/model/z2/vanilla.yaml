@@ -1,0 +1,12 @@
+# @package _global_
+# The arm under interrogation: a 2026-default general-purpose transformer.
+defaults:
+  - /task: z2
+
+model:
+  name: vanilla
+  ladder: vanilla       # conf/ladders/vanilla.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.vanilla.VanillaTransformer
+    _partial_: true

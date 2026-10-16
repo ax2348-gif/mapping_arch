@@ -1,0 +1,46 @@
+# One training run (mapping.config.Experiment). Pick a model, which picks
+# its task and that task's generator; every other group has a default.
+#   python run.py model=se2d/hybrid4 model.size=s
+#   python run.py model=z2/vanilla model.size=m schedule=wsd
+#   python run.py +experiment=se2c_bridge model.size=m
+#   python run.py --exp my_experiment.yaml run.seed=1
+# docs/config.md has the field map and the experiment workflow.
+defaults:
+  - model: ???          # <task>/<name>: conf/model/<task>/<name>.yaml
+  - schedule: cosine
+  - _self_
+
+_target_: mapping.config.Experiment
+
+# Every model file (conf/model/<task>/<name>.yaml) sets model.name,
+# model.ladder, model.size (a rung of that ladder) and model.arch; the
+# rung's arguments come from conf/ladders/<ladder>.yaml.
+model:
+  _target_: mapping.config.Model
+  size_kwargs: ${ladder:${model.ladder},${model.size}}
+
+optim:
+  _target_: mapping.config.AdamW
+  lr: ${model_lr:${task.name},${model.name},${model.size}}   # the model's default
+  weight_decay: 0.1
+  clip: 1.0
+  batch: 64
+
+run:
+  _target_: mapping.config.Run
+  name: null            # run directory name; null: seed<seed>
+  out: null             # explicit run directory, overriding name
+  steps: 2000
+  seed: 0
+  save_every: 0         # write step<k>.pt (with optimizer) every k steps
+  branch: null          # a step<k>.pt to continue from, into a new run
+  device: null          # null: cuda if available, else cpu
+  bf16: true
+  compile: false
+  overwrite: false      # true: write into a non-empty run directory (else refused)
+
+eval:
+  _target_: mapping.config.Eval
+  batches: 16
+  every: 250
+  log_every: 50

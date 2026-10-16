@@ -1,12 +1,12 @@
 """se2c geometry (``mapping.se2c.geometry``): agrees with the discrete
-conventions of ``mapping.se2`` at quarter turns, and the walk's
+conventions of ``mapping.se2d`` at quarter turns, and the walk's
 integration and odometry are inverse to each other."""
 import math
 
 import numpy as np
 import torch
 
-from mapping import se2
+from mapping import se2d
 from mapping.data import crop_windows
 from mapping.se2c import geometry as geo
 
@@ -15,7 +15,7 @@ def test_rotate_matches_discrete_at_quarter_turns():
     v = torch.tensor([[3., -7.], [0., 2.], [-5., 4.]])
     for h in range(4):
         th = torch.full((3,), h * math.pi / 2)
-        want = se2.rotate(v.numpy().astype(np.int64), h)
+        want = se2d.rotate(v.numpy().astype(np.int64), h)
         assert torch.allclose(geo.rotate(v, th), torch.tensor(want).float(),
                               atol=1e-5)
         assert torch.allclose(geo.unrotate(geo.rotate(v, th), th), v,
@@ -35,7 +35,7 @@ def test_view_points_are_discrete_face_at_quarter_turns():
         for h in range(4):
             centre = np.array([17, 21])
             crop = crop_windows(world, (centre - c)[None], size)
-            want = se2.face(crop, [h])[0]
+            want = se2d.face(crop, [h])[0]
             pts = geo.view_points(torch.tensor(centre).float(),
                                   torch.tensor(h * math.pi / 2), size)
             ij = pts.round().long().numpy()

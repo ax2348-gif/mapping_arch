@@ -31,7 +31,7 @@ REFERENCES = [                       # (mse, label), from results on Z^2
     (0.0150, 'Z² solved: hybrid xs, 20k'),
     (0.0690, 'Z² drift: vanilla / lstm xs, 20k'),
 ]
-FLOORS = {'z2': 0.0969, 'se2': 0.0975}   # constant floor per task, eval set
+FLOORS = {'z2': 0.0969, 'se2d': 0.0975}   # constant floor per task, eval set
 
 
 def read_log(run_dir):
@@ -91,7 +91,7 @@ def run_header(run_dir):
         return json.load(open(final)), True
     parts = os.path.normpath(run_dir).split(os.sep)
     model, size, run = parts[-3], parts[-2], parts[-1]
-    task = 'se2' if 'se2' in parts[:-3] else 'z2'
+    task = 'se2d' if 'se2d' in parts[:-3] else 'z2'
     head = {'task': task, 'model': model, 'size': size, 'run': run,
             'params': 0, 'args': {'lr': float('nan')},
             'floor': {'mse': FLOORS[task]}}

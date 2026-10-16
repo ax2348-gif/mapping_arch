@@ -3,7 +3,7 @@ step (``Config.step``, ``--step-px``) and odometry dropout
 (``Config.odometry_dropout``, ``--odometry-dropout``).
 
 With both at their defaults every batch is byte-identical to the code
-before they existed (``test_contract_z2.py`` for Z^2, ``SE2_GOLDEN`` here
+before they existed (``test_contract_z2.py`` for Z^2, ``SE2D_GOLDEN`` here
 for SE(2), hashes taken from commit 6eeb869). With dropout above 0 the
 model-facing symbols are dropped, the true ones ride along under a
 forbidden key, and every other field equals the dropout-0 batch."""
@@ -15,9 +15,9 @@ import pytest
 import torch
 
 import mapping.task
-import mapping.task_se2
+import mapping.task_se2d
 import mapping.tasks as tasks
-from mapping import se2
+from mapping import se2d
 from mapping.data import (UNKNOWN, Config, coverage, crop_windows, load_bank,
                           make_batch, render_map)
 from mapping.loader import eval_set
@@ -39,17 +39,17 @@ def digest(batch):
 
 
 # from commit 6eeb869, before step_px / odometry_dropout were options
-SE2_GOLDEN = {
-    'se2 train last s0': '2712dadb0800538f',
-    'se2 train last s1': 'a4074a53c1755b69',
-    'se2 eval last': '82358a16207d40e4',
+SE2D_GOLDEN = {
+    'se2d train last s0': '2712dadb0800538f',
+    'se2d train last s1': 'a4074a53c1755b69',
+    'se2d eval last': '82358a16207d40e4',
     'z2 step3 last': '570e925a218a15c5',
-    'se2 step3 last': 'c8d1853fa9655c54',
-    'se2 train uniform s0': 'c039c07a762cb611',
-    'se2 train uniform s1': 'a8920aa645ff5b3f',
-    'se2 eval uniform': '8e7d3ce6159655a6',
+    'se2d step3 last': 'c8d1853fa9655c54',
+    'se2d train uniform s0': 'c039c07a762cb611',
+    'se2d train uniform s1': 'a8920aa645ff5b3f',
+    'se2d eval uniform': '8e7d3ce6159655a6',
     'z2 step3 uniform': '45ad1bc73b960a8a',
-    'se2 step3 uniform': '931dd2dc132e9cde',
+    'se2d step3 uniform': '931dd2dc132e9cde',
 }
 
 
@@ -58,20 +58,20 @@ def bank():
     return load_bank(BANK, 32, 'train', True)[0]
 
 
-def test_se2_and_step_batches_unchanged(bank):
+def test_se2d_and_step_batches_unchanged(bank):
     out = {}
     for qt in ('last', 'uniform'):
         for seed in (0, 1):
             c = Config(seed=seed, heading=True, query_times=qt)
-            out[f'se2 train {qt} s{seed}'] = digest(
+            out[f'se2d train {qt} s{seed}'] = digest(
                 make_batch(np.random.default_rng([c.seed, 0]), c, bank, 8))
         ev = eval_set(Config(heading=True, query_times=qt), bank, 8, 1, 0)[0]
-        out[f'se2 eval {qt}'] = digest({k: v.numpy() for k, v in ev.items()})
+        out[f'se2d eval {qt}'] = digest({k: v.numpy() for k, v in ev.items()})
         for heading in (False, True):
             c = Config(query_times=qt, step=3, heading=heading)
-            out[f'{"se2" if heading else "z2"} step3 {qt}'] = digest(
+            out[f'{"se2d" if heading else "z2"} step3 {qt}'] = digest(
                 make_batch(np.random.default_rng([0, 0]), c, bank, 8))
-    assert out == SE2_GOLDEN
+    assert out == SE2D_GOLDEN
 
 
 def test_default_spec_unchanged():
@@ -86,14 +86,14 @@ def test_default_spec_unchanged():
 def test_spec_follows_options():
     _, s = tasks.config_and_spec('z2', 32, 8, 0, 'uniform', 3, 1.0)
     assert (s.directions, s.step_px, s.offset_max) == (5, 3, 96)
-    _, s = tasks.config_and_spec('se2', 32, 8, 0, 'uniform', 3, 0.5)
+    _, s = tasks.config_and_spec('se2d', 32, 8, 0, 'uniform', 3, 0.5)
     assert (s.odometry, s.turns, s.step_px, s.offset_max) == (17, 4, 3, 96)
     assert UNKNOWN == {False: 4, True: 16}
 
 
 def test_forbidden_keys():
     assert 'directions_true' in mapping.task.FORBIDDEN_KEYS
-    assert 'odometry_true' in mapping.task_se2.FORBIDDEN_KEYS
+    assert 'odometry_true' in mapping.task_se2d.FORBIDDEN_KEYS
 
 
 @pytest.mark.parametrize('heading', [False, True])
@@ -130,28 +130,28 @@ def test_loader_carries_true_odometry(bank):
 
 
 @pytest.mark.parametrize('step', [1, 2, 3])
-def test_se2_small_step_consistent(bank, step):
-    """Overlapping windows: the SE(2) checks of test_se2.py, and per-step
+def test_se2d_small_step_consistent(bank, step):
+    """Overlapping windows: the SE(2) checks of test_se2d.py, and per-step
     queries fully observed by their step and within offset_max."""
     for qt in ('last', 'uniform'):
         c = Config(heading=True, step=step, query_times=qt,
                    odometry_dropout=1.0)
         b = make_batch(np.random.default_rng(3), c, bank, 6)
-        disp, hh = se2.compose(b['odometry_true'], c.step, b['headings'][:, 0])
+        disp, hh = se2d.compose(b['odometry_true'], c.step, b['headings'][:, 0])
         assert (hh == b['headings']).all()
         assert (b['positions'][:, 0:1] + disp == b['positions']).all()
         assert (np.abs(b['query_pose'][..., :2]) <= c.steps * c.step).all()
         for i, e in enumerate(b['episodes']):
             image = render_map(bank, e.tile_grid, c.tile, e.tile_sym)
             world_obs = crop_windows(image, e.positions, c.obs)
-            assert (se2.face(world_obs, b['headings'][i])
+            assert (se2d.face(world_obs, b['headings'][i])
                     == b['observations'][i]).all()
             q, t = b['query_pose'][i], b['query_time'][i]
-            corners = e.positions[t] + se2.unrotate(q[:, :2],
+            corners = e.positions[t] + se2d.unrotate(q[:, :2],
                                                     b['headings'][i, t])
             assert (corners == e.queries).all()
             qh = (q[:, 2] + b['headings'][i, t]) % 4
-            assert (se2.face(crop_windows(image, e.queries, c.obs), qh)
+            assert (se2d.face(crop_windows(image, e.queries, c.obs), qh)
                     == b['target'][i]).all()
             h, w = np.array(e.tile_grid.shape) * c.tile
             seen = coverage(e.positions, c.obs, h, w, first=True)
@@ -162,11 +162,11 @@ def test_se2_small_step_consistent(bank, step):
 
 
 def test_config_from_old_args():
-    _, spec = tasks.config_and_spec('se2', 32, 8, 0)
+    _, spec = tasks.config_and_spec('se2d', 32, 8, 0)
     old = {'seed': 0, 'query_times': 'uniform'}          # pre-option checkpoint
-    c = tasks.config_from_args('se2', spec, old)
+    c = tasks.config_from_args('se2d', spec, old)
     assert (c.step, c.odometry_dropout, c.query_times) == (9, 0.0, 'uniform')
-    c = tasks.config_from_args('se2', spec, dict(old, step_px=3,
+    c = tasks.config_from_args('se2d', spec, dict(old, step_px=3,
                                                  odometry_dropout=1.0))
     assert (c.step, c.odometry_dropout) == (3, 1.0)
 

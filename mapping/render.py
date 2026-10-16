@@ -148,7 +148,7 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
         if off.is_floating_point():               # se2c: px and degrees
             label = (f't{t} q ({float(off[0]):+.1f},{float(off[1]):+.1f})'
                      f' {math.degrees(float(off[2])):+.0f}deg')
-        elif off.numel() > 2:                     # se2: heading change too
+        elif off.numel() > 2:                     # se2d: heading change too
             label += f' turn {int(off[2])}'
         draw.text((4, y + 4), label, fill=220, font=small)
         draw.text((4, y + 20), f'mse {mse:.3f}', fill=220, font=small)

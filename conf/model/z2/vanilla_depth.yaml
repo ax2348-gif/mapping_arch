@@ -1,0 +1,12 @@
+# @package _global_
+# vanilla at fixed width 256, depth only: 4, 8, 16, 32 layers.
+defaults:
+  - /task: z2
+
+model:
+  name: vanilla_depth
+  ladder: depth       # conf/ladders/depth.yaml; model.size=<rung>
+  size: d4
+  arch:
+    _target_: mapping.models.vanilla.VanillaTransformer
+    _partial_: true

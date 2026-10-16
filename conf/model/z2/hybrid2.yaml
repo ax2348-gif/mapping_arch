@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid2: the hybrid with time carried by RoPE instead of learned tables.
+defaults:
+  - /task: z2
+
+model:
+  name: hybrid2
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.hybrid2.Hybrid2
+    _partial_: true

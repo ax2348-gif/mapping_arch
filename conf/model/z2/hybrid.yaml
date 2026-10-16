@@ -1,0 +1,12 @@
+# @package _global_
+# Hybrid transformer: blocks alternate gated linear attention with softmax attention, in the style of recent...
+defaults:
+  - /task: z2
+
+model:
+  name: hybrid
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.hybrid.Hybrid
+    _partial_: true

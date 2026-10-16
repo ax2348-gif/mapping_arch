@@ -1,0 +1,8 @@
+# @package task.generator
+# Tile-bank generator of the z2 and se2d tasks (mapping.data, CONTRACT.md).
+_target_: mapping.config.BankGenerator
+texture: mnist          # mnist | imagenette | imagenette_hp (mapping.data.TEXTURES)
+bank: null              # null: the texture's bank file
+step_px: 9              # walk step in pixels
+odometry_dropout: 0.0   # probability each odometry symbol becomes "unknown"
+workers: 4              # loader processes

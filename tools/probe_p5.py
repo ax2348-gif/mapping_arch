@@ -1,7 +1,7 @@
 """Evaluate P5 (as frozen) and P5' (post hoc) of HYPOTHESIS.md on a trained
 SE(2) hybrid4-family checkpoint whose first block is the Gated DeltaNet.
 
-    python tools/probe_p5.py results/se2/hybrid4/xs/seed0_100k_qt/final.pt
+    python tools/probe_p5.py results/se2d/hybrid4/xs/seed0_100k_qt/final.pt
 
 Runs on CPU. Recomputes the first layer's q, k, v, decay and beta exactly
 as the layer does (tools/transition_probe.layer_quantities), runs the
@@ -34,7 +34,7 @@ sys.path.insert(0, 'tools')
 import mapping.tasks as tasks  # noqa: E402
 from mapping.checkpoint import load_checkpoint  # noqa: E402
 from mapping.loader import eval_set, load_banks  # noqa: E402
-from mapping import se2  # noqa: E402
+from mapping import se2d  # noqa: E402
 from transition_probe import Stop, layer_quantities  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
 
@@ -96,7 +96,7 @@ def ridge_r2(X, Y, groups, rng):
 def rel_pose(pos, head, s, t):
     """Pose of window s seen from pose t: body-frame (dy, dx), cos, sin of
     the heading change."""
-    body = se2.rotate(pos[s] - pos[t], head[t])
+    body = se2d.rotate(pos[s] - pos[t], head[t])
     dh = (head[s] - head[t]) % 4
     return [body[0], body[1], np.cos(dh * np.pi / 2), np.sin(dh * np.pi / 2)]
 

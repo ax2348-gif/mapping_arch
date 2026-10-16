@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid4: hybrid3.5 with the scan on the fused kernel.
+defaults:
+  - /task: z2
+
+model:
+  name: hybrid4
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.hybrid4.Hybrid4
+    _partial_: true

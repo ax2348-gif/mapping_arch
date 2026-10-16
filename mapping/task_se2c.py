@@ -24,7 +24,7 @@ target pixels above 0.5 (on the stroke texture no pixel is exactly 0),
 plus ``metrics_by_query``: error per |heading change| bin.
 """
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, replace
 
 import torch
 
@@ -152,37 +152,54 @@ def add_args(p):
                    choices=('causal', 'global'))
 
 
+# Config fields a run's args record does not carry under the same name
+# (the episode settings are task fields; the texture is ``se2c_texture``)
+_NOT_IN_ARGS = ('view', 'steps', 'queries', 'seed', 'texture', 'bank', 'holdout',
+                'holdout_mode', 'query_times', 'motion', 'directions')
+
+
 def config_from_args(args, eval_holdout=None):
-    """Generator config from train.py's argument dict; ``eval_holdout``
-    overrides the held-out mode (evaluation sees the band)."""
+    """Generator config from a run's ``args`` record (render.py, tools);
+    ``eval_holdout`` overrides the held-out mode (evaluation sees the
+    band). Records older than a setting get its value before the setting
+    existed. Any other Config field the record carries is passed through,
+    so a new generator setting reaches the tools with no code here."""
     a = dict(args)
     bank = a.get('se2c_texture', 'procedural')
+    same = {f.name: a[f.name] for f in fields(Config)
+            if f.name not in _NOT_IN_ARGS and f.name in a}
+    same.setdefault('v_min', Config.v_min)
+    same.setdefault('v_max', Config.v_max)
+    same.setdefault('omega_max', math.pi)
+    same.setdefault('turn_n', 0)
+    same.setdefault('query_coverage', 'causal')
+    same.setdefault('odometry_dropout', 0.0)  # records before the se2c knob
     return Config(steps=a.get('episode_steps', 32), queries=a.get('queries', 8),
-                  v_min=a.get('v_min', Config.v_min),
-                  v_max=a.get('v_max', Config.v_max),
-                  omega_max=a.get('omega_max', math.pi),
-                  turn_n=a.get('turn_n', 0), motion=a.get('motion', 'arc'),
+                  motion=a.get('motion', 'arc'),
                   directions=a.get('directions', 'lattice' if a.get('motion') == 'decoupled'
                                    and a.get('turn_n') else 'persistent'),
                   holdout=tuple(a.get('holdout') or ()),
                   holdout_mode=eval_holdout or a.get('holdout_mode', 'exclude'),
                   query_times=a.get('query_times', 'uniform'),
-                  query_coverage=a.get('query_coverage', 'causal'),
                   bank='' if bank == 'procedural' else bank,
-                  texture=TextureSpec(), seed=a.get('seed', 0),
-                  odometry_dropout=a.get('odometry_dropout', 0.0))
+                  texture=TextureSpec(), seed=a.get('seed', 0), **same)
 
 
 def data(args, device, start=0, eval_batches=None, batch=None):
+    """``from_config`` for a run's ``args`` record (render.py, tools)."""
+    a = dict(args)
+    return from_config(config_from_args(a), device, start,
+                       eval_batches if eval_batches is not None else a.get('eval_batches', 16),
+                       batch or a.get('batch', 64))
+
+
+def from_config(config, device, start=0, eval_batches=16, batch=64):
     """Everything train.py needs: ``config``, ``spec``, ``stream`` (an
     iterator of GPU batches starting at batch ``start``), ``held_out``
     (fixed evaluation batches from the evaluation stream: the band
     included when one is held out, the test split of a tile bank) and
     ``info`` (settings recorded with the run)."""
-    a = dict(args)
-    batch = batch or a.get('batch', 64)
-    config = config_from_args(a)
-    ev_config = config_from_args(a, 'include' if config.holdout else None)
+    ev_config = replace(config, holdout_mode='include') if config.holdout else config
     train_bank = eval_bank = None
     if config.bank:
         from mapping.se2c import bank as tb
@@ -196,10 +213,9 @@ def data(args, device, start=0, eval_batches=None, batch=None):
         while True:
             yield make_batch(config, i, device, batch, bank=train_bank)
             i += 1
-    n = eval_batches if eval_batches is not None else a.get('eval_batches', 16)
     held_out = [make_batch(ev_config, i, device, batch, eval_set=True,
-                           bank=eval_bank) for i in range(n)]
-    info = {'texture': a.get('se2c_texture', 'procedural'),
+                           bank=eval_bank) for i in range(eval_batches)]
+    info = {'texture': config.bank or 'procedural',
             'texture_spec': config.texture.__dict__,
             'generator': {k: v for k, v in config.__dict__.items()
                           if k != 'texture'}}

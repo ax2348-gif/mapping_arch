@@ -1,0 +1,10 @@
+# @package _global_
+# The se2c task contract and its episodes; the model selects it.
+defaults:
+  - /generator: se2c
+  - _episode           # episode_steps, queries, query_times
+  - _self_
+
+task:
+  _target_: mapping.config.Task
+  name: se2c

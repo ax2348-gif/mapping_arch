@@ -1,0 +1,12 @@
+# @package _global_
+# hybrid3: hybrid2 with SwiGLU in place of the 4x GELU MLP.
+defaults:
+  - /task: z2
+
+model:
+  name: hybrid3
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.hybrid3.Hybrid3
+    _partial_: true

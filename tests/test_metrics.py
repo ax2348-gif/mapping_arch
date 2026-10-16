@@ -4,7 +4,7 @@ loss and every existing metric value as they were."""
 import torch
 import torch.nn.functional as F
 
-from mapping import task, task_se2
+from mapping import task, task_se2d
 
 
 def sample(seed=0):
@@ -32,7 +32,7 @@ def test_definition():
     tc = target - target.mean((-1, -2), keepdim=True)
     want = (pc - tc).pow(2).mean((-1, -2)).mean().item()
     assert abs(task.metrics(pred, target)['mse_centered'] - want) < 1e-7
-    assert task_se2.metrics is task.metrics
+    assert task_se2d.metrics is task.metrics
 
 
 def test_existing_values_unchanged():
