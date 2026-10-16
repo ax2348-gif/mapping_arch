@@ -40,15 +40,16 @@ from mapping.loader import eval_set, load_banks, train_loader
 from mapping.plot import plot_run
 from mapping.render import render_grid, run_title
 from mapping.task import metrics_by_time
+from mapping.task_se2c import add_args as add_se2c_args
 
 DEFAULT_LR = 3e-4
 
 
 def parse():
     p = argparse.ArgumentParser()
-    p.add_argument('--task', default='z2', choices=sorted(tasks.TASKS),
-                   help='which contract: z2 (CONTRACT.md) or se2 '
-                        '(CONTRACT_SE2.md); picks the model registry, the '
+    p.add_argument('--task', default='z2', choices=sorted(tasks.ALL),
+                   help='which contract: z2 (CONTRACT.md), se2 '
+                        '(CONTRACT_SE2.md) or se2c (CONTRACT_SE2C.md); picks the model registry, the '
                         'batch layout and the results root')
     p.add_argument('--model', required=True)
     p.add_argument('--size', required=True)
@@ -106,6 +107,7 @@ def parse():
                    help='probability that each step\'s odometry symbol is '
                         'replaced by a reserved "unknown" symbol (generator '
                         'setting, not a new task); 1.0 hides all odometry')
+    add_se2c_args(p)
     return p.parse_args()
 
 
@@ -122,6 +124,13 @@ def lr_at(step, args):
     return args.lr * 0.5 * (1 + math.cos(math.pi * progress))
 
 
+def permute_steps(x, perm):
+    """``x (B, T, ...)`` with each row's steps permuted by ``perm (B, T)``
+    (symbols on z2/se2, pose vectors on se2c)."""
+    idx = perm.view(*perm.shape, *([1] * (x.dim() - 2))).expand_as(x)
+    return torch.gather(x, 1, idx)
+
+
 def call(model, obs, directions, offset, qtime, takes_time):
     """Forward with the query times when the model accepts them."""
     if takes_time:
@@ -131,31 +140,35 @@ def call(model, obs, directions, offset, qtime, takes_time):
 
 @torch.no_grad()
 def evaluate(model, batches, device, autocast, prepare, metrics,
-             takes_time, steps, shuffle_directions=False):
+             takes_time, steps, shuffle_directions=False, by_query=None):
     """``shuffle_directions`` permutes each episode's odometry tokens in
     time (directions on z2, symbols on se2). Returns the whole-set metrics
     plus the per-prefix-length breakdown. Under odometry dropout the
     permutation moves the unknown symbols too, so it tests only the known
     ones; with every symbol dropped it is a no-op (see
-    ``shuffle_informative``)."""
+    ``shuffle_informative``). ``by_query(pred, target, query)`` adds a
+    task's per-query breakdown (se2c: by heading change)."""
     model.eval()
-    preds, targets, times = [], [], []
+    preds, targets, times, queries = [], [], [], []
     gen = torch.Generator().manual_seed(0)
     for b in batches:
         obs, directions, offset, target, qtime = prepare(b, device)
         if shuffle_directions:
-            perm = torch.argsort(torch.rand(directions.shape, generator=gen),
+            perm = torch.argsort(torch.rand(directions.shape[:2], generator=gen),
                                  dim=1).to(device)
-            directions = torch.gather(directions, 1, perm)
+            directions = permute_steps(directions, perm)
         with autocast:
             pred = call(model, obs, directions, offset, qtime, takes_time)
         preds.append(pred.float())
         targets.append(target)
         times.append(qtime)
+        queries.append(offset)
     model.train()
     pred, target, qtime = torch.cat(preds), torch.cat(targets), torch.cat(times)
     out = metrics(pred, target)
     out.update(metrics_by_time(pred, target, qtime, steps))
+    if by_query is not None:
+        out.update(by_query(pred, target, torch.cat(queries)))
     return out
 
 
@@ -171,27 +184,30 @@ def main():
     out = args.out or os.path.join(task['root'], args.model, args.size, run)
     os.makedirs(out, exist_ok=True)
 
-    if args.bank is None:
-        args.bank = TEXTURES[args.texture]['path']
-    config, spec = tasks.config_and_spec(args.task, args.episode_steps,
-                                         args.queries, args.seed,
-                                         args.query_times, args.step_px,
-                                         args.odometry_dropout, args.texture)
-    # everything the bank fixes, recorded beside the run's numbers
-    texture = {'texture': args.texture, 'bank': args.bank,
-               'tile': config.tile, 'cutoff': config.cutoff,
-               'start_window': config.start_window,
-               'dihedral': config.dihedral}
+    gpu_data = task.get('gpu_data', False)   # se2c: generated on the GPU
+    by_query = getattr(task['task'], 'metrics_by_query', None)
     # the shuffled-odometry diagnostic permutes the model-facing symbols;
     # with all of them replaced by "unknown" it cannot change anything
     shuffle_informative = args.odometry_dropout < 1.0
-    try:
-        train_bank, eval_bank = load_banks(args.bank, config, args.texture)
-        bank_filter = check_texture(args.bank, args.texture)
-    except ValueError as e:
-        raise SystemExit(f'--texture {args.texture} --bank {args.bank}: {e}')
-    if bank_filter is not None:     # a derived bank's exact parameters
-        texture['bank_filter'] = bank_filter
+    if not gpu_data:
+        if args.bank is None:
+            args.bank = TEXTURES[args.texture]['path']
+        config, spec = tasks.config_and_spec(args.task, args.episode_steps,
+                                             args.queries, args.seed,
+                                             args.query_times, args.step_px,
+                                             args.odometry_dropout, args.texture)
+        # everything the bank fixes, recorded beside the run's numbers
+        texture = {'texture': args.texture, 'bank': args.bank,
+                   'tile': config.tile, 'cutoff': config.cutoff,
+                   'start_window': config.start_window,
+                   'dihedral': config.dihedral}
+        try:
+            train_bank, eval_bank = load_banks(args.bank, config, args.texture)
+            bank_filter = check_texture(args.bank, args.texture)
+        except ValueError as e:
+            raise SystemExit(f'--texture {args.texture} --bank {args.bank}: {e}')
+        if bank_filter is not None:     # a derived bank's exact parameters
+            texture['bank_filter'] = bank_filter
     start = 0
     branch = None
     if args.branch:
@@ -209,11 +225,17 @@ def main():
                                  f'{vars(args)[key]!r}')
         if start >= args.steps:
             raise SystemExit(f'checkpoint step {start} >= --steps {args.steps}')
-    loader = train_loader(config, train_bank, args.batch, args.workers,
-                          start)
-    held_out = eval_set(config, eval_bank, args.batch, args.eval_batches,
-                        args.seed)
-    floor = constant_floor([b['target'].float() / 255 for b in held_out])
+    if gpu_data:
+        d = task['task'].data(vars(args), device, start)
+        config, spec, held_out = d['config'], d['spec'], d['held_out']
+        texture, source = d['info'], d['stream']
+        floor = constant_floor([b['target'] for b in held_out])
+    else:
+        loader = train_loader(config, train_bank, args.batch, args.workers,
+                              start)
+        held_out = eval_set(config, eval_bank, args.batch, args.eval_batches,
+                            args.seed)
+        floor = constant_floor([b['target'].float() / 255 for b in held_out])
 
     module = models.get(args.model)
     if args.lr is None:
@@ -255,8 +277,10 @@ def main():
           f'floor fg_mae {floor["fg_mae"]:.4f}, floor c-mse '
           f'{floor["mse_centered"]:.4f}; step_px {args.step_px}, '
           f'odometry_dropout {args.odometry_dropout}; texture '
-          f'{args.texture} ({args.bank}, tile {config.tile}, cutoff '
-          f'{config.cutoff})', flush=True)
+          + (f'{texture["texture"]} (se2c generator {texture["generator"]})'
+             if gpu_data else
+             f'{args.texture} ({args.bank}, tile {config.tile}, cutoff '
+             f'{config.cutoff})'), flush=True)
     if not shuffle_informative:
         print('all odometry is dropped: the "dirs shuffled" number permutes '
               'unknown symbols only and equals eval mse by construction; it '
@@ -268,7 +292,7 @@ def main():
                           'schedule': args.schedule, 'branch': args.branch,
                           'start': start, 'step_px': args.step_px,
                           'odometry_dropout': args.odometry_dropout,
-                          'offset_max': spec.offset_max,
+                          'offset_max': getattr(spec, 'offset_max', None),
                           'shuffle_informative': shuffle_informative,
                           **texture,
                           'args': vars(args)}) + '\n')
@@ -276,7 +300,7 @@ def main():
     best, best_step = None, -1
     t_start = time.perf_counter()
     running, since = 0.0, 0
-    it = iter(loader)
+    it = source if gpu_data else iter(loader)
     rec = None
     for step in range(start, args.steps):
         for g in opt.param_groups:
@@ -302,7 +326,8 @@ def main():
             running, since = 0.0, 0
             if (step + 1) % args.eval_every == 0 or last:
                 ev = evaluate(model, held_out, device, autocast, prepare,
-                              metrics, takes_time, spec.steps)
+                              metrics, takes_time, spec.steps,
+                              by_query=by_query)
                 rec['eval'] = ev
                 rec['eval_shuffled'] = evaluate(model, held_out, device,
                                                 autocast, prepare, metrics,

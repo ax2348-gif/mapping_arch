@@ -27,10 +27,14 @@ def main():
     a = p.parse_args()
     import inspect
     model, args, spec, task = load_checkpoint(a.checkpoint, a.device)
-    config = tasks.config_from_args(task, spec, args)
-    _, eval_bank = load_banks(args['bank'], config,
-                              args.get('texture', 'mnist'))
-    batches = eval_set(config, eval_bank, 64, 2, args['seed'])
+    if tasks.get(task).get('gpu_data'):        # se2c: its own generator
+        batches = tasks.get(task)['task'].data(args, a.device, eval_batches=2,
+                                               batch=64)['held_out']
+    else:
+        config = tasks.config_from_args(task, spec, args)
+        _, eval_bank = load_banks(args['bank'], config,
+                                  args.get('texture', 'mnist'))
+        batches = eval_set(config, eval_bank, 64, 2, args['seed'])
     out = a.out or os.path.join(os.path.dirname(a.checkpoint), 'grid.png')
     title = ''
     summary = os.path.join(os.path.dirname(a.checkpoint), 'final.json')

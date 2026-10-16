@@ -70,6 +70,10 @@ render.py              redraw a grid from any checkpoint
 mapping/models/se2/    the SE(2) task's registry (ports of the Z² models)
 mapping/se2.py         SE(2) conventions: headings, egocentric odometry
 mapping/task_se2.py    the SE(2) task as a model sees it
+mapping/se2c/          continuous SE(2) (se2c): geometry, procedural texture,
+                       coverage, GPU generator, oracle, shared pose encoding
+mapping/task_se2c.py   the se2c task as a model sees it; its harness data path
+mapping/models/se2c/   the se2c registry (hybrid4c, vanilla4c)
 mapping/tasks.py       task name -> registry, spec, batch layout, results root
 tools/                 analysis: audit, probes, registrability, benchmark
 docs/models/           one page per architecture
@@ -133,6 +137,11 @@ python train.py --task se2 --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --texture imagenette_hp \
     --run seed0_vo_imagenette_hp                   # VO, brightness removed
 python tools/registrability.py --texture imagenette_hp --step-px 3
+# continuous SE(2) (CONTRACT_SE2C.md), batches generated on the GPU:
+python train.py --task se2c --model hybrid4c --size xs --query-times uniform \
+    --steps 20000 --run seed0                      # results/se2c/...
+python tools/se2c_sheets.py                        # texture contact sheets
+python tools/se2c_bench.py --sizes xs s            # se2c throughput
 python summarize.py                                             # all runs
 python summarize.py --fit                                       # best per rung + fits
 ```
@@ -213,6 +222,8 @@ numbers at the time it was written.
 - `docs/applications_review.md`: practice at scale, the gradient audit,
   and memory agents.
 - `docs/decision_arm_design.md`: the decision arm's draft design (on hold).
+- `docs/lift/`: the continuous-SE(2) lift: plan, build log, contact sheets;
+  the task contract is `CONTRACT_SE2C.md`.
 
 Published pages, private until shared:
 

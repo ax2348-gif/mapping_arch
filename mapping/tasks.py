@@ -15,13 +15,18 @@ grows by one so tables have a row for it). A third, ``texture``
 picks the tile bank and with it the tile side, brightness cutoff and start
 window; it does not touch the spec, so models are sized exactly as before.
 
+``se2c`` (continuous SE(2)) has its own generator settings
+(``mapping.task_se2c.add_args``) and generates batches on the GPU.
+
 ``z2`` is the default everywhere, so code written before ``se2`` existed
 behaves as it did. Checkpoints record their task; ones without it are z2.
 """
 import mapping.models
 import mapping.models.se2
+import mapping.models.se2c
 import mapping.task
 import mapping.task_se2
+import mapping.task_se2c
 from mapping.data import VOCAB, Config, texture_settings
 
 TASKS = {
@@ -31,11 +36,21 @@ TASKS = {
                 root='results/se2', heading=True, odometry='odometry'),
 }
 
+# Tasks with their own GPU generator (batches made inside the training
+# step by the task module's ``data``), kept apart from TASKS so code and
+# tests written for the tile-bank tasks never meet them by iteration.
+# se2c: continuous SE(2), CONTRACT_SE2C.md.
+GPU_TASKS = {
+    'se2c': dict(models=mapping.models.se2c, task=mapping.task_se2c,
+                 root='results/se2c', gpu_data=True),
+}
+ALL = {**TASKS, **GPU_TASKS}
+
 
 def get(name='z2'):
-    if name not in TASKS:
-        raise KeyError(f'unknown task {name!r}; have {sorted(TASKS)}')
-    return TASKS[name]
+    if name not in ALL:
+        raise KeyError(f'unknown task {name!r}; have {sorted(ALL)}')
+    return ALL[name]
 
 
 def config_and_spec(name, steps, queries, seed, query_times='last',
@@ -46,6 +61,12 @@ def config_and_spec(name, steps, queries, seed, query_times='last',
     config's tile, cutoff and start window; the spec does not depend on
     it."""
     t = get(name)
+    if t.get('gpu_data'):          # se2c: the generator config and its spec
+        config = t['task'].config_from_args(
+            {'episode_steps': steps, 'queries': queries, 'seed': seed,
+             'query_times': query_times})
+        return config, t['task'].TaskSpec(view=config.view, steps=steps,
+                                          queries=queries)
     config = Config(steps=steps, queries=queries, seed=seed,
                     heading=t['heading'], query_times=query_times,
                     step=step_px, odometry_dropout=odometry_dropout,

@@ -10,6 +10,8 @@ the last window and the per-query MSE.
 ``train.py`` writes one of these as ``grid.png`` in every run directory;
 ``render.py`` draws one from any checkpoint.
 """
+import math
+
 import numpy as np
 import torch
 from PIL import Image, ImageDraw, ImageFont
@@ -84,9 +86,11 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
         kw = {'query_time': time} if takes_time else {}
         with autocast:
             pred = model(obs, directions, offset, **kw).float()
-            perm = torch.argsort(torch.rand(directions.shape, generator=gen),
+            perm = torch.argsort(torch.rand(directions.shape[:2], generator=gen),
                                  dim=1).to(device)
-            shuffled = model(obs, torch.gather(directions, 1, perm),
+            idx = perm.view(*perm.shape, *([1] * (directions.dim() - 2)))
+            shuffled = model(obs, torch.gather(directions, 1,
+                                               idx.expand_as(directions)),
                              offset, **kw).float()
         for i in range(obs.shape[0]):
             for q in range(offset.shape[1]):
@@ -122,7 +126,10 @@ def render_grid(model, batches, view, out, rows=12, seed=0, device=None,
         y = HEADER + 20 + r * (cell + GAP)
         mse = (prd - tgt).pow(2).mean().item()
         label = f't{t} off ({int(off[0]):+d},{int(off[1]):+d})'
-        if off.numel() > 2:                       # se2: heading change too
+        if off.is_floating_point():               # se2c: px and degrees
+            label = (f't{t} q ({float(off[0]):+.1f},{float(off[1]):+.1f})'
+                     f' {math.degrees(float(off[2])):+.0f}deg')
+        elif off.numel() > 2:                     # se2: heading change too
             label += f' turn {int(off[2])}'
         draw.text((4, y + 4), label, fill=220, font=small)
         draw.text((4, y + 20), f'mse {mse:.3f}', fill=220, font=small)
