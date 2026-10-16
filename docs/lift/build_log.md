@@ -199,7 +199,7 @@ The z2 and se2 batch hashes and every pre-existing test pass unchanged
 (209 tests at this commit, with the blind-probe and ablation agents'
 tests). Evaluation: 16 fixed batches from the evaluation seed stream;
 with a held-out band the evaluation stream includes it. Floor on the
-default eval set: mse 0.1329, c-mse 0.1209, fg_mae 0.4715.
+default eval set (16 batches, seed 0): mse 0.1311, c-mse 0.1192, fg_mae 0.4828. Copying the observation at the query step instead: 0.248. Pose oracle (bicubic) by prefix bin: 0.00034 / 0.00054 / 0.00058 / 0.00057; by |turn| bin 0.00045-0.00055.
 
 ## Phase 3: model ports
 
@@ -245,3 +245,78 @@ proving run:
 | vanilla4c m | 5.7 | 6.1 | 18.8 | 15.0 |
 
 Generator alone: 14 ms per batch of 64.
+
+**Clean remeasurement** (under the GPU lock; the blind probe's own run
+was not under the lock, so a small residual contention is possible):
+
+| model, rung | 3x3 fixed batch | 3x3 with generation | 5x5 fixed | 5x5 with generation |
+| --- | --- | --- | --- | --- |
+| hybrid4c xs | 71.6 | 46.9 | 167.3 | 77.3 |
+| hybrid4c s | 16.3 | 14.6 | 48.7 | 36.2 |
+| vanilla4c xs | 108.3 | 61.8 | 247.9 | 92.0 |
+| vanilla4c s | 27.2 | 22.8 | 81.8 | 51.9 |
+
+Generator alone 6.8 ms per batch of 64; peak memory at s (3x3): hybrid4c
+2.5 GiB, vanilla4c 1.8 GiB. Readings:
+
+- 3x3 patches cost about 2.3-3x the 5x5 tokeniser's compute at a fixed
+  batch (1057 against 401 tokens). At xs it does not matter (a 25k run
+  is 10 minutes). At s, 100k steps is about 2 h locally; m is about 3x
+  slower again. **Not switched.** Proposal for the scaled sweeps only:
+  keep 3x3 at xs/s locally, and measure on the H200 before deciding;
+  if 5x5 is wanted, it is one constructor argument (`patch=5`) and a
+  separate model name, so the 3x3 curves stay comparable.
+- At xs the generator, not the model, limits the step (71.6 -> 46.9):
+  it is CPU launch-bound (~150 small kernels). Prefetching the next
+  batch on a side CUDA stream or a CUDA graph would recover most of it;
+  not done yet.
+
+## Phase 4: smoke and the proving run
+
+Smoke, 300 steps (outside the lock, as allowed): runs end to end, eval
+0.1237 against floor 0.1311, shuffled equal (as expected so early).
+
+Proving run, under the shared GPU lock: `python train.py --task se2c
+--model hybrid4c --size xs --steps 25000 --query-times uniform
+--eval-every 500 --log-every 100 --run seed0_25k_qt` (cosine schedule,
+lr 3e-4, batch 64), 45.5 it/s, 9.5 minutes. Run directory
+`results/se2c/hybrid4c/xs/seed0_25k_qt/` (not in git; grid and curve
+copied to `docs/lift/sheets/proving_hybrid4c_xs_25k_{grid,curve}.png`).
+
+| step | eval mse | shuffled | last-step |
+| --- | --- | --- | --- |
+| 2k | 0.0911 | 0.0912 | 0.1260 |
+| 4k | 0.0759 | 0.0759 | 0.1085 |
+| 10k | 0.0710 | 0.0713 | 0.1042 |
+| 16k | 0.0683 | 0.0705 | 0.1025 |
+| 20k | 0.0665 | 0.0715 | 0.1011 |
+| 25k | **0.0655** | **0.0715** | 0.1006 |
+
+Final by prefix bin 0.029 / 0.062 / 0.077 / 0.090; by |heading change|
+0.066 / 0.062 / 0.069 / 0.066 (flat). Floor 0.1311, oracle 0.0005.
+
+Reading: the pipeline works; the model is not solving. It learns the
+easy part first: early queries (where a sixth of queries are fallback
+re-renders of an observation, and targets overlap the anchor view most)
+and blurred local content; the odometry gap opens only after ~14k steps
+(0.0655 against 0.0715 shuffled) and is still widening, and the
+last-step error is near the floor. For scale, the discrete hybrid4 xs on
+MNIST at the same 25k steps was 0.0543 against shuffled 0.0928 (floor
+0.0986) and needed about 90k steps to meet "solved"; so this is
+consistent with an xs model early in its curve, not evidence either
+way. The grid: the good rows (mse ~0.01) are re-renders near the anchor
+or fallbacks, equally good with shuffled odometry; the long-range rows
+are grey blur.
+
+Checks done after the run, on 8 evaluation batches:
+
+- Non-fallback targets are not copies of any observation: the best
+  observation, at the best quarter turn, matches within MSE 0.02 for
+  only 1% of them (18% of all queries, i.e. the fallbacks).
+- Query centres lie a median 2.0 px (p90 3.6 px) from some observation
+  centre up to t: the free-heading coverage constraint pins queries to
+  where the agent has been; the headings are free, so the task is a
+  rotation and resampling, not a lookup.
+- On average 22% of a (non-fallback) target's points lie in the anchor
+  observation's own footprint (44% in the first prefix bin, 14% in the
+  last): most of each target must come from other steps.

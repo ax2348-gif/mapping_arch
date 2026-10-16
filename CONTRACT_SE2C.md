@@ -92,11 +92,11 @@ As before (`mse`, `mse_centered`, per prefix-length bins, last-step, the
 shuffled-odometry diagnostic which permutes the odometry vectors in
 time), with foreground = ink (target > 0.5), plus `mse_turnA_B`: error
 per |query heading change| bin. References on the default settings: the
-constant floor is about 0.133; a pose-oracle that interpolates the
+constant floor is 0.131 (16 evaluation batches, seed 0); a pose-oracle that interpolates the
 observations bicubically with the TRUE poses reaches 0.0005
 (`mapping.se2c.oracle`). Proposed reading (not frozen):
 **solved ≤ 0.02** (about a 0.5 px / 3° pose error, or a 1-px blur, per
-view; `docs/lift/sheets/mockup.png`), **failed ≥ 0.07** (half the
+view; `docs/lift/sheets/mockup.png`), **failed ≥ 0.065** (half the
 floor). The per-query MSE of a 2-px / 10° pose error is already at the
 floor: on sharp strokes MSE does not grade near misses, so look at the
 grid.
@@ -114,5 +114,6 @@ odometry, query_pose, query_time=None)`; `spec` is
 ## Status
 
 Generator, coverage, oracle, encoding, the harness path and the ports
-`hybrid4c` and `vanilla4c` exist; see `docs/lift/build_log.md` for the
-first runs.
+`hybrid4c` and `vanilla4c` exist. First run: hybrid4c xs, 25k steps,
+eval 0.0655 (shuffled 0.0715, floor 0.131): the pipeline is proven, the
+task is not yet solved at that budget (`docs/lift/build_log.md`).
