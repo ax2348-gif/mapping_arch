@@ -89,16 +89,18 @@ work. Iterate locally first.
 
 ## Horizon: SE(3) with a camera (framing, 2026-10-16)
 
-**The objective is egocentric, streaming novel-view synthesis.**
-- The task family has always rendered the view at a query pose from history, end to end. Z², discrete SE(2) and continuous SE(2) are its rungs. The camera rung keeps the objective and inserts a projection.
+**The objective is egocentric novel-view synthesis, end to end.**
+- Render the view at a query pose from the observation and odometry/action history. Z², discrete SE(2) and continuous SE(2) are its rungs. The camera rung keeps the objective and inserts a projection.
+- **The models are deliberately NOT streaming.** The memory is recomputed from the full history every forward pass, which is acceptable as long as the compute is parallel. hybrid4 scans the whole history in both directions. Incremental state updates are not a goal.
 - **The user's distinction:**
-  - VGGT-type models predict geometry (cameras, depth, point maps) feed-forward. They are a partial existence proof that general transformers learn camera geometry, at scale.
+  - VGGT-type models predict geometry (cameras, depth, point maps) feed-forward: a partial existence proof that general transformers learn camera geometry, at scale.
   - They do not, and presently cannot, do novel-view synthesis end to end.
-- End-to-end NVS transformers exist (SRT, LVSM; details to check against the papers). They are offline and set-based, conditioned on calibrated per-image poses, with no persistent memory under actions.
+- End-to-end NVS transformers exist (SRT, LVSM; details to check against the papers). They are conditioned on calibrated per-image poses.
+- **LVSM's encoder-decoder** compresses posed views into latent scene tokens. The user notes it looks close to a scene memory a policy or world model could read end to end. A research agent is reviewing this: docs/lvsm_memory_review.md.
 - **Our niche:**
-  - a causal stream with odometry or actions only;
-  - a constant-state memory through partial observability;
-  - a geometric bias in that memory for efficiency.
+  - egocentric, with relative odometry or actions in place of calibrated poses;
+  - end-to-end NVS as the memory objective;
+  - a geometric bias (exact state rotations from odometry) for efficiency.
 
 **Proposed rungs.** Each has exact analytic rendering and lifts one thing at a time:
 1. SE(2) motion with a pinhole camera over a textured ground plane: a homography; camera, no occlusion.
@@ -106,7 +108,7 @@ work. Iterate locally first.
 3. 3D scenes with occlusion: true NVS.
 
 **Baselines for the camera rung:**
-- LVSM-style decoding over an egocentric stream: the vanilla analogue.
+- LVSM-style decoding, conditioned on the egocentric history: the vanilla analogue.
 - VGGT as the reference for geometry alone, and as an optional frozen visual front end.
 
 **Prerequisites:**
