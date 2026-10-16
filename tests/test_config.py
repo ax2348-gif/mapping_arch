@@ -1,10 +1,12 @@
 """The Hydra config tree (conf/, mapping/config.py, run.py).
 
-1. Every field is consumed. Every composable config (each model file, on
-   each schedule, and each experiment preset) instantiates; an unknown key
-   at any node is an error; and changing any value changes what the
-   trainer receives (the settings, or for architecture fields the built
-   model). So no field is ever composed that nothing reads.
+1. Every field is consumed. Every composable config (each model file,
+   each schedule, each experiment preset) instantiates; an unknown key at
+   any node is an error; a short real run of the trainer reads every
+   field of every object; and changing any value changes what the trainer
+   trains on (through the calls it makes: the generator config, the
+   learning rate, the model it builds), or is refused. So no field is
+   ever composed that nothing reads.
 2. The size ladders moved into conf/ladders/ are the old in-code
    tables, entry for entry and in order (tests/sizes_snapshot.json), and
    a model file's ladder is its module's. An override that would train
@@ -92,41 +94,96 @@ def _bump(v):
     raise TypeError(v)
 
 
-CONSUMED_CASES = [
-    ['model=z2/hybrid4'], ['model=z2/vanilla', 'schedule=wsd'], ['model=z2/lstm'],
-    ['model=z2/vanilla_depth'], ['model=se2d/vanilla4', 'schedule=wsd'],
-    ['model=se2d/hybrid45b_two'], ['model=se2c/hybrid4c'],
-    ['+experiment=se2c_bridge'], ['+experiment=se2d_scaling_wsd'],
-]
+CONSUMED_CASES = (
+    [[f'model={m}'] for m in MODELS]
+    + [['model=z2/hybrid4', f'schedule={os.path.basename(f)[:-5]}']
+       for f in sorted(glob.glob('conf/schedule/*.yaml'))]
+    + [[f'+experiment={p}'] for p in PRESETS])
+
+
+def trainer_inputs(e):
+    """What ``train.main`` derives from the objects, through the calls it
+    makes: the generator config (and spec, bank file and loader workers),
+    the learning rate at every step, the model it builds, and the
+    optimizer, run and evaluation settings."""
+    from dataclasses import asdict
+    from mapping.config import BankGenerator
+    g, t = e.task.generator, e.task
+    if isinstance(g, BankGenerator):
+        config, spec = g.data(t, e.run.seed)
+        data = (config, spec.__dict__, g.bank_path(), g.workers)
+    else:
+        data = g.config(t, e.run.seed)
+    steps = sorted({*range(0, e.run.steps, max(1, e.run.steps // 400)), e.run.steps - 1})
+    lrs = [e.schedule.lr(i, e.run.steps, e.optim.lr) for i in steps]
+    return (t.name, data, lrs, e.model.record(), asdict(e.optim), asdict(e.run),
+            asdict(e.eval))
 
 
 @pytest.mark.parametrize('overrides', CONSUMED_CASES, ids=lambda o: ' '.join(o))
 def test_every_field_is_consumed(overrides):
-    """Change each leaf in turn: the settings the trainer receives must
-    change, or, for an architecture field, the model must."""
+    """Change each leaf in turn: what the trainer trains on must change,
+    or the change must be refused (an architecture argument, a name). The
+    args record must change too, so the tools that read it see it."""
     base = OmegaConf.to_container(compose(*overrides))
     exp = run.build(OmegaConf.create(base))
-    a0 = vars(exp.legacy_args())
-    spec = tasks.config_and_spec(a0['task'], 32, 8, 0, 'uniform')[1]
+    t0, a0 = trainer_inputs(exp), vars(exp.legacy_args())
     for path, value in leaves(base):
         cfg = copy.deepcopy(base)
         node = cfg
         for k in path[:-1]:
             node = node[k]
         if path[0] == 'model' and path[1] in ('arch', 'size_kwargs'):
-            # an architecture argument: changing it would train another
-            # model than the registered one at this rung, so it is refused
             node[path[-1]] = (value * 2 if isinstance(value, int) else
                               (['first'] if value != ['first'] else ['last']))
-            with pytest.raises(InstantiationException):
-                run.build(OmegaConf.create(cfg))
-            continue
-        node[path[-1]] = _bump(value)
+        else:
+            node[path[-1]] = _bump(value)
         try:
-            a = vars(run.build(OmegaConf.create(cfg)).legacy_args())
-        except (InstantiationException, KeyError, ValueError, TypeError):
-            continue          # rejected outright (an unknown task or model name): consumed
-        assert a != a0, f'{".".join(path)} changed but the run settings did not'
+            e = run.build(OmegaConf.create(cfg))
+            t = trainer_inputs(e)
+        except Exception:
+            continue          # refused outright, before any training: loud
+        name = '.'.join(path)
+        assert t != t0, f'{name} changed but what the trainer trains on did not'
+        assert vars(e.legacy_args()) != a0, f'{name} changed but the args record did not'
+
+
+TRACKED_RUNS = {
+    'z2 cosine': ['model=z2/vanilla4', 'task.generator.workers=0'],
+    'se2d wsd': ['model=se2d/vanilla4', 'task.generator.workers=0', 'schedule=wsd',
+                 'task.generator.odometry_dropout=0.5'],
+    'se2c': ['model=se2c/vanilla4c', 'task.generator.holdout=[0.8,1.2]',
+             'task.generator.turn_n=8'],
+}
+
+
+@pytest.mark.parametrize('case', sorted(TRACKED_RUNS))
+def test_the_trainer_reads_every_field(tmp_path, monkeypatch, case):
+    """A short real run of ``train.main`` with every config object's
+    attribute reads recorded (not those that only build the args record,
+    or that dataclass machinery makes): each field of each object must be
+    read by the trainer."""
+    import sys
+    from dataclasses import fields
+    from mapping.config import NODES
+    skip = {'legacy_args', '__post_init__', '__repr__', '__eq__', '__hash__', '__init__'}
+    cfg = compose(*TRACKED_RUNS[case], 'run.device=cpu', 'run.steps=2', 'run.save_every=1',
+                  'eval.every=1', 'eval.log_every=1', 'eval.batches=1', 'optim.batch=2',
+                  'schedule.warmup=1', f'run.out={tmp_path}/run')
+    exp = run.build(cfg)
+    reads = set()
+    for cls in NODES:
+        names = {f.name for f in fields(cls)}
+
+        def tracked(self, key, _names=names):
+            if key in _names and sys._getframe(1).f_code.co_name not in skip:
+                reads.add((type(self).__name__, key))
+            return object.__getattribute__(self, key)
+        monkeypatch.setattr(cls, '__getattribute__', tracked)
+    train.main(exp, config=cfg)
+    nodes = (exp.run, exp.eval, exp.optim, exp.schedule, exp.task, exp.task.generator)
+    want = {(type(n).__name__, f.name) for n in nodes for f in fields(n)}
+    assert want - reads == set(), f'never read by the trainer: {sorted(want - reads)}'
 
 
 @pytest.mark.parametrize('node', ['', 'optim', 'run', 'eval', 'schedule', 'task',

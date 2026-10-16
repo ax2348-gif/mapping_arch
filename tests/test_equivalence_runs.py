@@ -7,7 +7,10 @@ Each case trains a short run three ways and compares everything it writes:
   run    this checkout's ``run.py`` with Hydra overrides written by hand
 On CPU the runs must be bit-identical: log.jsonl, final.json and the
 checkpoints' tensors and args (timing and the output path aside, and the
-task's old name ``se2`` read as ``se2d``), and grid.png byte for byte. The
+task's old name ``se2`` read as ``se2d``), and grid.png byte for byte. New
+checkpoints add one entry, ``arch`` (the class and constructor arguments
+the model was built with); it must rebuild the checkpoint's model, and
+everything else in them must be identical. The
 GPU case (a Triton delta-rule model) is not bit-reproducible even run to
 run (about 1e-6), so it is compared within that noise.
 
@@ -97,6 +100,22 @@ def same_tensors(a, b):
     return norm(a) == norm(b)
 
 
+def rebuilds(arch, state):
+    """``arch`` builds a module with exactly the checkpoint's parameters."""
+    import mapping.tasks as tasks
+    from mapping.checkpoint import build_from_arch
+    from mapping.task_se2c import TaskSpec as Se2cSpec
+    for spec in (tasks.config_and_spec('z2', 32, 8, 0)[1],
+                 tasks.config_and_spec('se2d', 32, 8, 0)[1], Se2cSpec()):
+        try:
+            got = build_from_arch(arch, spec).state_dict()
+        except Exception:
+            continue
+        if got.keys() == state.keys() and all(got[k].shape == state[k].shape for k in got):
+            return True
+    return False
+
+
 def same_grid(a, b):
     """Byte-identical, or identical pixels below the title line (the title
     names the task, so an se2d run's differs from the old se2 one's)."""
@@ -124,7 +143,9 @@ def test_cpu_runs_are_bit_identical(tmp_path, case):
         ckpt = checkpoints(dirs[k])
         assert ckpt.keys() == old_ckpt.keys(), k
         for name in ckpt:
+            arch = ckpt[name].pop('arch')        # new, additive
             assert same_tensors(ckpt[name], old_ckpt[name]), (k, name)
+            assert rebuilds(arch, ckpt[name]['model']), (k, name)
         assert same_grid(os.path.join(dirs[k], 'grid.png'), old_grid), k
         assert os.path.exists(os.path.join(dirs[k], 'config.yaml')), k
 

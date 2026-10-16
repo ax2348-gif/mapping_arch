@@ -90,12 +90,11 @@ def main(argv=None):
     else:
         cfg = resolved(load(overrides, exp))
     experiment = build(cfg)
-    args = experiment.legacy_args()
     if show:
         print(OmegaConf.to_yaml(cfg))
-        print('train.py ' + ' '.join(train.flags(args)))
+        print('train.py ' + ' '.join(train.flags(experiment.legacy_args())))
         return
-    train.main(args, config=cfg)
+    train.main(experiment, config=cfg)
 
 
 if __name__ == '__main__':

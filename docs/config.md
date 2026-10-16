@@ -1,16 +1,20 @@
 # Configuration (Hydra)
 
 A run is configured by composing the tree in `conf/` and instantiating it
-into the objects in `mapping/config.py`. The rule: **every field in a
-composed config is consumed by an object**.
+into the objects in `mapping/config.py`; the trainer (`train.main`) reads
+every setting from those objects. The rule: **every field in a composed
+config is consumed by the trainer**.
 - Variants (which generator a task uses, which schedule, which size) are
   chosen by the defaults list, so a run never carries the fields of a
   variant it does not use.
 - Every node instantiates a class with a strict signature, so an unknown
   or misspelled key is an error, not an ignored setting.
 
-`tests/test_config.py` enforces both. It changes every field of
-representative configs in turn and checks that the run changes.
+`tests/test_config.py` enforces this. A short real run of the trainer
+must read every field of every object, and changing any field of every
+model file, schedule and preset must change what the trainer trains on
+(the generator config, the learning rate at each step, the model it
+builds), or be refused.
 
 Behaviour is unchanged from the `train.py --flags` harness:
 `tests/test_equivalence_runs.py` trains short runs on the pre-refactor
@@ -142,9 +146,16 @@ run.seed=1`.
 - **The legacy `args`.** Checkpoints, `final.json` and the first record
   of `log.jsonl` keep the flat `args` dict as before, with the same keys
   and values as a `train.py --flags` run, so every tool and loader reads
-  new runs unchanged. It is an output only. Settings a run's variants do
-  not compose appear there at train.py's defaults, for example the se2c
-  generator fields on a z2 run.
+  new runs unchanged. It is an output only: the trainer never reads it.
+  Every task, generator and schedule field is copied into it under its
+  own name (the se2c texture as `se2c_texture`), so a new field reaches
+  it with no code. Settings a run's variants do not compose appear there
+  at train.py's defaults, for example the se2c generator fields on a z2
+  run.
+- **`arch` in checkpoints.** `final.pt` and `step<k>.pt` also hold
+  `arch`, the model's class and constructor arguments
+  (`Model.record()`). `load_checkpoint` builds from it, and falls back to
+  the registered module's `build(size, spec)` for older checkpoints.
 
 ## se2 is now se2d
 

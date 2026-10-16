@@ -2,9 +2,10 @@
 
 A run directory ``results/<model>/<size>/<run>/`` holds
 
-    final.pt      model weights plus the arguments and task spec that
-                  built it, enough to rebuild the model with no other
-                  information
+    final.pt      model weights plus the arguments, the task spec and
+                  the architecture (class and constructor arguments)
+                  that built it, enough to rebuild the model with no
+                  other information
     final.json    the summary a scaling fit reads: parameters, steps,
                   final and best evaluation, the shuffled-direction
                   evaluation, the constant floor, timing, arguments
@@ -18,14 +19,28 @@ import torch
 import mapping.tasks as tasks
 
 
-def save_checkpoint(path, model, args, spec, task='z2'):
-    torch.save({'model': model.state_dict(), 'args': dict(args),
-                'spec': spec.__dict__, 'task': task}, path)
+def save_checkpoint(path, model, args, spec, task='z2', arch=None):
+    """``arch``: ``mapping.config.Model.record()``, the class and
+    constructor arguments the model was built with."""
+    state = {'model': model.state_dict(), 'args': dict(args),
+             'spec': spec.__dict__, 'task': task}
+    if arch is not None:
+        state['arch'] = arch
+    torch.save(state, path)
+
+
+def build_from_arch(arch, spec):
+    """The module a checkpoint's ``arch`` record describes."""
+    import importlib
+    module, _, name = arch['class'].rpartition('.')
+    return getattr(importlib.import_module(module), name)(spec, **arch['kwargs'])
 
 
 def load_checkpoint(path, device='cpu'):
     """``(model in eval mode, args dict, TaskSpec, task name)`` from
-    ``final.pt`` or a mid-run ``step<k>.pt``. Checkpoints written before
+    ``final.pt`` or a mid-run ``step<k>.pt``. The model is built from the
+    checkpoint's ``arch`` record; checkpoints from before it existed use
+    the registered module's ``build(size, spec)``, and ones from before
     tasks existed are z2."""
     state = torch.load(path, map_location='cpu', weights_only=False)
     args = state['args']
@@ -38,7 +53,9 @@ def load_checkpoint(path, device='cpu'):
             task, args['episode_steps'], args['queries'], args['seed'],
             args['query_times'], args.get('step_px', 9),
             args.get('odometry_dropout', 0.0), args.get('texture', 'mnist'))
-    t = tasks.get(task)
-    model = t['models'].get(args['model']).build(args['size'], spec)
+    if 'arch' in state:
+        model = build_from_arch(state['arch'], spec)
+    else:
+        model = tasks.get(task)['models'].get(args['model']).build(args['size'], spec)
     model.load_state_dict(state['model'])
     return model.to(device).eval(), args, spec, task
