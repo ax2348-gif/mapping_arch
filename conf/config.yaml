@@ -33,6 +33,13 @@ run:
   root: results         # where run directories live (docs/config.md, "Run directories")
   # the run directory, the same template for every task; a preset may restructure it
   dir: ${run.root}/${task.name}/${model.name}/${model.size}/${run_name:${run.name},${run.seed}}
+  # REQUIRED at launch and never set in conf/ or a preset: what this run is for, like a
+  # commit message (run.note='...', xp run -m '...'); recorded in the ledger
+  note: null
+  tag: []               # campaign labels (a preset may set them), recorded in the ledger
+  provenance:           # the code snapshot every run makes (mapping/provenance.py)
+    _target_: mapping.config.Provenance
+    max_untracked_mb: 20  # refuse to snapshot an untracked file larger than this
   steps: 2000
   seed: 0
   save_every: 0         # write step<k>.pt (with optimizer) every k steps

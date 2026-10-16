@@ -225,6 +225,6 @@ def test_odometry_dropout_outside_0_1_is_refused(p):
             run.build(run.resolved(run.load([f'model={model}',
                                              f'task.generator.odometry_dropout={p}'])))
     with pytest.raises(Exception, match='probability'):
-        train.main_from_flags(['--task', 'se2c', '--model', 'vanilla4c', '--size', 'xs',
+        train.main_from_flags(['--note', 'test', '--task', 'se2c', '--model', 'vanilla4c', '--size', 'xs',
                                '--odometry-dropout', str(p), '--device', 'cpu',
                                '--out', '/nonexistent/never_written'])

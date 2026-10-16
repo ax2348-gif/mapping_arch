@@ -105,7 +105,10 @@ CONSUMED_CASES = (
 # record (it must stay what train.py --flags gives): config.yaml has them.
 # run.root and run.dir say where the run is written (the args record keeps
 # train.py's ``out``, null for a default directory, as before them).
-NOT_IN_RECORD = {'run.overwrite', 'run.root', 'run.dir'}
+# run.note, run.tag and run.provenance are launch metadata, recorded in the
+# provenance ledger only (tests/test_provenance.py: they change no training input).
+NOT_IN_RECORD = {'run.overwrite', 'run.root', 'run.dir', 'run.note', 'run.tag',
+                 'run.provenance.max_untracked_mb'}
 
 
 def trainer_inputs(e):
@@ -175,7 +178,8 @@ def test_the_trainer_reads_every_field(tmp_path, monkeypatch, case):
     from dataclasses import fields
     from mapping.config import NODES
     skip = {'legacy_args', '__post_init__', '__repr__', '__eq__', '__hash__', '__init__'}
-    cfg = compose(*TRACKED_RUNS[case], 'run.device=cpu', 'run.steps=2', 'run.save_every=1',
+    cfg = compose(*TRACKED_RUNS[case], 'run.note=test', 'run.device=cpu', 'run.steps=2',
+                  'run.save_every=1',
                   'eval.every=1', 'eval.log_every=1', 'eval.batches=1', 'optim.batch=2',
                   'schedule.warmup=1', f'run.root={tmp_path}')   # run.out unset: the template is read
     exp = run.build(cfg)
@@ -357,7 +361,7 @@ def test_external_experiment_file(tmp_path):
 
 
 TINY = ['run.device=cpu', 'run.steps=2', 'eval.every=2', 'eval.log_every=2',
-        'eval.batches=1', 'optim.batch=2']
+        'eval.batches=1', 'optim.batch=2', 'run.note=test']
 
 
 def test_an_experiment_file_named_like_a_preset_is_that_file(tmp_path):
@@ -376,7 +380,7 @@ def test_a_run_directory_is_never_overwritten_silently(tmp_path):
         run.main(['model=se2c/vanilla4c', out, 'run.seed=1', *TINY])
     assert open(tmp_path / 'r' / 'log.jsonl').read() == before
     with pytest.raises(SystemExit, match='is not empty'):     # --from, same name
-        run.main(['--from', str(tmp_path / 'r' / 'config.yaml'), 'run.seed=1'])
+        run.main(['--from', str(tmp_path / 'r' / 'config.yaml'), 'run.seed=1', 'run.note=test'])
     run.main(['model=se2c/vanilla4c', out, 'run.seed=1', 'run.overwrite=true', *TINY])
     assert open(tmp_path / 'r' / 'log.jsonl').read() != before
 
@@ -473,17 +477,18 @@ def test_flags_translation_ignores_settings_flags_cannot_express(monkeypatch):
     monkeypatch.setattr(Experiment, 'legacy_args', with_new_field)
     ran = []
     monkeypatch.setattr(train, 'main', lambda e, config=None, sources=None: ran.append(e))
-    train.main_from_flags('--task se2c --model hybrid4c --size xs'.split())
+    train.main_from_flags('--task se2c --model hybrid4c --size xs --note test'.split())
     assert len(ran) == 1
 
 
 def test_old_se2_checkpoints_load_as_se2d(tmp_path):
-    from mapping.checkpoint import load_checkpoint, save_checkpoint
+    from mapping.checkpoint import load_checkpoint
     module = tasks.get('se2d')['models'].get('vanilla4')
     spec = tasks.config_and_spec('se2d', 32, 8, 0)[1]
     args = vars(train.parse('--task se2d --model vanilla4 --size xs'.split()))
-    save_checkpoint(tmp_path / 'final.pt', module.build('xs', spec), {**args, 'task': 'se2'},
-                    spec, 'se2')                  # as written before the rename, no arch
+    # exactly as written before the rename: no arch, no provenance
+    torch.save({'model': module.build('xs', spec).state_dict(), 'args': {**args, 'task': 'se2'},
+                'spec': spec.__dict__, 'task': 'se2'}, tmp_path / 'final.pt')
     assert load_checkpoint(tmp_path / 'final.pt')[3] == 'se2d'
 
 
@@ -539,6 +544,7 @@ def test_job_generators_write_commands_that_compose(tmp_path):
     e = run.build(run.resolved(run.load(argv)))
     assert (e.model.size, e.optim.lr, e.schedule.name, e.run.name, e.task.generator.workers) == (
         's', 1e-3, 'wsd', 'seed0_lr1e-3', 4)
+    assert e.run.note == 'scaling se2d hybrid4 s seed0_lr1e-3'      # one note per task
     out = tmp_path / 'cd.sbatch'
     r = subprocess.run([sys.executable, os.path.join(here, 'tools', 'branch_jobs.py'),
                         '--task', 'se2c', '--model', 'hybrid4c', '--sizes', 'xs',
@@ -549,6 +555,7 @@ def test_job_generators_write_commands_that_compose(tmp_path):
                               '$(( S / 1000 ))': '62', '$S': '62500'})
     e = run.build(run.resolved(run.load(argv)))
     assert (e.task.name, e.run.steps, e.run.name, e.schedule.name) == ('se2c', 62500, 'p_cd62k', 'wsd')
+    assert e.run.note == 'cooldown se2c hybrid4c xs p to 62500 steps'
 
 
 def test_a_value_for_another_variant_is_explained(tmp_path):

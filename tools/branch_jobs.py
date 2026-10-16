@@ -43,7 +43,8 @@ python -c "import hydra, omegaconf; print('hydra-core', hydra.__version__, 'omeg
 test -f $PARENT/step$K.pt
 python run.py model={task}/{model} model.size=$SIZE run.steps=$S \\
     schedule=wsd run.branch=$PARENT/step$K.pt run.name={parent}_cd$(( S / 1000 ))k \\
-    optim.batch=64 run.seed={seed} {workers} eval.every=2500 eval.log_every=1000 {extra}
+    optim.batch=64 run.seed={seed} {workers} eval.every=2500 eval.log_every=1000 {extra} \\
+    "run.note='cooldown {task} {model} $SIZE {parent} to $S steps'"
 """
 
 

@@ -83,12 +83,21 @@ class Node:
 
 
 @dataclass(frozen=True)
+class Provenance(Node):
+    """The code snapshot every run makes (mapping/provenance.py)."""
+    max_untracked_mb: int        # an untracked file larger than this is refused
+
+
+@dataclass(frozen=True)
 class Run(Node):
     """Where the run goes, how long, and on what."""
     name: Optional[str]          # run directory name; None: seed<seed>
     out: Optional[str]           # explicit run directory; wins over dir
     root: str                    # where run directories live
     dir: str                     # the run directory: ${root}/<task>/<model>/<size>/<name>
+    note: Optional[str]          # required at launch (run.py refuses none); ledger only
+    tag: tuple                   # campaign labels; ledger only
+    provenance: Provenance
     steps: int
     seed: int
     save_every: int              # write step<k>.pt every k steps; 0: never
@@ -97,6 +106,16 @@ class Run(Node):
     bf16: bool                   # bf16 autocast (CUDA only; ignored on CPU)
     compile: bool
     overwrite: bool              # write into a non-empty run directory
+
+    def __post_init__(self):
+        super().__post_init__()
+        if isinstance(self.tag, str):
+            object.__setattr__(self, 'tag', (self.tag,))
+        if isinstance(self.note, str):
+            object.__setattr__(self, 'note', self.note.strip())
+        if not isinstance(self.provenance, Provenance):
+            raise TypeError(f'run.provenance must instantiate a Provenance, got '
+                            f'{type(self.provenance).__name__}')
 
     def location(self):
         """Where this run writes: ``{'dir', 'root', 'rel'}``. ``dir`` is

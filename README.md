@@ -123,7 +123,7 @@ from a learning-rate grid; name one anything with `--run`.
 3. **Check the ladder.** `python scaling.py --model <name> --dry` prints
    parameters and learning rate per rung. Confirm the largest rung fits a
    batch of 64 in bf16 on the local GPU.
-4. **Smoke test.** `python train.py --model <name> --size xs --steps 500`.
+4. **Smoke test.** `python run.py model=z2/<name> run.steps=500 run.note=smoke`.
    Read three things from the output: eval mse against the constant floor
    printed at the start; `dirs shuffled mse`, which must eventually rise
    above eval mse or the model is not using the odometry; and
@@ -138,29 +138,32 @@ from a learning-rate grid; name one anything with `--run`.
 ## Training and evaluating
 
 Runs are configured with Hydra: `python run.py model=se2d/hybrid4
-model.size=m`, presets with `+experiment=<name>`, your own experiment
-file with `--exp file.yaml`, reruns with `--from <run>/config.yaml`. See
-`docs/config.md`. The `train.py` flags below still work and run exactly
-the same thing.
+model.size=m run.note='<what this run is for>'`, presets with
+`+experiment=<name>`, your own experiment file with `--exp file.yaml`,
+reruns with `--from <run>/config.yaml`. See `docs/config.md`. Every run
+needs a note (`run.note`, like a commit message) and is pinned to a
+snapshot commit of its code with a ledger record (docs/config.md,
+"Provenance"). The `train.py` flags below still work and run exactly the
+same thing; they take the note as `--note`.
 
 ```bash
-python train.py --model vanilla --size m --steps 20000          # one run
-python train.py --model vanilla --size m --steps 20000 --lr 1e-3 --run seed0_lr1e-3
+python train.py --note <note> --model vanilla --size m --steps 20000          # one run
+python train.py --note <note> --model vanilla --size m --steps 20000 --lr 1e-3 --run seed0_lr1e-3
 python render.py results/z2/vanilla/m/seed0/final.pt --rows 24  # redraw
 # generator settings (same tasks, CONTRACT.md "Generator settings"):
-python train.py --task se2d --model hybrid4 --size xs --query-times uniform \
+python train.py --note <note> --task se2d --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --run seed0_vo  # visual odometry
 python tools/registrability.py --step-px 1 2 3     # ceiling for that run
-python train.py --task se2d --model hybrid4 --size xs --query-times uniform \
+python train.py --note <note> --task se2d --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --texture imagenette \
     --run seed0_vo_imagenette                      # VO on natural images
 python tools/registrability.py --texture imagenette --step-px 1 2 3
-python train.py --task se2d --model hybrid4 --size xs --query-times uniform \
+python train.py --note <note> --task se2d --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --texture imagenette_hp \
     --run seed0_vo_imagenette_hp                   # VO, brightness removed
 python tools/registrability.py --texture imagenette_hp --step-px 3
 # continuous SE(2) (CONTRACT_SE2C.md), batches generated on the GPU:
-python train.py --task se2c --model hybrid4c --size xs --query-times uniform \
+python train.py --note <note> --task se2c --model hybrid4c --size xs --query-times uniform \
     --steps 20000 --run seed0                      # results/se2c/...
 python tools/se2c_sheets.py                        # texture contact sheets
 python tools/se2c_bench.py --sizes xs s            # se2c throughput

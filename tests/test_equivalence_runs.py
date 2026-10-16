@@ -8,9 +8,13 @@ Each case trains a short run three ways and compares everything it writes:
 On CPU the runs must be bit-identical: log.jsonl, final.json and the
 checkpoints' tensors and args (timing and the output path aside, and the
 task's old name ``se2`` read as ``se2d``), and grid.png byte for byte. New
-checkpoints add one entry, ``arch`` (the class and constructor arguments
-the model was built with); it must rebuild the checkpoint's model, and
-everything else in them must be identical. The
+checkpoints add two entries: ``arch`` (the class and constructor arguments
+the model was built with), which must rebuild the checkpoint's model, and
+``provenance`` (the run id and code snapshot, mapping/provenance.py), which
+must name the run that wrote it (its RUN_ID, provenance.json and completed
+ledger record); everything else in them must be identical. The run note
+every new run carries is launch metadata and reaches none of the compared
+files. The
 GPU case (a Triton delta-rule model) is not bit-reproducible even run to
 run (about 1e-6), so it is compared within that noise.
 
@@ -72,7 +76,10 @@ def ref_has_se2c_dropout():
 GPU_CASE = (['--task', 'se2d', '--model', 'hybrid4', '--size', 'xs', '--workers', '2'],
             ['model=se2d/hybrid4', 'task.generator.workers=2'])
 TIMING = ('elapsed_s', 'steps_per_s')
-NOTE = []          # run.py launch arguments every run needs besides its overrides
+# every run needs a note (launch metadata, never in the args record or the
+# training inputs, so it cannot touch the bitwise comparison)
+NOTE = ['run.note=test']
+FLAGS_NOTE = ['--note', 'test']
 
 
 def launch(cwd, script, argv, out):
@@ -86,8 +93,8 @@ def three_runs(tmp_path, flags, overrides):
     old_flags = ['se2' if f == 'se2d' else f for f in flags]   # the old task name
     dirs = {k: str(tmp_path / k) for k in ('old', 'flags', 'run')}
     launch(REF, 'train.py', old_flags + COMMON, dirs['old'])
-    launch(HERE, 'train.py', flags + COMMON, dirs['flags'])
-    launch(HERE, 'run.py', overrides + COMMON_RUN, dirs['run'])
+    launch(HERE, 'train.py', flags + COMMON + FLAGS_NOTE, dirs['flags'])
+    launch(HERE, 'run.py', overrides + COMMON_RUN + NOTE, dirs['run'])
     return dirs
 
 
@@ -172,10 +179,22 @@ def test_cpu_runs_are_bit_identical(tmp_path, case):
         assert ckpt.keys() == old_ckpt.keys(), k
         for name in ckpt:
             arch = ckpt[name].pop('arch')        # new, additive
+            stamp = ckpt[name].pop('provenance')  # new, additive (mapping/provenance.py)
             assert same_tensors(ckpt[name], old_ckpt[name]), (k, name)
             assert rebuilds(arch, ckpt[name]['model']), (k, name)
+            assert stamped_by_its_run(dirs[k], stamp), (k, name, stamp)
         assert same_grid(os.path.join(dirs[k], 'grid.png'), old_grid), k
         assert os.path.exists(os.path.join(dirs[k], 'config.yaml')), k
+
+
+def stamped_by_its_run(d, stamp):
+    """A checkpoint's provenance stamp names the run that wrote it: the
+    run directory's RUN_ID and its ledger record's code snapshot."""
+    prov = json.load(open(os.path.join(d, 'provenance.json')))
+    ledger = os.path.join(os.environ['XP_LEDGER_DIR'], prov['host'], prov['run_id'] + '.json')
+    return (stamp == {'run_id': prov['run_id'], 'snapshot': prov['code']['snapshot']}
+            and open(os.path.join(d, 'RUN_ID')).read().strip() == prov['run_id']
+            and json.load(open(ledger))['status'] == 'completed')
 
 
 def gap(log_a, log_b):

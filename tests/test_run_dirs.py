@@ -23,7 +23,7 @@ import run
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TINY = ['run.device=cpu', 'run.steps=2', 'eval.every=2', 'eval.log_every=2',
-        'eval.batches=1', 'optim.batch=2']
+        'eval.batches=1', 'optim.batch=2', 'run.note=test']
 
 
 def location(*overrides):
@@ -68,6 +68,7 @@ def test_a_run_writes_to_its_template_directory(tmp_path):
     saved = OmegaConf.load(d / 'config.yaml')
     assert (saved.run.root, saved.run.dir) == (str(tmp_path), str(d))
     assert sorted(os.listdir(tmp_path)) == ['z2']
+    assert (d / 'RUN_ID').exists() and (d / 'provenance.json').exists()
 
 
 @pytest.mark.skipif(shutil.which('rsync') is None, reason='needs rsync')

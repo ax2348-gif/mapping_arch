@@ -11,6 +11,11 @@ A run directory ``results/<task>/<model>/<size>/<run>/`` (``run.dir``) holds
                   evaluation, the constant floor, timing, arguments
     log.jsonl     one record per logging interval
     grid.png      sampled predictions beside their targets
+    RUN_ID        the run id (mapping/provenance.py), claimed at creation
+    provenance.json  the run's ledger record (code snapshot, config, env)
+    pip_freeze.txt   the installed packages
+
+Every checkpoint also carries ``provenance``: ``{run_id, snapshot}``.
 
 ``load_checkpoint`` rebuilds the model from ``final.pt`` alone.
 """
@@ -19,14 +24,31 @@ import torch
 import mapping.tasks as tasks
 
 
-def save_checkpoint(path, model, args, spec, task='z2', arch=None):
-    """``arch``: ``mapping.config.Model.record()``, the class and
-    constructor arguments the model was built with."""
+def save(record, path, state):
+    """THE checkpoint writer: every ``.pt`` a run writes goes through here.
+    It needs the run's live ledger record (``mapping.provenance.Record``),
+    embeds its ``provenance`` stamp (run id and code snapshot) so a
+    checkpoint found anywhere leads back to its ledger entry, and records
+    the checkpoint in the ledger. tests/test_provenance.py checks that no
+    other module in the training path calls ``torch.save``."""
+    if record is None or getattr(record, 'ended', True) or getattr(record, 'out', None) is None:
+        raise RuntimeError(f'{path}: a checkpoint needs a live provenance record '
+                           f'(mapping.provenance.begin); none was given')
+    torch.save({**state, 'provenance': record.stamp()}, path)
+    record.checkpoint(state.get('step', record.data['progress']['last_step']), path)
+
+
+def save_checkpoint(record, path, model, args, spec, task='z2', arch=None, step=None):
+    """``final.pt``: the weights, the args record, the spec and the task.
+    ``arch``: ``mapping.config.Model.record()``, the class and constructor
+    arguments the model was built with. Written through ``save``."""
     state = {'model': model.state_dict(), 'args': dict(args),
              'spec': spec.__dict__, 'task': task}
     if arch is not None:
         state['arch'] = arch
-    torch.save(state, path)
+    save(record, path, state)
+    if step is not None:
+        record.checkpoint(step, path)
 
 
 def build_from_arch(arch, spec):

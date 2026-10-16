@@ -1,0 +1,6 @@
+# Logical hosts for run ids and ledger directories (mapping/provenance.py, host()).
+# XP_HOST wins; else the machine name is matched against `machines` (exact or glob).
+# Torch jobs and held-GPU sessions set XP_HOST=torch (docs/provenance_design.md §1).
+# Not a Hydra config group: run.py never composes this file.
+machines:
+  erid-2: erid-2

@@ -228,8 +228,8 @@ sweep needs no extra flags.
 2. `docs/models/<name>.md`, at most a page: the architecture, why it might
    integrate odometry where a vanilla transformer would not, the scaling
    rule and expected failure modes, and the smoke results.
-3. A smoke run on the local GPU: `python train.py --model <name> --size xs
-   --steps 500` must run, and its final `eval mse` must beat the constant
+3. A smoke run on the local GPU: `python run.py model=z2/<name> run.steps=500
+   run.note=smoke` must run, and its final `eval mse` must beat the constant
    floor printed at the start. Report the numbers. If 500 steps is not
    enough to beat the floor, run longer and say how long it took. The
    trainer also reports `dirs shuffled mse`: the same evaluation with each

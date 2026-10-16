@@ -173,9 +173,14 @@ def test_config_from_old_args():
 
 def test_checkpoint_roundtrip(tmp_path):
     from mapping.checkpoint import load_checkpoint, save_checkpoint
+    from mapping.provenance import Record
     _, spec = tasks.config_and_spec('z2', 32, 8, 0, 'last', 3, 1.0)
     net = tasks.get('z2')['models'].get('mlp').build('xs', spec)
-    save_checkpoint(tmp_path / 'final.pt', net,
+    record = Record(str(tmp_path / 'ledger.json'),          # a live record, as a run has
+                    {'run_id': 'r', 'code': {'snapshot': '0' * 40},
+                     'progress': {'last_step': 0, 'checkpoints': []}}, '')
+    record.out = str(tmp_path)
+    save_checkpoint(record, tmp_path / 'final.pt', net,
                     {'model': 'mlp', 'size': 'xs'}, spec, 'z2')
     _, _, spec2, _ = load_checkpoint(tmp_path / 'final.pt')
     assert spec2 == spec

@@ -12,7 +12,8 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def tiny_run(out, *overrides):
-    cmd = [sys.executable, 'run.py', 'model=se2c/vanilla4c', 'model.size=xs', 'run.device=cpu',
+    cmd = [sys.executable, 'run.py', 'model=se2c/vanilla4c', 'model.size=xs', 'run.note=test',
+           'run.device=cpu',
            'run.steps=2', 'eval.every=2', 'eval.log_every=2', 'eval.batches=1', 'optim.batch=2',
            'task.query_times=uniform', f'run.out={out}', *overrides]
     r = subprocess.run(cmd, cwd=HERE, capture_output=True, text=True)

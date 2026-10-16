@@ -6,6 +6,12 @@
     python run.py --from results/se2c/hybrid4c/m/<run>/config.yaml run.name=rerun
     python run.py ... --print            # the resolved config and train.py flags; no run
 
+Every run needs ``run.note='<what this run is for>'`` on the command line,
+like a commit message (``mapping.provenance.check_note``). Each run is
+pinned to a snapshot commit of its code (``refs/runs/<run_id>``) and gets
+a ledger record (``experiments/ledger/<host>/<run_id>.json``) before it
+trains (mapping/provenance.py).
+
 Arguments are Hydra overrides (``key=value``, ``group=option``,
 ``+experiment=name``). ``--exp FILE`` composes an experiment file from
 anywhere exactly like a preset in ``conf/experiment/``. ``--from FILE``
@@ -147,7 +153,12 @@ def differences(a, b, prefix=''):
 # files: the run directory template (2026-10-16). They say where a run is
 # written, never what it trains, so recomposing an older run may add them
 # (the current defaults) without that counting as drift.
-ADDED_RUN_FIELDS = ('run.root', 'run.dir')
+ADDED_RUN_FIELDS = ('run.root', 'run.dir', 'run.note', 'run.tag', 'run.provenance')
+
+# Run fields that are metadata about a launch, not settings: never compared
+# as drift, never carried into a rerun's sources (a rerun gets its own note)
+LAUNCH_ONLY = ('run.overwrite', 'run.note')
+METADATA = ('run.note', 'run.tag', 'run.provenance')
 
 
 def _added_since(saved):
@@ -177,7 +188,7 @@ def rerun(frm, overrides):
         exp = os.path.join(d, rec['experiment']) if rec.get('experiment') else None
         again = OmegaConf.to_container(resolved(load(rec['overrides'], exp)))
         drift = [k for k in differences(again, saved)
-                 if k != 'run.overwrite' and k not in _added_since(saved)]
+                 if k not in LAUNCH_ONLY and k not in _added_since(saved)]
         if drift:
             raise SystemExit(f'{frm}: composing its sources ({src}) with the current '
                              f'conf/ no longer gives its saved config; changed: '
@@ -198,12 +209,15 @@ def rerun(frm, overrides):
             raise SystemExit(f'{o}: {frm} has no overrides.yaml (it predates them), so '
                              f'only value overrides of existing keys apply (key=value), '
                              f'not group choices or added/removed keys')
+        if key == 'run.note':                 # the launcher's, never the saved one
+            continue
         if OmegaConf.select(cfg, key, default='<missing>') == '<missing>':
             raise SystemExit(f'{o}: {frm} has no key {key!r}')
         if OmegaConf.is_dict(OmegaConf.select(cfg, key)):
             raise SystemExit(f'{o}: {key} is a config node, not a value. {frm} has no '
                              f'overrides.yaml (it predates them), so a group choice '
                              f'cannot be recomposed; only key=value on existing leaves')
+    cfg.run.note = None                      # a rerun's note is its own
     cfg.merge_with(OmegaConf.from_dotlist(overrides))
     if OmegaConf.select(cfg, 'run.overwrite', default=None) is None:
         cfg.run.overwrite = False            # runs saved before the field existed
@@ -224,12 +238,13 @@ def flags_equivalent(cfg, experiment):
             again = resolved(load(train.overrides_from_flags(train.parse(flags))))
         drift = [k for k in differences(OmegaConf.to_container(again),
                                         OmegaConf.to_container(cfg))
-                 if k not in ('run.overwrite',)]
+                 if k != 'run.overwrite' and not k.startswith(METADATA)]
     except (SystemExit, Exception) as e:
         drift = [f'the flags do not parse ({e})']
     if drift:
         return '# no exact train.py equivalent (differs: ' + ', '.join(drift) + ')'
-    return 'train.py ' + ' '.join(flags)
+    note = OmegaConf.select(cfg, 'run.note')
+    return 'train.py ' + ' '.join(flags) + (f' --note {train._value(note)}' if note else '')
 
 
 def parse_cli(argv):
@@ -278,7 +293,20 @@ def main(argv=None):
         print(OmegaConf.to_yaml(cfg))
         print(flags_equivalent(cfg, experiment))
         return
+    cfg.run.note = check_launch_note(cfg, overrides)     # stripped, as recorded
     train.main(experiment, config=cfg, sources=sources)
+
+
+def check_launch_note(cfg, overrides):
+    """``run.note`` is required, non-empty, and given by the launcher (an
+    override on this command line), never by a preset or experiment file."""
+    from mapping.provenance import NOTE_HELP, check_note
+    given = [o for o in overrides if _key(o) == 'run.note']
+    note = OmegaConf.select(cfg, 'run.note')
+    if note is not None and not given:
+        raise SystemExit(f'run.note={note!r} comes from a file (a preset, an experiment '
+                         f'file or a saved run), not from this launch. {NOTE_HELP}')
+    return check_note(note)
 
 
 if __name__ == '__main__':

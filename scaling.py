@@ -54,7 +54,8 @@ cd {workdir}
 python -c "import hydra, omegaconf; print('hydra-core', hydra.__version__, 'omegaconf', omegaconf.__version__)" \\
     || {{ echo "this venv lacks the config tree's dependencies: pip install -r requirements.txt" >&2; exit 1; }}
 python run.py model={task}/{model} model.size=$SIZE run.name=$RUN run.steps={steps} \\
-    optim.batch={batch} run.seed={seed} {workers} $LRFLAG {extra}
+    optim.batch={batch} run.seed={seed} {workers} $LRFLAG {extra} \\
+    "run.note='scaling {task} {model} $SIZE $RUN'"
 """
 
 
@@ -123,6 +124,7 @@ def main():
                     cmd += [f'optim.lr={lr}']
                     run += f'_lr{lr}'
                 cmd += [f'run.name={run + args.tag}'] + args.extra.split()
+                cmd += [f"run.note='scaling {args.task} {args.model} {size} {run + args.tag}'"]
                 print('>>', ' '.join(cmd), flush=True)
                 subprocess.run(cmd, check=True)
 

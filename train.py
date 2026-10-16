@@ -37,9 +37,10 @@ import time
 
 import torch
 
+import mapping.provenance as provenance
 import mapping.tasks as tasks
 from mapping.data import TEXTURES, check_texture
-from mapping.checkpoint import save_checkpoint
+from mapping.checkpoint import save, save_checkpoint
 from mapping.loader import eval_set, load_banks, train_loader
 from mapping.models import cuda_only
 from mapping.plot import plot_run
@@ -278,9 +279,14 @@ def main(experiment, config=None, sources=None):
 
     A run directory that is not empty is refused unless
     ``run.overwrite``; nothing is written until the data, the model and
-    the device have been checked."""
+    the device have been checked. Then ``mapping.provenance.begin`` pins
+    the code (a snapshot at ``refs/runs/<run_id>``) and writes the ledger
+    record, before the run directory or any training step exists; the
+    record is ended however the run ends, and every checkpoint carries the
+    run id (``mapping.checkpoint.save``). ``run.note`` is required."""
     e = experiment
     r, t, g, o, ev, sched = e.run, e.task, e.task.generator, e.optim, e.eval, e.schedule
+    provenance.check_note(r.note)            # before anything else: no note, no run
     args = e.legacy_args()                  # the record: output only
     torch.manual_seed(r.seed)
     device = torch.device(r.device or ('cuda' if torch.cuda.is_available() else 'cpu'))
@@ -399,132 +405,140 @@ def main(experiment, config=None, sources=None):
         opt.load_state_dict(branch['opt'])
         print(f'branched from {r.branch} at step {start}', flush=True)
 
-    # everything is checked: only now does the run directory get written
-    os.makedirs(out, exist_ok=True)
-    write_sources(out, config, sources)
+    # everything is checked: pin the code and open the ledger record, then
+    # (only now) write the run directory
+    data_files = [bank] if not gpu_data else (
+        [TEXTURES[g.texture]['path']] if g.texture in TEXTURES else [])
+    record = provenance.begin(e, config, sources, where, data_files, device=device,
+                              parent=branch)
+    with record.lifetime():
+        os.makedirs(out, exist_ok=True)
+        record.attach(out, overwrite=r.overwrite)
+        write_sources(out, config, sources)
 
-    print(f'{t.name} {e.model.name}/{e.model.size} -> {out} '
-          f'({"under " + where["root"] if where["rel"] else "outside run.root " + where["root"]}): '
-          f'{params:,} params, '
-          f'lr {lr:.2g}; floor mse {floor["mse"]:.4f}, '
-          f'floor fg_mae {floor["fg_mae"]:.4f}, floor c-mse '
-          f'{floor["mse_centered"]:.4f}; step_px {args.step_px}, '
-          f'odometry_dropout {args.odometry_dropout}; texture '
-          + (f'{texture["texture"]} (se2c generator {texture["generator"]})'
-             if gpu_data else
-             f'{g.texture} ({bank}, tile {config_.tile}, cutoff '
-             f'{config_.cutoff})'), flush=True)
-    if not shuffle_informative:
-        print('all odometry is dropped: the "dirs shuffled" number permutes '
-              'unknown symbols only and equals eval mse by construction; it '
-              'says nothing about odometry use', flush=True)
-    log = open(os.path.join(out, 'log.jsonl'), 'w')
-    log.write(json.dumps({'step': 0, 'task': t.name, 'model': e.model.name,
-                          'size': e.model.size, 'run': run, 'params': params,
-                          'lr': lr, 'floor': floor,
-                          'schedule': sched.name, 'branch': r.branch,
-                          'start': start, 'step_px': args.step_px,
-                          'odometry_dropout': args.odometry_dropout,
-                          'offset_max': getattr(spec, 'offset_max', None),
-                          'shuffle_informative': shuffle_informative,
-                          **texture,
-                          'args': vars(args)}) + '\n')
-    log.flush()
-    arch = e.model.record()
-    best, best_step = None, -1
-    t_start = time.perf_counter()
-    running, since = 0.0, 0
-    it = source if gpu_data else iter(loader)
-    rec = None
-    for step in range(start, r.steps):
-        for group in opt.param_groups:
-            group['lr'] = sched.lr(step, r.steps, lr)
-        obs, directions, offset, target, qtime = prepare(next(it), device)
-        with autocast:
-            pred = call(model, obs, directions, offset, qtime, takes_time)
-        loss = loss_fn(pred, target)
-        opt.zero_grad(set_to_none=True)
-        loss.backward()
-        if o.clip:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), o.clip)
-        opt.step()
-        running += loss.item()
-        since += 1
+        print(f'{t.name} {e.model.name}/{e.model.size} -> {out} '
+              f'({"under " + where["root"] if where["rel"] else "outside run.root " + where["root"]}): '
+              f'{params:,} params, '
+              f'lr {lr:.2g}; floor mse {floor["mse"]:.4f}, '
+              f'floor fg_mae {floor["fg_mae"]:.4f}, floor c-mse '
+              f'{floor["mse_centered"]:.4f}; step_px {args.step_px}, '
+              f'odometry_dropout {args.odometry_dropout}; texture '
+              + (f'{texture["texture"]} (se2c generator {texture["generator"]})'
+                 if gpu_data else
+                 f'{g.texture} ({bank}, tile {config_.tile}, cutoff '
+                 f'{config_.cutoff})'), flush=True)
+        if not shuffle_informative:
+            print('all odometry is dropped: the "dirs shuffled" number permutes '
+                  'unknown symbols only and equals eval mse by construction; it '
+                  'says nothing about odometry use', flush=True)
+        log = open(os.path.join(out, 'log.jsonl'), 'w')
+        log.write(json.dumps({'step': 0, 'task': t.name, 'model': e.model.name,
+                              'size': e.model.size, 'run': run, 'params': params,
+                              'lr': lr, 'floor': floor,
+                              'schedule': sched.name, 'branch': r.branch,
+                              'start': start, 'step_px': args.step_px,
+                              'odometry_dropout': args.odometry_dropout,
+                              'offset_max': getattr(spec, 'offset_max', None),
+                              'shuffle_informative': shuffle_informative,
+                              **texture,
+                              'args': vars(args)}) + '\n')
+        log.flush()
+        arch = e.model.record()
+        best, best_step = None, -1
+        t_start = time.perf_counter()
+        running, since = 0.0, 0
+        it = source if gpu_data else iter(loader)
+        rec = None
+        for step in range(start, r.steps):
+            for group in opt.param_groups:
+                group['lr'] = sched.lr(step, r.steps, lr)
+            obs, directions, offset, target, qtime = prepare(next(it), device)
+            with autocast:
+                pred = call(model, obs, directions, offset, qtime, takes_time)
+            loss = loss_fn(pred, target)
+            opt.zero_grad(set_to_none=True)
+            loss.backward()
+            if o.clip:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), o.clip)
+            opt.step()
+            running += loss.item()
+            since += 1
 
-        last = step == r.steps - 1
-        if (step + 1) % ev.log_every == 0 or last:
-            elapsed = time.perf_counter() - t_start
-            rec = {'step': step + 1, 'train_mse': running / since,
-                   'lr': sched.lr(step, r.steps, lr), 'elapsed_s': elapsed,
-                   'steps_per_s': (step + 1) / elapsed}
-            running, since = 0.0, 0
-            if (step + 1) % ev.every == 0 or last:
-                res = evaluate(model, held_out, device, autocast, prepare,
-                               metrics, takes_time, spec.steps,
-                               by_query=by_query)
-                rec['eval'] = res
-                rec['eval_shuffled'] = evaluate(model, held_out, device,
-                                                autocast, prepare, metrics,
-                                                takes_time, spec.steps, True,
-                                                by_query=by_query)
-                if best is None or res['mse'] < best['mse']:
-                    best, best_step = res, step + 1
-                by_t = ('' if t.query_times == 'last' else
-                        f' last-step {res["mse_last"]:.4f} ')
-                print(f'step {step + 1:6d} train {rec["train_mse"]:.4f} '
-                      f'eval mse {res["mse"]:.4f}{by_t} '
-                      f'c-mse {res["mse_centered"]:.4f} '
-                      f'fg_mae {res["fg_mae"]:.4f} '
-                      f'fg<0.1 {res["fg_within_0.1"]:.3f} '
-                      f'| dirs shuffled mse '
-                      f'{rec["eval_shuffled"]["mse"]:.4f}'
-                      f'{"" if shuffle_informative else " (n/a: all dropped)"} '
-                      f'({rec["steps_per_s"]:.1f} it/s)', flush=True)
-                if 'mse_far' in res:     # se2c: by query kind, true | shuffled
-                    sh = rec['eval_shuffled']
-                    print('             by kind: ' + '  '.join(
-                        f'{k} {res["mse_" + k]:.4f}|{sh["mse_" + k]:.4f}'
-                        for k in ('fallback', 'near', 'mid', 'far')), flush=True)
-            log.write(json.dumps(rec) + '\n')
-            log.flush()
-        if r.save_every and (step + 1) % r.save_every == 0 and not last:
-            torch.save({'model': raw_model.state_dict(),
-                        'opt': opt.state_dict(), 'step': step + 1,
-                        'args': vars(args), 'arch': arch},
-                       os.path.join(out, f'step{step + 1}.pt'))
-    log.close()
+            last = step == r.steps - 1
+            if (step + 1) % ev.log_every == 0 or last:
+                elapsed = time.perf_counter() - t_start
+                rec = {'step': step + 1, 'train_mse': running / since,
+                       'lr': sched.lr(step, r.steps, lr), 'elapsed_s': elapsed,
+                       'steps_per_s': (step + 1) / elapsed}
+                running, since = 0.0, 0
+                if (step + 1) % ev.every == 0 or last:
+                    res = evaluate(model, held_out, device, autocast, prepare,
+                                   metrics, takes_time, spec.steps,
+                                   by_query=by_query)
+                    rec['eval'] = res
+                    rec['eval_shuffled'] = evaluate(model, held_out, device,
+                                                    autocast, prepare, metrics,
+                                                    takes_time, spec.steps, True,
+                                                    by_query=by_query)
+                    if best is None or res['mse'] < best['mse']:
+                        best, best_step = res, step + 1
+                    by_t = ('' if t.query_times == 'last' else
+                            f' last-step {res["mse_last"]:.4f} ')
+                    print(f'step {step + 1:6d} train {rec["train_mse"]:.4f} '
+                          f'eval mse {res["mse"]:.4f}{by_t} '
+                          f'c-mse {res["mse_centered"]:.4f} '
+                          f'fg_mae {res["fg_mae"]:.4f} '
+                          f'fg<0.1 {res["fg_within_0.1"]:.3f} '
+                          f'| dirs shuffled mse '
+                          f'{rec["eval_shuffled"]["mse"]:.4f}'
+                          f'{"" if shuffle_informative else " (n/a: all dropped)"} '
+                          f'({rec["steps_per_s"]:.1f} it/s)', flush=True)
+                    if 'mse_far' in res:     # se2c: by query kind, true | shuffled
+                        sh = rec['eval_shuffled']
+                        print('             by kind: ' + '  '.join(
+                            f'{k} {res["mse_" + k]:.4f}|{sh["mse_" + k]:.4f}'
+                            for k in ('fallback', 'near', 'mid', 'far')), flush=True)
+                log.write(json.dumps(rec) + '\n')
+                log.flush()
+            if r.save_every and (step + 1) % r.save_every == 0 and not last:
+                save(record, os.path.join(out, f'step{step + 1}.pt'),
+                     {'model': raw_model.state_dict(),
+                      'opt': opt.state_dict(), 'step': step + 1,
+                      'args': vars(args), 'arch': arch})
+        log.close()
 
-    final = {'task': t.name, 'model': e.model.name, 'size': e.model.size,
-             'run': run, 'query_times': t.query_times,
-             'step_px': args.step_px,
-             'odometry_dropout': args.odometry_dropout,
-             'shuffle_informative': shuffle_informative,
-             **texture,
-             'schedule': sched.name, 'branch': r.branch,
-             'start': start,
-             'params': params, 'steps': r.steps, 'batch': o.batch,
-             'episodes_seen': r.steps * o.batch,   # including the parent's
-             'final_eval': rec['eval'],
-             'final_eval_shuffled': rec['eval_shuffled'],
-             'best_eval': best, 'best_step': best_step, 'floor': floor,
-             'scaling_rule': getattr(module, 'SCALING_RULE', ''),
-             'size_kwargs': dict(e.model.size_kwargs),
-             'elapsed_s': time.perf_counter() - t_start,
-             'args': vars(args)}
-    with open(os.path.join(out, 'final.json'), 'w') as f:
-        json.dump(final, f, indent=1)
-    save_checkpoint(os.path.join(out, 'final.pt'), raw_model, vars(args),
-                    spec, t.name, arch=arch)
-    render_grid(raw_model, held_out[:2], spec.view,
-                os.path.join(out, 'grid.png'), device=device,
-                autocast=autocast, title=run_title(final), prepare=prepare,
-                takes_time=takes_time,
-                kinds=getattr(task['task'], 'query_kinds', None))
-    plot_run(out, final)
-    print(f'done: eval mse {final["final_eval"]["mse"]:.4f} '
-          f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}'
-          f'{"" if shuffle_informative else " n/a"}, '
-          f'floor {floor["mse"]:.4f}); wrote {out}')
+        final = {'task': t.name, 'model': e.model.name, 'size': e.model.size,
+                 'run': run, 'query_times': t.query_times,
+                 'step_px': args.step_px,
+                 'odometry_dropout': args.odometry_dropout,
+                 'shuffle_informative': shuffle_informative,
+                 **texture,
+                 'schedule': sched.name, 'branch': r.branch,
+                 'start': start,
+                 'params': params, 'steps': r.steps, 'batch': o.batch,
+                 'episodes_seen': r.steps * o.batch,   # including the parent's
+                 'final_eval': rec['eval'],
+                 'final_eval_shuffled': rec['eval_shuffled'],
+                 'best_eval': best, 'best_step': best_step, 'floor': floor,
+                 'scaling_rule': getattr(module, 'SCALING_RULE', ''),
+                 'size_kwargs': dict(e.model.size_kwargs),
+                 'elapsed_s': time.perf_counter() - t_start,
+                 'args': vars(args)}
+        with open(os.path.join(out, 'final.json'), 'w') as f:
+            json.dump(final, f, indent=1)
+        save_checkpoint(record, os.path.join(out, 'final.pt'), raw_model, vars(args),
+                        spec, t.name, arch=arch, step=r.steps)
+        render_grid(raw_model, held_out[:2], spec.view,
+                    os.path.join(out, 'grid.png'), device=device,
+                    autocast=autocast, title=run_title(final), prepare=prepare,
+                    takes_time=takes_time,
+                    kinds=getattr(task['task'], 'query_kinds', None))
+        plot_run(out, final)
+        print(f'done: eval mse {final["final_eval"]["mse"]:.4f} '
+              f'(shuffled {final["final_eval_shuffled"]["mse"]:.4f}'
+              f'{"" if shuffle_informative else " n/a"}, '
+              f'floor {floor["mse"]:.4f}); wrote {out}')
+        record.end('completed', 0, final=final)
 
 
 # what a branch may change from its parent: how long and where it runs,
@@ -559,8 +573,8 @@ def write_sources(out, config, sources):
         if exp is not None and os.path.abspath(exp) != os.path.abspath(
                 os.path.join(out, 'experiment.yaml')):
             shutil.copy(exp, os.path.join(out, 'experiment.yaml'))
-        overrides = [o for o in sources['overrides']
-                     if o.split('=', 1)[0].lstrip('+~') != 'run.overwrite']
+        overrides = [o for o in sources['overrides']     # launch-only: a rerun gives its own
+                     if o.split('=', 1)[0].lstrip('+~') not in ('run.overwrite', 'run.note')]
         OmegaConf.save(OmegaConf.create(
             {'overrides': overrides,
              'experiment': 'experiment.yaml' if exp is not None else None}),
@@ -582,10 +596,21 @@ def main_from_flags(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     overwrite = '--overwrite' in argv      # not a setting: not in the args record
     argv = [a for a in argv if a != '--overwrite']
+    note = None                            # the run note: required, like run.py's
+    for flag in ('--note', '-m'):           # (launch metadata, not a setting or a flag
+        while flag in argv:                 # of the frozen parser: not in the args record)
+            i = argv.index(flag)
+            if i + 1 >= len(argv):
+                raise SystemExit(f'{flag} needs the note')
+            note = argv[i + 1]
+            del argv[i:i + 2]
     parsed = parse(argv)
     overrides = overrides_from_flags(parsed) + (['run.overwrite=true'] if overwrite else [])
-    print(FROZEN_NOTE + '\n  equivalent: python run.py ' + ' '.join(overrides),
-          file=sys.stderr, flush=True)
+    print(FROZEN_NOTE + '\n  equivalent: python run.py ' + ' '.join(
+        overrides + [f'run.note={_value(note) if note else "<note>"}']),
+        file=sys.stderr, flush=True)
+    from mapping.provenance import check_note
+    overrides.append(f'run.note={_value(check_note(note))}')
     cfg = entry.resolved(entry.load(overrides))
     experiment = entry.build(cfg)
     args = experiment.legacy_args()

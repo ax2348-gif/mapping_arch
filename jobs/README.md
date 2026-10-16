@@ -18,6 +18,10 @@ YAML from conf/, and a launcher is a record of a submission, not a setting.
   `--output` and task-list paths are that tree's (e.g. mapping_hydra keeps
   its task lists at jobs/h1c_tasks.txt), so they are left as they ran.
 - Generated launchers (`scaling.py --slurm`, `tools/branch_jobs.py`) write
-  their logs to `results/jobs/logs/`.
+  their logs to `results/jobs/logs/`, and pass each task an automatic
+  `run.note` (`scaling se2d hybrid4 $SIZE $RUN`, `cooldown ...`): every run
+  needs one (docs/config.md, "The run note"). The records in `jobs/lift/`
+  predate the rule and are left as they were submitted; relaunching one
+  from this tree needs a `run.note=...` added.
 - `jobs/logs/` (older logs) and `jobs/legacy/` (pre-Hydra launchers of the
   z2 and se2 runs) are local and gitignored.

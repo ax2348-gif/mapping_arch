@@ -95,7 +95,7 @@ def test_the_scan_sees_what_it_should():
 def test_flags_path_says_it_is_deprecated(capsys, tmp_path):
     import pytest
     with pytest.raises(BaseException):          # stops at the model (CUDA-only on CPU) or runs
-        train.main_from_flags(['--task', 'se2d', '--model', 'hybrid4', '--size', 'xs',
+        train.main_from_flags(['--note', 'test', '--task', 'se2d', '--model', 'hybrid4', '--size', 'xs',
                                '--device', 'cpu', '--steps', '1', '--out', str(tmp_path / 'r')])
     err = capsys.readouterr().err
     assert 'deprecated and frozen' in err and 'python run.py model=se2d/hybrid4' in err

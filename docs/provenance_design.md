@@ -983,3 +983,69 @@ Each phase is one commit on master, with the full suite green against
   the reference `train.py` and this `run.py` each write a default
   directory, and the new relative path must be the reference's with the
   stated change (z2: `z2/` prefixed; se2 -> se2d; se2c: identical).
+
+### Phase 2: the provenance core, and the run note
+
+- **Where.** `mapping/provenance.py` (snapshot, ledger, `Record`,
+  `check_note`, `read_ledger`, `find_run`, `iter_run_dirs`).
+  `train.main` calls `provenance.begin` once everything is checked (data,
+  model, device, branch), before the run directory exists and before any
+  step; it is the point §8.2 names, and the only trainer both entries reach
+  (run.py, and train.py's frozen translator). The rest of the run is inside
+  `record.lifetime()`, which ends the record as `completed` (the trainer
+  writes it with the final metrics), `failed` (any exception, with its
+  text, including a refused RUN_ID claim) or `terminated` (SIGTERM, which it
+  turns into an exception, exit 143; Ctrl-C, 130). A SIGKILL leaves
+  `running`, as designed.
+- **Snapshot** exactly as §2, with two details the shell sketch left open:
+  the private index is seeded from the real one and then has
+  `experiments/ledger` removed (`git rm --cached`), so a *committed* ledger
+  file is not in a dirty snapshot either; and the dirty check compares
+  against HEAD's tree with the ledger likewise removed, so committed ledger
+  files that differ on disk never make a run dirty. A clean run's snapshot
+  is HEAD itself (§2, [mine], approved), whose tree does carry whatever
+  ledger files HEAD committed; the working-tree ledger never enters.
+  The 20 MB guard runs before anything is written to the object store.
+  `refs/runs/<id>` is created with update-ref's empty old value (fails if it
+  exists). No strict mode (§14).
+- **Ledger** schema 1 as §3, plus `run.note` and `run.tags` in the `run`
+  block. Written at the start, at every checkpoint (`progress`), and at the
+  end; `provenance.json` in the run directory mirrors it. The run directory
+  also gets `RUN_ID` (created with O_EXCL unless `run.overwrite`, so two runs
+  racing for one directory cannot both write it) and `pip_freeze.txt` (read
+  through importlib.metadata; its sha256 is `env.pip_freeze_sha256`).
+- **Checkpoints** go only through `mapping.checkpoint.save(record, ...)`,
+  which needs a live record and stamps `provenance: {run_id, snapshot}`;
+  an AST test checks `torch.save` appears nowhere else in run.py, train.py
+  or mapping/.
+- **Run note** (the user's addition, 2026-10-16). `run.note` is required,
+  stripped, non-empty, and comes from the launcher only: conf/config.yaml
+  declares it `null` and a test checks no file under conf/ sets it; a note
+  that arrives from an experiment file or a saved run is refused; `--from`
+  never inherits it (it is left out of `overrides.yaml`, like
+  `run.overwrite`). `train.py --flags` takes it as `--note` (stripped
+  before parsing like `--overwrite`, so the frozen flag set is unchanged).
+  `run.tag` is the preset-settable campaign label (a list). Both are
+  metadata: not in the args record, not in any training input; a test runs
+  two runs that differ only in note and tags and compares their logs,
+  finals, checkpoint tensors and grids byte for byte.
+- **Configuration.** `run.provenance.max_untracked_mb` (a small
+  `mapping.config.Provenance` node, as §2 named it), `conf/hosts.yaml`
+  (machine name -> logical host; `XP_HOST` wins).
+- **Test isolation.** Every run makes a snapshot, tests included. So that
+  the suite does not fill this repository's `refs/runs/` and ledger,
+  tests/conftest.py points the session at a scratch bare repository that
+  borrows this repository's objects (`XP_SNAPSHOT_GIT_DIR`, used by nothing
+  but tests) and a scratch ledger (`XP_LEDGER_DIR`). tests/test_provenance.py
+  turns that off and checks the real mechanism on throwaway clones of the
+  harness: round trip of the exact tree (untracked included, ignored and
+  ledger excluded), HEAD/branch/index/status untouched, clean = HEAD,
+  ledger exclusion (untracked and committed), immutable refs, refusals,
+  the size guard writing nothing, 8 concurrent snapshots, concurrent runs
+  (distinct and racing for one directory), a run from a linked worktree
+  recording into the main ledger, SIGTERM, failure, no run and no
+  checkpoint without provenance.
+- **Equivalence.** Checkpoints gain `provenance` beside `arch`; the
+  equivalence test pops it and checks it names the run that wrote it (its
+  RUN_ID, provenance.json and completed ledger record). Everything else is
+  compared as before.

@@ -23,15 +23,30 @@ code and on both entry points here, and compares everything they write.
 ## Launch
 
 ```
-python run.py model=se2d/hybrid4                      # task se2d, size xs, cosine schedule
-python run.py model=se2d/hybrid4 model.size=m schedule=wsd run.steps=400000
-python run.py model=z2/vanilla model.size=l            # a rung of the model's own ladder
-python run.py +experiment=se2c_bridge model.size=s    # a preset (conf/experiment/)
-python run.py --exp ~/notes/my_run.yaml run.seed=1    # your own experiment file
-python run.py --from results/se2c/hybrid4c/s/bridge_n4dec_100k_qt/config.yaml run.name=again schedule=wsd
+python run.py model=se2d/hybrid4 run.note=smoke             # task se2d, size xs, cosine schedule
+python run.py model=se2d/hybrid4 model.size=m schedule=wsd run.steps=400000 \
+    "run.note='m at 400k, WSD, for the efficiency curve'"
+python run.py model=z2/vanilla model.size=l run.note=rung   # a rung of the model's own ladder
+python run.py +experiment=se2c_bridge model.size=s run.note=bridge   # a preset (conf/experiment/)
+python run.py --exp ~/notes/my_run.yaml run.seed=1 run.note=seed1    # your own experiment file
+python run.py --from results/se2c/hybrid4c/s/bridge_n4dec_100k_qt/config.yaml run.name=again \
+    schedule=wsd "run.note='bridge s again, WSD'"
 python run.py ... --print                             # resolved config, and the exact train.py command if any; no run
 ```
 
+- **The run note (required).** Every run needs `run.note`, one line saying
+  what it is for, like `git commit -m`; one word is enough, empty is
+  refused. It is given at launch only: no file under `conf/` sets it (a
+  test checks), an experiment file or a saved run that sets it is refused,
+  and `--from` never inherits it. Quote it for Hydra when it has spaces,
+  commas or colons: `"run.note='a, b: c'"`. `xp run <preset> -m '<note>'`
+  sets it; `train.py --flags` takes `--note '<note>'`. Job generators
+  (scaling.py, tools/branch_jobs.py) write one per task, `xp reproduce`
+  writes `reproduce <run_id>`. It is launch metadata: it is in
+  `config.yaml`, `provenance.json` and the ledger, never in the `args`
+  record or anything the trainer trains on (tests/test_provenance.py).
+- **Tags.** `run.tag=[h1c]` (a list; a preset may set it) labels a
+  campaign. Ledger only, like the note.
 - **Arguments.** Hydra overrides: `key=value`, `group=option` and
   `+experiment=name`. A mistake (no model, an unknown model or field, an
   architecture override, a comma sweep, an experiment file without its
@@ -63,7 +78,7 @@ python run.py ... --print                             # resolved config, and the
 | `generator` (chosen by the task; `generator=<variant>` overrides) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
 | `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` (`Schedule.lr(step, steps, peak)`) | `warmup` (+ `cooldown` for wsd) |
 | `optim` | in `config.yaml` | `AdamW` | `lr` (default: the model's, via `${model_lr:...}`), `weight_decay`, `clip`, `batch` |
-| `run` | in `config.yaml` | `Run` | `name out root dir steps seed save_every branch device bf16 compile overwrite` |
+| `run` | in `config.yaml` | `Run` | `name out root dir note tag provenance.max_untracked_mb steps seed save_every branch device bf16 compile overwrite` |
 | `eval` | in `config.yaml` | `Eval` | `batches every log_every` |
 | `experiment` | `se2c_bridge`, `se2d_scaling_wsd`, or any file via `--exp` | none: it only sets the fields above | |
 
@@ -324,6 +339,29 @@ for old records only:
 Paths recorded inside old `final.json`/`log.jsonl` files (`args.out`, null
 for default directories) are unchanged; the files were moved, not edited.
 
+## Provenance: every run's code and record
+
+Every run is pinned before it trains (mapping/provenance.py;
+docs/provenance_design.md, §15 has what was built):
+- **A snapshot commit** of the exact working tree (tracked and untracked
+  files, `.gitignore` respected, `experiments/ledger/` left out) at
+  `refs/runs/<run_id>`, made through a private index: the branch, HEAD and
+  the index are never touched. A clean tree's snapshot is HEAD. A dirty
+  tree is fine (no strict mode): the snapshot holds its bytes. An untracked
+  file over `run.provenance.max_untracked_mb` (20) is refused, and so is a
+  run outside a git checkout or with no commit.
+- **A ledger record**, `experiments/ledger/<host>/<run_id>.json` in the main
+  worktree (`XP_LEDGER_DIR` overrides it), with the run's code, command,
+  resolved config, note, environment, data hashes, Slurm ids, progress and,
+  at the end, its status and final metrics. The run directory holds the
+  same record as `provenance.json`, its id in `RUN_ID` (claimed when the
+  directory is created, so two runs can never write one directory) and
+  `pip_freeze.txt`. Every checkpoint carries `provenance: {run_id, snapshot}`.
+- `run_id` is `<UTC yyyymmddTHHMMSSZ>-<host>-<6 hex>`; the host is
+  `XP_HOST`, else the machine name mapped by `conf/hosts.yaml`.
+- See a run's code: `git show refs/runs/<run_id>`; check it out with
+  `git worktree add --detach <dir> refs/runs/<run_id>`.
+
 ## Outputs and reruns
 
 - **What a run directory holds besides the results.** `config.yaml`, the
@@ -352,7 +390,7 @@ for default directories) are unchanged; the files were moved, not edited.
   - Runs saved before `overrides.yaml` existed take value overrides of
     existing keys only, merged into their saved config.
   - A rerun needs a new `run.name` (or `run.out`), since the original's
-    directory is not empty.
+    directory is not empty, and its own `run.note`.
 - **The legacy `args`.** Checkpoints, `final.json` and the first record
   of `log.jsonl` keep the flat `args` dict as before, with the same keys
   and values as a `train.py --flags` run, so every tool and loader reads
