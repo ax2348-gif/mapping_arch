@@ -264,3 +264,15 @@ docs/scaling_study_design.md.
   - Caveat: at xs (2 layers) the _full variant has no attention at all. The clean A/B (last layer only) needs s, which is deferred.
   - Write-up: docs/time_recurrence.md on that branch.
 - **Causal experiment started (user chose it before the s A/B pair):** branch exp/causal off refactor/hydra; hybrid4_causal and vanilla4_causal at xs; sequential, local.
+- **2026-10-16, FINDING (provisional): fully causal hybrid4 fails where bidirectional succeeds** (se2d xs, matched shapes, branch exp/causal).
+  - Causal at 90k: 0.0575, shuffled 0.0879. Bidirectional: 0.0186, shuffled 0.1403. The curves split at ~20k, and causal never breaks away.
+  - **The information confound is ruled out on last-step queries,** where both models see identical history: causal last-step 0.072 vs bidirectional 0.026 at 100k. The gap is memory quality, not access to future observations.
+  - The user's reading:
+    - bidirectional context is cheap wherever the history is recomputed anyway (history -> 1 action, history-conditioned rendering), and may be why it was overlooked;
+    - it breaks teacher-forced world models (Dreamer-style), so bridging causal vs bidirectional is a research question in itself;
+    - it harmonises with recent NVS work.
+  - **Caveats:** one size (xs) and one seed. The vanilla4_causal control and the forward-head probe are pending.
+  - **Follow-ups proposed:**
+    - causal hybrid4 at s (impossible, or just costlier?);
+    - a causal backbone plus one final bidirectional delta-rule layer, or chunk-bidirectional;
+    - where the rotation forms.
