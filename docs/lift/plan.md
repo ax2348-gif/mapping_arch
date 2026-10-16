@@ -155,5 +155,20 @@ work. Iterate locally first.
   - the height field is tunable independently of the texture, including a wave-regularity dial;
   - an optional time-evolving surface h(x, y, t) is prepared for a held-out 4D scenario;
   - the TEXTURE IS FIXED IN THE WORLD (it never advects with the surface), as close enough to the real world.
+- **Renderer v2 (exp/ocean in ~/code/mapping-ocean; commits 68d9a49, 440e37b, be3d0db, 20c13af).** It has:
+  - a horizon and sky: pitch 20°, field of view 60°, horizon ~1/6 down a 32 px view, graded sky, haze with e-folding distance 320 px;
+  - smooth eased motion at 30 fps;
+  - independent height and texture seeds;
+  - a wave-regularity dial;
+  - h(x, y, t) with deep-water dispersion, the texture fixed in the world;
+  - the anti-aliasing mean bug fixed.
+  
+  Speed is untouched (~2.7 s per batch on a shared GPU). Appearance comes first.
+- **OPEN (user, 2026-10-16): marked open, not decided:**
+  1. Queries: the same camera at a new pose? Do sky pixels count as covered? How are unseen pixels handled?
+  2. Odometry: SE(2) at fixed altitude and pitch, or vary them?
+  3. Time units for the evolving sea: what one walk step equals, and the dynamics' pace relative to motion.
+  4. Is the remaining mid-distance speckle acceptable, or should the shading be band-limited too? The noise within ~8 px of the horizon is mostly the 32 px resolution limit.
+  5. The agent's own choices, awaiting confirmation: pitch and field of view, sky and haze values, the regularity dial's frequency ranges, the dynamics' timescale.
 - **Parked option (user):** small zero-mean distortions of the texture would test filtering. Not now: the camera's resolution limit is already a hard enough observation function.
 - **The patch-size and sample-efficiency decisions** carry over, since token counts only grow from here.
