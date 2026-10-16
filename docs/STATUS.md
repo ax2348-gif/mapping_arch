@@ -219,3 +219,16 @@ docs/scaling_study_design.md.
   - **S4 untestable:** the reference branch was cancelled.
   - Audits pass (hybrid4 l, vanilla4 xl, hybrid4 s T=64).
   - A draft HYPOTHESIS amendment is in the report, NOT applied: it needs user approval.
+- **2026-10-16, hybrid4c s on default se2c, 100k (worker): final 0.0260** (shuffled 0.0906, floor 0.1309). By kind:
+  | kind | error | note |
+  | --- | --- | --- |
+  | fallback | 0.0040 | |
+  | near | 0.0056 | |
+  | mid | 0.0140 | |
+  | far | 0.0447 | 0.34 of floor, still falling: data-limited |
+  - 75k grid: correct at arbitrary continuous angles except the farthest queries (~56 px).
+- **Matched vanilla on se2c (user priority):**
+  - vanilla4c s 100k cosine: 20043638
+  - vanilla4c m 400k WSD: 20043639
+  - hybrid4c m 400k WSD runs in worker 20041129 (`dec_400k_wsd_worker`). The duplicate queued hybrid job 20042194 was cancelled (user's yes).
+  - The weight-decay / grokking-like study is shelved behind se2c.
