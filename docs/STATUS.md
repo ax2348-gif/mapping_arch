@@ -232,3 +232,16 @@ docs/scaling_study_design.md.
   - vanilla4c m 400k WSD: 20043639
   - hybrid4c m 400k WSD runs in worker 20041129 (`dec_400k_wsd_worker`). The duplicate queued hybrid job 20042194 was cancelled (user's yes).
   - The weight-decay / grokking-like study is shelved behind se2c.
+- **2026-10-16, se2c matched results so far:** at 100k,
+  | model | all | far | note |
+  | --- | --- | --- | --- |
+  | hybrid4c s | 0.0260 | 0.0447 | |
+  | vanilla4c s | 0.0633 | 0.1082 | barely uses odometry: shuffled 0.0764 |
+  - hybrid4c s reached vanilla4c s's 100k score by ~20k: ~5x fewer episodes. One seed.
+  - hybrid4c m 400k (worker) at 65k, stable phase: 0.0282, far 0.0492.
+- **2026-10-16, se2c ladder extension queued (user):** array 20046841, jobs/lift/se2c_dec_ladder.sbatch. All WSD, checkpoints every 25k:
+  - hybrid4c and vanilla4c l at 200k;
+  - hybrid4c and vanilla4c s at 400k (the m runs' data budget).
+  - Plus vanilla4c m 400k (20043639), running.
+- **Small-model policy (user):** Torch kills low-utilisation jobs (hybrid4 xs seed 1, 20028847_0, was killed at 360k; its 350k checkpoint survives). Roll small jobs together; spend Torch on bigger models.
+- **Hydra branch:** all 13 seams fixed (8 commits). 454 tests pass, re-run independently. The cluster venv needs `pip install -r requirements.txt` before use.
