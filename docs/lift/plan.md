@@ -211,12 +211,12 @@ work. Iterate locally first.
     - So both decoders share one query interface: SE(2) pose in, view out. Only the render type differs (BEV or camera).
     - Not full SE(3), but no longer a toy: SE(2) motion with a pitched perspective camera over 2.5D terrain is mostly what autonomous vehicles need.
     - Full SE(3) camera control (varying altitude, pitch and roll in queries) stays out of scope.
-    - **Ablation for the "both" setup (the user): SEPARATE vs TIED queries.**
-      - NOTE: queries are MULTI-TOKEN: one token per output patch (9 in hybrid4, 25 in hybrid4c), each the pose encoding plus a learned patch-position vector. "Tied" means a shared SET of query tokens, not one token.
-      - Separate: per render type, its own set of patch tokens (BEV patches, camera patches), each read out to its own patch.
-      - Tied: one shared set of tokens at the pose, read out into BOTH renders. OPEN sub-choice (the user's): BEV and camera patches cover different ground, so either a common token grid with each head reading the whole set (small cross-attention or linear readout), or tie only the pose encoding and keep per-render patch tokens.
-      - Fair comparison: same query poses, matched readout parameters, each render's error reported separately, plus BEV-only and camera-only baselines for transfer.
-      - A tied win means a shared pose-indexed belief (the program criterion); a large tied loss means the renders want different things from one token. Optional third arm: separate tokens at untied poses.
+    - **The "both" setup (decided with the user, 2026-10-16): SEPARATE queries; "tied" DROPPED as ill-defined.**
+      - Queries are multi-token: one token per output patch (9 in hybrid4, 25 in hybrid4c). BEV patches (ground squares) and camera patches (perspective image regions) have no one-to-one correspondence, so any tying adds an arbitrary choice that confounds the question. A common grid adds a learned remapping; tying only the pose encoding is near-trivial.
+      - The shared object is the MEMORY, which both query types read. Test sharing via transfer:
+        1. **Joint vs single-render training:** does each render improve when the other query type is also trained (positive transfer through the shared memory)?
+        2. **Freeze and probe:** train on one render type, freeze the model, fit only a new readout for the other. If it decodes well with a light readout, the belief is view-independent: the program criterion, tested directly.
+      - Report each render's error separately in every arm.
   - **BEV decoding (the user):** in an SE(3)-ready design it is NOT a new head. A BEV view is just another query camera (pitch 90°, orthographic or very narrow field of view), handled by the same query token and readout.
     - Ablation: ego queries only, BEV only, both. Which builds the better belief, and BEV is what a planner wants.
     - The genuinely new option is a geometry channel (height or depth) alongside albedo.
