@@ -218,7 +218,7 @@ Published pages, private until shared:
 
 | page | link |
 | --- | --- |
-| research journal | (see the journal link in the latest session notes) |
+| research journal | https://claude.ai/artifact/24DMrX4JZkcwD4DGthpLYG |
 | hybrid4 results report | https://claude.ai/artifact/NjMCowkCEio9mcYQ1tF8Ti |
 | Z² scaling | https://claude.ai/artifact/8mjpJKB9LUMMKipyHtkRNK |
 | primer | https://claude.ai/artifact/9jFX4Cr2761JFTCBytKPQ3 |
