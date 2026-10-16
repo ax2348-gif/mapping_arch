@@ -18,7 +18,7 @@ from mapping.models.vanilla import VanillaTransformer
 
 WIDTH = 256
 from mapping.models import ladder  # noqa: E402
-SIZES = ladder('depth')   # conf/model/size/depth/*.yaml
+SIZES = ladder('depth')   # conf/ladders/depth.yaml
 SCALING_RULE = ('Depth-only family at width 256 (4 heads, hidden 704): '
                 'depth 4, 8, 16, 32. Learning rate: harness default 3e-4 at '
                 'every rung, as the parent uses at width 256.')

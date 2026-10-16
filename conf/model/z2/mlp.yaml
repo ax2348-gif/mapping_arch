@@ -1,13 +1,12 @@
 # @package _global_
 # Reference floor model: an MLP with no sequence structure at all.
-# Sizes: conf/model/size/mlp/ (model/size=mlp/<size>).
 defaults:
   - /task: z2
-  - /model/size: mlp/xs
 
 model:
-  _target_: mapping.config.Model
   name: mlp
+  ladder: mlp       # conf/ladders/mlp.yaml; model.size=<rung>
+  size: xs
   arch:
     _target_: mapping.models.mlp.FlatMLP
     _partial_: true

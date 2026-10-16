@@ -91,6 +91,7 @@ COPRO_WIDTH = 64     # fixed at every rung
 SIZES = v4.SIZES
 LR = dict(v4.LR)
 PLACEMENT = ('first',)
+ARCH = {'placement': PLACEMENT}   # what this model's config file binds
 
 
 def resolve(placement, n):

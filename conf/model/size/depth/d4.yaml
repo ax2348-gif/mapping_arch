@@ -1,5 +1,0 @@
-# @package model
-size: d4
-arch:
-  width: 256
-  depth: 4

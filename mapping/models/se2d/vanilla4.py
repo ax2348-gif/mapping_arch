@@ -248,7 +248,7 @@ HEAD_DIM = 32         # per-head key/value dim; heads = width / HEAD_DIM
 BASE_WIDTH = 256      # muP base width: the harness lr is the lr at this width
 
 from mapping.models import ladder  # noqa: E402
-SIZES = ladder('')   # conf/model/size/*.yaml
+SIZES = ladder('width')   # conf/ladders/width.yaml
 
 # The harness reads LR[size] when --lr is not given. It is deliberately the
 # same on every rung: per-width learning-rate scaling is done inside the

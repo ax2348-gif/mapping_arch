@@ -1,0 +1,9 @@
+# mlp's ladder: width and depth.
+# One rung per line, smallest first: rung name -> the model constructor's
+# size arguments. A model file names its ladder (model.ladder) and picks a
+# rung with model.size; mapping.models.ladder() reads this file in order.
+xs: {width: 128, depth: 2}
+s: {width: 256, depth: 2}
+m: {width: 512, depth: 3}
+l: {width: 1024, depth: 3}
+xl: {width: 2048, depth: 4}

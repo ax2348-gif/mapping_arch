@@ -83,7 +83,7 @@ from mapping.models import register
 # width x sqrt(2) per rung (rounded to a multiple of 64); depth +1 every
 # second rung. Params ~ 14 * width^2 * depth, see SCALING_RULE.
 from mapping.models import ladder  # noqa: E402
-SIZES = ladder('lstm')   # conf/model/size/lstm/*.yaml
+SIZES = ladder('lstm')   # conf/ladders/lstm.yaml
 
 SCALING_RULE = (
     'One-parameter family indexed by rung r = 0..6: width = 128 * 2^(r/2) '

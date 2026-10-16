@@ -5,8 +5,10 @@
    at any node is an error; and changing any value changes what the
    trainer receives (the settings, or for architecture fields the built
    model). So no field is ever composed that nothing reads.
-2. The size ladders moved into conf/model/size/ are the old in-code
-   tables, entry for entry and in order (tests/sizes_snapshot.json).
+2. The size ladders moved into conf/ladders/ are the old in-code
+   tables, entry for entry and in order (tests/sizes_snapshot.json), and
+   a model file's ladder is its module's. An override that would train
+   another architecture than the registered model's is refused.
 3. Models built from the config are the old ``build(size, spec)`` models,
    parameter for parameter, for every model and size.
 4. ``train.py --flags`` and ``run.py`` give the same settings.
@@ -111,14 +113,13 @@ def test_every_field_is_consumed(overrides):
         node = cfg
         for k in path[:-1]:
             node = node[k]
-        if path[0] == 'model' and path[1] == 'arch':
-            # an architecture field: it must reach the model's constructor
+        if path[0] == 'model' and path[1] in ('arch', 'size_kwargs'):
+            # an architecture argument: changing it would train another
+            # model than the registered one at this rung, so it is refused
             node[path[-1]] = (value * 2 if isinstance(value, int) else
                               (['first'] if value != ['first'] else ['last']))
-            m = run.build(OmegaConf.create(cfg)).model
-            assert m.arch.keywords[path[-1]] == (tuple(node[path[-1]])
-                                                 if isinstance(node[path[-1]], list)
-                                                 else node[path[-1]]), path
+            with pytest.raises(InstantiationException):
+                run.build(OmegaConf.create(cfg))
             continue
         node[path[-1]] = _bump(value)
         try:
@@ -139,24 +140,28 @@ def test_unknown_keys_are_errors(node):
 
 
 def test_ladders_are_the_old_tables():
-    for task in ('z2', 'se2d', 'se2c'):
-        for name, module in tasks.get(task)['models'].REGISTRY.items():
-            assert [[k, v] for k, v in module.SIZES.items()] == SNAPSHOT[f'{task}/{name}'], name
+    """The ladders moved out of the modules are the old tables, entry for
+    entry and in order. Models registered since (not in the snapshot) have
+    no old table; every snapshot model must still be registered."""
+    registered = {f'{t}/{n}': m for t in ('z2', 'se2d', 'se2c')
+                  for n, m in tasks.get(t)['models'].REGISTRY.items()}
+    assert set(SNAPSHOT) <= set(registered)
+    for key, rows in SNAPSHOT.items():
+        assert [[k, v] for k, v in registered[key].SIZES.items()] == rows, key
 
 
-def test_size_files_match_the_ladders():
-    """conf/model/<task>/<name>.yaml at each size gives the module's SIZES
-    entry, and its size name."""
+def test_model_files_name_their_ladder():
+    """conf/model/<task>/<name>.yaml at each rung gives the module's SIZES
+    entry (plus its fixed ARCH), and the rung's name."""
     for model in MODELS:
         task, name = model.split('/')
         module = tasks.get(task)['models'].get(name)
-        default = OmegaConf.load(f'conf/model/{model}.yaml').defaults[1]['/model/size']
-        prefix = default.rsplit('/', 1)[0] + '/' if '/' in default else ''
         for size, kwargs in module.SIZES.items():
-            m = run.build(compose(f'model={model}', f'model/size={prefix}{size}')).model
-            assert m.size == size
-            arch = {k: v for k, v in m.arch.keywords.items() if k != 'placement'}
-            assert arch == kwargs, (model, size)
+            m = run.build(compose(f'model={model}', f'model.size={size}')).model
+            assert m.size == size and m.size_kwargs == kwargs, (model, size)
+            fixed = {k: tuple(v) if isinstance(v, (list, tuple)) else v
+                     for k, v in getattr(module, 'ARCH', {}).items()}
+            assert m.kwargs == {**kwargs, **fixed}, (model, size)
 
 
 @pytest.mark.parametrize('model', MODELS)
@@ -165,18 +170,54 @@ def test_config_models_are_the_old_models(model):
     task, name = model.split('/')
     module = tasks.get(task)['models'].get(name)
     spec = tasks.config_and_spec(task, 32, 8, 0, 'uniform')[1]
-    default = OmegaConf.load(f'conf/model/{model}.yaml').defaults[1]['/model/size']
-    prefix = default.rsplit('/', 1)[0] + '/' if '/' in default else ''
     for size in module.SIZES:
         torch.manual_seed(0)
         old = module.build(size, spec).state_dict()
         torch.manual_seed(0)
-        new = run.build(compose(f'model={model}', f'model/size={prefix}{size}')).model.build(spec)
+        new = run.build(compose(f'model={model}', f'model.size={size}')).model.build(spec)
         new = new.state_dict()
         assert old.keys() == new.keys(), (model, size)
         assert all(torch.equal(old[k], new[k]) for k in old), (model, size)
         assert type(module.build(size, spec)) is type(run.build(
-            compose(f'model={model}', f'model/size={prefix}{size}')).model.build(spec))
+            compose(f'model={model}', f'model.size={size}')).model.build(spec))
+
+
+@pytest.mark.parametrize('overrides,match', [
+    # each of these used to compose, save the override in config.yaml and
+    # train the registered model regardless (seams probe, 2026-10-16)
+    (['model=se2c/hybrid4c', '+model.arch.width=96'], 'set by the size'),
+    (['model=z2/vanilla', '+model.arch.width=96'], 'set by the size'),
+    (['model=se2d/hybrid45b_two', 'model.arch.placement=[last]'], 'is not what hybrid45b_two registers'),
+    (['model=se2c/hybrid4c', '+model.arch.patch=5'], 'is not what hybrid4c registers'),
+    (['model=se2d/hybrid4', '+model.arch.patch=5'], "unexpected keyword argument 'patch'"),
+    (['model=z2/vanilla', 'model.size=zz'], 'not a rung of the .vanilla. ladder'),
+])
+def test_architecture_overrides_are_refused(overrides, match):
+    with pytest.raises(Exception, match=match):
+        run.build(compose(*overrides))
+
+
+def test_size_kwargs_must_be_the_rung():
+    cfg = compose('model=z2/vanilla', 'model.size=m')
+    cfg.model.size_kwargs.width = 192            # the shared ladder's m
+    with pytest.raises(Exception, match="not rung 'm' of the 'vanilla' ladder"):
+        run.build(cfg)
+    cfg = compose('model=z2/vanilla', 'model.size=m')
+    cfg.model.size = 's'                         # a relabel of m's numbers
+    with pytest.raises(Exception, match="not rung 's'"):
+        run.build(cfg)
+
+
+def test_model_file_and_module_agree_on_the_ladder():
+    cfg = compose('model=z2/vanilla', 'model.size=m')
+    cfg.model.ladder, cfg.model.size_kwargs = 'width', {'width': 192}
+    with pytest.raises(Exception, match="names ladder 'width'"):
+        run.build(cfg)
+
+
+def test_old_size_syntax_explains_itself():
+    with pytest.raises(SystemExit, match='model.size=m'):
+        run.parse_cli(['model=z2/vanilla', 'model/size=vanilla/m'])
 
 
 FLAG_CASES = [
@@ -231,8 +272,8 @@ def test_old_task_name_is_not_a_new_run():
 def test_external_experiment_file(tmp_path):
     exp = tmp_path / 'mine.yaml'
     exp.write_text('# @package _global_\ndefaults:\n  - override /model: se2d/vanilla4\n'
-                   '  - override /model/size: m\n  - override /schedule: wsd\n'
-                   'run:\n  steps: 123\ntask:\n  generator:\n    texture: imagenette\n')
+                   '  - override /schedule: wsd\n'
+                   'model:\n  size: m\nrun:\n  steps: 123\ntask:\n  generator:\n    texture: imagenette\n')
     a = run.build(run.resolved(run.load(['run.seed=3'], exp=str(exp)))).legacy_args()
     assert (a.task, a.model, a.size, a.schedule, a.steps, a.seed, a.texture) == (
         'se2d', 'vanilla4', 'm', 'wsd', 123, 3, 'imagenette')
@@ -243,7 +284,7 @@ def test_external_experiment_file(tmp_path):
 
 
 def test_saved_config_reruns(tmp_path):
-    cfg = compose('+experiment=se2c_bridge', 'model/size=s')
+    cfg = compose('+experiment=se2c_bridge', 'model.size=s')
     path = tmp_path / 'config.yaml'
     OmegaConf.save(cfg, path)
     loaded = OmegaConf.load(path)

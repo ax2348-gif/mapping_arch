@@ -1,5 +1,0 @@
-# @package model
-size: l
-arch:
-  width: 384
-  depth: 3

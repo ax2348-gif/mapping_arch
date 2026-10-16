@@ -1,13 +1,12 @@
 # @package _global_
 # vanilla4c: vanilla4 (``mapping/models/se2d/vanilla4.py``) ported to the continuous SE(2) task: hybrid4c...
-# Sizes: conf/model/size/ (model/size=<size>).
 defaults:
   - /task: se2c
-  - /model/size: xs
 
 model:
-  _target_: mapping.config.Model
   name: vanilla4c
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
   arch:
     _target_: mapping.models.se2c.vanilla4c.Vanilla4c
     _partial_: true

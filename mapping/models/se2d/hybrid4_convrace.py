@@ -309,7 +309,7 @@ DECAY_TAU = 16.0      # GLA: log a = logsigmoid(z) / tau keeps a close to 1
 CONV_GAIN = 0.5       # the repo's init gain: effective std 0.5 / sqrt(fan_in)
 
 from mapping.models import ladder  # noqa: E402
-SIZES = ladder('')   # conf/model/size/*.yaml
+SIZES = ladder('width')   # conf/ladders/width.yaml
 
 # The harness reads LR[size] when --lr is not given. It is deliberately the
 # same on every rung: per-width learning-rate scaling is done inside the

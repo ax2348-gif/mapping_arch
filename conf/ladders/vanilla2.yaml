@@ -1,0 +1,10 @@
+# vanilla2's ladder: width only.
+# One rung per line, smallest first: rung name -> the model constructor's
+# size arguments. A model file names its ladder (model.ladder) and picks a
+# rung with model.size; mapping.models.ladder() reads this file in order.
+xs: {width: 64}
+s: {width: 128}
+m: {width: 256}
+l: {width: 384}
+xl: {width: 512}
+xxl: {width: 768}

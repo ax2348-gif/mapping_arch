@@ -1,0 +1,10 @@
+# The shared width ladder (the hybrid and *4 families): width only.
+# One rung per line, smallest first: rung name -> the model constructor's
+# size arguments. A model file names its ladder (model.ladder) and picks a
+# rung with model.size; mapping.models.ladder() reads this file in order.
+xs: {width: 64}
+s: {width: 128}
+m: {width: 192}
+l: {width: 256}
+xl: {width: 384}
+xxl: {width: 512}

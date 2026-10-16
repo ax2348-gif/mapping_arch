@@ -1,7 +1,7 @@
 """Train one run from the Hydra config tree (``conf/``, docs/config.md).
 
-    python run.py model=se2d/hybrid4 model/size=s run.steps=500
-    python run.py +experiment=se2c_bridge model/size=m
+    python run.py model=se2d/hybrid4 model.size=s run.steps=500
+    python run.py +experiment=se2c_bridge model.size=m
     python run.py --exp path/to/my_experiment.yaml run.seed=1
     python run.py --from results/se2c/hybrid4c/m/<run>/config.yaml run.name=rerun
     python run.py ... --print            # the resolved config and train.py flags; no run
@@ -73,6 +73,11 @@ def parse_cli(argv):
                 frm = value
     if exp and frm:
         raise SystemExit('--exp and --from do not combine')
+    for a in argv:
+        if a.split('=', 1)[0].lstrip('+~') == 'model/size':
+            raise SystemExit(f'{a}: sizes are no longer a config group. A model file names '
+                             f'its ladder (conf/ladders/); pick a rung with model.size=<rung>, '
+                             f'e.g. model.size={a.split("=", 1)[-1].rsplit("/", 1)[-1]}')
     return argv, exp, frm, show
 
 

@@ -15,6 +15,7 @@ SIZES = base.SIZES
 LR = base.LR
 SCALING_RULE = base.SCALING_RULE
 PLACEMENT = ()
+ARCH = {'placement': PLACEMENT}   # what this model's config file binds
 
 
 def build(size, spec):

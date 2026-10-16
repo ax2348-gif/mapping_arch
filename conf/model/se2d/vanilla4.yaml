@@ -1,13 +1,12 @@
 # @package _global_
 # vanilla4, SE(2) port: hybrid4 with every token mixer as softmax attention.
-# Sizes: conf/model/size/ (model/size=<size>).
 defaults:
   - /task: se2d
-  - /model/size: xs
 
 model:
-  _target_: mapping.config.Model
   name: vanilla4
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
   arch:
     _target_: mapping.models.se2d.vanilla4.Vanilla4
     _partial_: true

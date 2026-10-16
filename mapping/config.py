@@ -24,6 +24,7 @@ from typing import Optional, Union
 
 from omegaconf import OmegaConf
 
+import mapping.models as models
 import mapping.tasks as tasks
 
 DEFAULT_LR = 3e-4
@@ -36,8 +37,20 @@ def model_lr(task, name, size):
     return getattr(module, 'LR', {}).get(size, DEFAULT_LR)
 
 
+def ladder_rung(name, size):
+    """A rung's constructor arguments, ``conf/ladders/<name>.yaml``.
+    Resolver for ``model.size_kwargs``."""
+    rungs = models.ladder(name)
+    if size not in rungs:
+        raise KeyError(f'model.size={size!r} is not a rung of the {name!r} ladder '
+                       f'(conf/ladders/{name}.yaml): have {list(rungs)}')
+    return dict(rungs[size])
+
+
 if not OmegaConf.has_resolver('model_lr'):
     OmegaConf.register_new_resolver('model_lr', model_lr)
+if not OmegaConf.has_resolver('ladder'):
+    OmegaConf.register_new_resolver('ladder', ladder_rung)
 
 
 @dataclass(frozen=True)
@@ -131,22 +144,71 @@ class Task:
                             f'got {type(self.generator).__name__}')
 
 
-class Model:
-    """A registered model at one size. ``arch`` is the model class with
-    its architecture arguments bound (Hydra ``_partial_``); ``build(spec)``
-    makes the module. Checked at construction: the name is registered for
-    the task, and the architecture arguments bind to the class's own
-    signature, so a stray key is an error here, not at training time."""
+def _plain(v):
+    """Lists (as yaml gives them) as tuples, for comparison and binding."""
+    return tuple(_plain(x) for x in v) if isinstance(v, (list, tuple)) else v
 
-    def __init__(self, name, size, arch):
-        self.name, self.size = name, size
-        kwargs = {k: tuple(v) if isinstance(v, list) else v
-                  for k, v in arch.keywords.items()}
-        self.arch = functools.partial(arch.func, *arch.args, **kwargs)
-        inspect.signature(arch.func).bind(None, *arch.args, **kwargs)
+
+class Model:
+    """A registered model at one rung of its size ladder.
+
+    ``ladder`` names ``conf/ladders/<ladder>.yaml``; ``size`` is a rung of
+    it and ``size_kwargs`` that rung's constructor arguments (resolved
+    from the ladder file and saved with the run). ``arch`` is the model
+    class with any fixed arguments bound (Hydra ``_partial_``), such as
+    hybrid45b's placement. ``build(spec)`` makes the module the trainer
+    trains.
+
+    Checked here: the size is a rung of the ladder, ``size_kwargs`` is
+    that rung exactly, ``arch`` does not set a ladder argument, and every
+    argument binds to the class's signature. ``Experiment`` checks that
+    this is the registered model (the same ladder and fixed arguments as
+    its module). So a model's architecture is always its name at a rung:
+    an override that would train something else is an error, never a run
+    whose saved config differs from what trained."""
+
+    def __init__(self, name, ladder, size, size_kwargs, arch):
+        self.name, self.ladder, self.size = name, ladder, str(size)
+        rung = ladder_rung(ladder, self.size)
+        size_kwargs = {k: _plain(v) for k, v in dict(size_kwargs).items()}
+        if size_kwargs != rung:
+            raise ValueError(
+                f'model.size_kwargs {size_kwargs} is not rung {self.size!r} of the '
+                f'{ladder!r} ladder ({rung}). A size is a rung: pick one with '
+                f'model.size, or add one to conf/ladders/{ladder}.yaml')
+        fixed = {k: _plain(v) for k, v in arch.keywords.items()}
+        clash = sorted(set(fixed) & set(rung))
+        if clash:
+            raise ValueError(
+                f'model.arch.{clash[0]} is set by the size ({ladder} ladder, rung '
+                f'{self.size!r}: {rung}). Pick another rung with model.size, or add '
+                f'one to conf/ladders/{ladder}.yaml')
+        self.size_kwargs, self.fixed = rung, fixed
+        self.kwargs = {**rung, **fixed}
+        self.cls = arch.func
+        self.arch = functools.partial(arch.func, *arch.args, **self.kwargs)
+        inspect.signature(arch.func).bind(None, *arch.args, **self.kwargs)
 
     def module(self, task):
         return tasks.get(task)['models'].get(self.name)
+
+    def check_registered(self, task):
+        """This is the model ``name`` registers for ``task``: its module
+        reads the same ladder and binds the same fixed arguments."""
+        module = self.module(task)
+        if dict(module.SIZES) != models.ladder(self.ladder):
+            raise ValueError(f'model {self.name}: its config names ladder '
+                             f'{self.ladder!r} but its module builds from another '
+                             f'(SIZES in {module.__name__})')
+        want = {k: _plain(v) for k, v in getattr(module, 'ARCH', {}).items()}
+        if self.fixed != want:
+            diff = sorted(k for k in set(want) | set(self.fixed)
+                          if want.get(k) != self.fixed.get(k))
+            raise ValueError(
+                f'model.arch.{diff[0]}={self.fixed.get(diff[0])!r} is not what '
+                f'{self.name} registers ({want.get(diff[0])!r}, ARCH in '
+                f'{module.__name__}). A different architecture is a different '
+                f'model: register one (docs/config.md, "Add a model")')
 
     def build(self, spec):
         return self.arch(spec)
@@ -163,7 +225,7 @@ class Experiment:
     eval: Eval
 
     def __post_init__(self):
-        self.model.module(self.task.name)       # registered for this task
+        self.model.check_registered(self.task.name)
 
     def legacy_args(self):
         """``argparse.Namespace`` exactly as ``train.parse`` gives it for

@@ -20,9 +20,9 @@ code and on both entry points here, and compares everything they write.
 
 ```
 python run.py model=se2d/hybrid4                      # task se2d, size xs, cosine schedule
-python run.py model=se2d/hybrid4 model/size=m schedule=wsd run.steps=400000
-python run.py model=z2/vanilla model/size=vanilla/l   # a model on its own ladder
-python run.py +experiment=se2c_bridge model/size=s    # a preset (conf/experiment/)
+python run.py model=se2d/hybrid4 model.size=m schedule=wsd run.steps=400000
+python run.py model=z2/vanilla model.size=l            # a rung of the model's own ladder
+python run.py +experiment=se2c_bridge model.size=s    # a preset (conf/experiment/)
 python run.py --exp ~/notes/my_run.yaml run.seed=1    # your own experiment file
 python run.py --from results/se2c/hybrid4c/s/bridge_n4dec_100k_qt/config.yaml run.name=again
 python run.py ... --print                             # resolved config + train.py flags; no run
@@ -46,8 +46,7 @@ python run.py ... --print                             # resolved config + train.
 
 | group / node | options | object (`mapping.config`) | fields |
 | --- | --- | --- | --- |
-| `model` (required) | `<task>/<name>`, one file per registered model | `Model` (name, size, `arch`), with `arch` the model class (`_partial_`) | `name`; `arch.*` = the class's own constructor arguments |
-| `model/size` (chosen by the model file) | `xs` `s` `m` `l` `xl` `xxl` (width ladder); `vanilla/*`, `vanilla2/*`, `lstm/*`, `mlp/*`, `depth/d4..d32` | merged into `model` | `size`, `arch.width` (+ `arch.depth`) |
+| `model` (required) | `<task>/<name>`, one file per registered model | `Model` | `name`, `ladder`, `size` (a rung of the ladder), `size_kwargs` (resolved from `conf/ladders/<ladder>.yaml`), `arch` (the class, `_partial_`, with fixed arguments such as hybrid45b's `placement`) |
 | `task` (chosen by the model) | `z2`, `se2d`, `se2c` | `Task` | `name`, `episode_steps`, `queries`, `query_times` |
 | `generator` (chosen by the task) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
 | `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` | `warmup` (+ `cooldown` for wsd) |
@@ -60,20 +59,29 @@ python run.py ... --print                             # resolved config + train.
 (`hybrid4` exists for z2 and for se2d), and a model is written for one
 task's interface, so `model=se2d/hybrid4` is the whole choice.
 
-**Size ladders live in `conf/model/size/`.** Each model module's `SIZES`
-is read from there (`mapping.models.ladder`), so `build(size, spec)`, the
-path used by loaders and tools, uses the same numbers. Each module's
-`SCALING_RULE` still describes its ladder. `tests/sizes_snapshot.json`
-holds the pre-move tables, and the tests check the files against them
-entry for entry and in order. They also check that config-built models
-equal `build(size, spec)` models parameter for parameter, at every size of
-every model.
+**Size ladders live in `conf/ladders/`,** one file per ladder (`width`,
+`vanilla`, `vanilla2`, `lstm`, `mlp`, `depth`), one rung per line in order.
+A model file names its ladder (`model.ladder`) and a default rung; pick
+another with `model.size=<rung>`. The rung's arguments are resolved into
+`model.size_kwargs` and saved with the run. Each model module reads the
+same file (`SIZES = mapping.models.ladder('<ladder>')`), so `build(size,
+spec)`, the path loaders and tools use, gives the same numbers.
+- **A model's architecture is its name at a rung.** An override that
+  would train anything else is refused: a ladder argument
+  (`+model.arch.width=96`), a rung's numbers (`model.size_kwargs.*`), or
+  a fixed argument the module does not register (`ARCH`, e.g. a
+  hybrid45b placement). Add a rung to the ladder file, or register a new
+  model ("How to add" below).
+- `tests/sizes_snapshot.json` holds the pre-move tables; the tests check
+  the ladder files against them entry for entry and in order, and that
+  config-built models equal `build(size, spec)` models parameter for
+  parameter, at every size of every model.
 
 ## Field map: config key and train.py flag
 
 | config key | train.py flag | | config key | train.py flag |
 | --- | --- | --- | --- | --- |
-| `model` + `model/size` | `--task --model --size` | | `task.episode_steps` | `--episode-steps` |
+| `model` + `model.size` | `--task --model --size` | | `task.episode_steps` | `--episode-steps` |
 | `run.name` | `--run` | | `task.queries` | `--queries` |
 | `run.out` | `--out` | | `task.query_times` | `--query-times` |
 | `run.steps` | `--steps` | | `task.generator.texture` (bank) | `--texture` |
@@ -104,9 +112,10 @@ key. Put it in `conf/experiment/` (`+experiment=<name>`), or anywhere
 # One-line purpose, and what it reproduces.
 defaults:
   - override /model: se2d/vanilla4
-  - override /model/size: m
   - override /schedule: wsd
 
+model:
+  size: m
 run:
   name: seed0_400k_qt_wsd
   steps: 400000
@@ -117,7 +126,7 @@ task:
     workers: 14
 ```
 
-Command-line overrides apply on top of it: `--exp f.yaml model/size=l
+Command-line overrides apply on top of it: `--exp f.yaml model.size=l
 run.seed=1`.
 
 ## Outputs and reruns

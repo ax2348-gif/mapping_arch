@@ -1,13 +1,12 @@
 # @package _global_
 # Hybrid transformer, SE(2) port.
-# Sizes: conf/model/size/ (model/size=<size>).
 defaults:
   - /task: se2d
-  - /model/size: xs
 
 model:
-  _target_: mapping.config.Model
   name: hybrid
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
   arch:
     _target_: mapping.models.se2d.hybrid.Hybrid
     _partial_: true

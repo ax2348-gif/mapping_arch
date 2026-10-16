@@ -35,7 +35,7 @@ CASES = {
            ['model=z2/vanilla4', 'task.generator.workers=2', 'run.device=cpu']),
     'se2d_wsd': (['--task', 'se2d', '--model', 'vanilla4', '--size', 's', '--workers', '2',
                   '--device', 'cpu', '--schedule', 'wsd', '--cooldown', '0.5', '--seed', '3'],
-                 ['model=se2d/vanilla4', 'model/size=s', 'task.generator.workers=2',
+                 ['model=se2d/vanilla4', 'model.size=s', 'task.generator.workers=2',
                   'run.device=cpu', 'schedule=wsd', 'schedule.cooldown=0.5', 'run.seed=3']),
     'se2c': (['--task', 'se2c', '--model', 'vanilla4c', '--size', 'xs', '--device', 'cpu',
               '--turn-n', '8'],

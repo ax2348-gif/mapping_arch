@@ -182,22 +182,16 @@ def _value(v):
 
 def overrides_from_flags(args):
     """Hydra overrides equivalent to parsed train.py flags: the model
-    (which selects the task), its size on the model's ladder, and every
+    (which selects the task), its rung on the model's ladder, and every
     flag that differs from its default. A non-default flag for a generator
     or schedule the run does not use is an error (train.py used to ignore
     it silently)."""
-    import os
-    import yaml
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'conf',
                         'model', args.task, args.model + '.yaml')
     if not os.path.exists(path):
         raise SystemExit(f'no config for model {args.model!r} on task {args.task!r} ({path})')
-    with open(path) as f:
-        default_size = next(d['/model/size'] for d in yaml.safe_load(f)['defaults']
-                            if isinstance(d, dict) and '/model/size' in d)
-    ladder = default_size.rsplit('/', 1)[0] + '/' if '/' in default_size else ''
     generator = 'se2c' if tasks.get(args.task).get('gpu_data') else 'bank'
-    out = [f'model={args.task}/{args.model}', f'model/size={ladder}{args.size}']
+    out = [f'model={args.task}/{args.model}', f'model.size={_value(args.size)}']
     if args.schedule != 'cosine':
         out.append(f'schedule={args.schedule}')
     defaults = {a.dest: a.default for a in build_parser()._actions}

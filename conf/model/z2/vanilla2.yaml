@@ -1,13 +1,12 @@
 # @package _global_
 # The second vanilla arm: the same 2026-default transformer block, the other standard option at every...
-# Sizes: conf/model/size/vanilla2/ (model/size=vanilla2/<size>).
 defaults:
   - /task: z2
-  - /model/size: vanilla2/xs
 
 model:
-  _target_: mapping.config.Model
   name: vanilla2
+  ladder: vanilla2       # conf/ladders/vanilla2.yaml; model.size=<rung>
+  size: xs
   arch:
     _target_: mapping.models.vanilla2.VanillaTransformer2
     _partial_: true

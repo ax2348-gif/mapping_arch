@@ -1,5 +1,0 @@
-# @package model
-size: 2xl
-arch:
-  width: 768
-  depth: 4

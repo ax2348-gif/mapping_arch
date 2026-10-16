@@ -1,13 +1,12 @@
 # @package _global_
 # hybrid4_noconv: ablation of hybrid4 without the short convolution.
-# Sizes: conf/model/size/ (model/size=<size>).
 defaults:
   - /task: z2
-  - /model/size: xs
 
 model:
-  _target_: mapping.config.Model
   name: hybrid4_noconv
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
   arch:
     _target_: mapping.models.hybrid4_noconv.Hybrid4Noconv
     _partial_: true

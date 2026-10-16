@@ -14,7 +14,7 @@ import torch.nn as nn
 from mapping.models import register
 
 from mapping.models import ladder  # noqa: E402
-SIZES = ladder('mlp')   # conf/model/size/mlp/*.yaml
+SIZES = ladder('mlp')   # conf/ladders/mlp.yaml
 
 SCALING_RULE = ('Width doubles per rung; depth grows by one every other '
                 'rung. Parameters scale roughly with width squared.')

@@ -100,8 +100,8 @@ from a learning-rate grid; name one anything with `--run`.
 2. **Copy the pattern.** `mapping/models/mlp.py` is the smallest complete
    example; `vanilla.py` is a full one. A model file defines `SIZES` (an
    ordered ladder of at least five rungs over two orders of magnitude,
-   read from `conf/model/size/` with `mapping.models.ladder`; a new
-   ladder shape gets its own subdirectory there),
+   read from `conf/ladders/<ladder>.yaml` with `mapping.models.ladder`; a
+   new ladder shape gets its own file there),
    `SCALING_RULE` (one paragraph: which dimensions grow and how), an
    optional `LR = {size: lr}`, and `build(size, spec) -> nn.Module` whose
    `forward(obs, directions, query_offset)` returns the query views. End
@@ -109,9 +109,10 @@ from a learning-rate grid; name one anything with `--run`.
    enters, and why it is within the rules. Register at the bottom:
    `register('<name>')(sys.modules[__name__])`. Dropping the file into
    `mapping/models/` registers it with the harness. For `run.py`, also add
-   `conf/model/<task>/<name>.yaml` (copy a sibling: its task, its default
-   size, and its class as `arch._target_`); `tests/test_config.py` fails
-   until every registered model has one.
+   `conf/model/<task>/<name>.yaml` (copy a sibling: its task, its ladder,
+   its default size, and its class as `arch._target_`); `tests/test_config.py`
+   fails until every registered model has one. docs/config.md, "Add a
+   model", has the whole recipe.
 3. **Check the ladder.** `python scaling.py --model <name> --dry` prints
    parameters and learning rate per rung. Confirm the largest rung fits a
    batch of 64 in bf16 on the local GPU.
@@ -130,7 +131,7 @@ from a learning-rate grid; name one anything with `--run`.
 ## Training and evaluating
 
 Runs are configured with Hydra: `python run.py model=se2d/hybrid4
-model/size=m`, presets with `+experiment=<name>`, your own experiment
+model.size=m`, presets with `+experiment=<name>`, your own experiment
 file with `--exp file.yaml`, reruns with `--from <run>/config.yaml`. See
 `docs/config.md`. The `train.py` flags below still work and run exactly
 the same thing.

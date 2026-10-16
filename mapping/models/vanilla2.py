@@ -104,7 +104,7 @@ MIN_DEPTH = 4
 DEC_DEPTH = 2
 
 from mapping.models import ladder  # noqa: E402
-SIZES = ladder('vanilla2')   # conf/model/size/vanilla2/*.yaml
+SIZES = ladder('vanilla2')   # conf/ladders/vanilla2.yaml
 
 SCALING_RULE = (
     'One-parameter family in width: head dim is fixed at 64, heads = '

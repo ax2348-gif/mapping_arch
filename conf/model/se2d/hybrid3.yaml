@@ -1,13 +1,12 @@
 # @package _global_
 # hybrid3, SE(2) port: hybrid2 with SwiGLU in place of the 4x GELU MLP.
-# Sizes: conf/model/size/ (model/size=<size>).
 defaults:
   - /task: se2d
-  - /model/size: xs
 
 model:
-  _target_: mapping.config.Model
   name: hybrid3
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
   arch:
     _target_: mapping.models.se2d.hybrid3.Hybrid3
     _partial_: true

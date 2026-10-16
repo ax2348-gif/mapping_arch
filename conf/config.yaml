@@ -1,8 +1,8 @@
 # One training run (mapping.config.Experiment). Pick a model, which picks
 # its task and that task's generator; every other group has a default.
-#   python run.py model=se2d/hybrid4 model/size=s
-#   python run.py model=z2/vanilla model/size=vanilla/m schedule=wsd
-#   python run.py +experiment=se2c_bridge model/size=m
+#   python run.py model=se2d/hybrid4 model.size=s
+#   python run.py model=z2/vanilla model.size=m schedule=wsd
+#   python run.py +experiment=se2c_bridge model.size=m
 #   python run.py --exp my_experiment.yaml run.seed=1
 # docs/config.md has the field map and the experiment workflow.
 defaults:
@@ -11,6 +11,13 @@ defaults:
   - _self_
 
 _target_: mapping.config.Experiment
+
+# Every model file (conf/model/<task>/<name>.yaml) sets model.name,
+# model.ladder, model.size (a rung of that ladder) and model.arch; the
+# rung's arguments come from conf/ladders/<ladder>.yaml.
+model:
+  _target_: mapping.config.Model
+  size_kwargs: ${ladder:${model.ladder},${model.size}}
 
 optim:
   _target_: mapping.config.AdamW

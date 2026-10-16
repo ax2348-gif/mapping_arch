@@ -116,7 +116,7 @@ from mapping.models import register
 HEAD_DIM = 64
 
 from mapping.models import ladder  # noqa: E402
-SIZES = ladder('vanilla')   # conf/model/size/vanilla/*.yaml
+SIZES = ladder('vanilla')   # conf/ladders/vanilla.yaml
 
 SCALING_RULE = (
     'One-parameter family in width: head dim is fixed at 64, heads = '
