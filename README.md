@@ -241,7 +241,7 @@ numbers at the time it was written.
 - `docs/decision_arm_design.md`: the decision arm's draft design (on hold).
 - `docs/lift/`: the continuous-SE(2) lift: plan, build log, contact sheets;
   the task contract is `CONTRACT_SE2C.md`.
-- `experiments/registry.yaml` and `experiments/audit/`: the provenance audit (every run found, its commit, config and GPU time; the major experiments).
+- `experiments/registry.yaml`, `experiments/audit/` and `docs/provenance_design.md`: the provenance audit (every run, its commit, config and GPU time; the major experiments) and the proposed design (snapshot refs, ledger, `xp`), awaiting approval.
 
 Published pages, private until shared:
 

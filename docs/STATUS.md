@@ -51,7 +51,7 @@ docs/scaling_study_design.md.
 
 - Decision-arm `[decide]` items (docs/decision_arm_design.md).
 - Multi-agent arm: a design note, after reviewing the multi-robot SLAM literature.
-- Provenance: the audit (experiments/audit/README.md, borderline list) and the registry of major experiments (experiments/registry.yaml), 2026-10-16.
+- Provenance: the audit (experiments/audit/README.md, borderline list), the registry (experiments/registry.yaml) and the design for approval (docs/provenance_design.md, open questions in its section 13), 2026-10-16.
 
 ## Working rules learned (also in the agent memory)
 
