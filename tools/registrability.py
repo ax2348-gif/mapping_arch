@@ -9,6 +9,7 @@ observations alone. The numbers are a ceiling for any model.
 
     python tools/registrability.py --step-px 1 2 3 --episodes 4000
     python tools/registrability.py --texture imagenette --step-px 1 2 3
+    python tools/registrability.py --texture imagenette_hp --step-px 3
 
 Definitions (all on the TEST bank, dihedral augmentation on, headings as
 the SE(2) generator draws them, per-step queries):
@@ -50,8 +51,9 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from mapping.data import (MOVES, TEXTURES, Config, load_bank,  # noqa: E402
-                          make_batch, texture_settings)
+from mapping.data import (MOVES, TEXTURES, Config,  # noqa: E402
+                          check_texture, load_bank, make_batch,
+                          texture_settings)
 from mapping.loader import EVAL_SPLIT  # noqa: E402
 
 
@@ -196,6 +198,7 @@ def main():
     a = p.parse_args()
     settings = texture_settings(a.texture)
     path = a.bank or TEXTURES[a.texture]['path']
+    check_texture(path, a.texture)
     bank = load_bank(path, settings['cutoff'], EVAL_SPLIT, True)[0]
     print(f'texture {a.texture}: {path} {EVAL_SPLIT} split, '
           f'{bank.shape[1]} tiles of {bank.shape[-1]} px, {settings}',

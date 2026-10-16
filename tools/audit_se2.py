@@ -23,7 +23,7 @@ model, args, spec, task = load_checkpoint(ckpt, dev)
 t = tasks.get(task)
 prepare = t['task'].prepare
 config = tasks.config_from_args(task, spec, args)
-_, test_bank = load_banks(args['bank'], config)
+_, test_bank = load_banks(args['bank'], config, args.get('texture', 'mnist'))
 UNKNOWN = DATA_UNKNOWN[True]   # reserved symbol under odometry dropout
 print(f'checkpoint {ckpt}\n  task {task}, query_times {config.query_times}, '
       f'dihedral {config.dihedral}, heading {config.heading}, '

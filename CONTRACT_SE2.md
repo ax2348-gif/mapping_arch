@@ -54,7 +54,13 @@ often blank and so cannot be registered, natural ones almost never are
 single channel and face their heading exactly as before; dihedral tile
 augmentation stays on, so the upright orientation of natural content
 cannot reveal the heading. The interface, the spec and the rules do not
-change.
+change. `--texture imagenette_hp` is the same bank high-passed once
+(each tile minus its Gaussian blur, sigma 2 px; `CONTRACT.md`), which
+removes the per-episode brightness shortcut: on raw Imagenette at step 3
+with all odometry dropped, predicting each episode's mean observation
+reaches 0.64 of the floor's MSE, on the high-passed bank 0.997, with
+registration still well-posed (99.5% of steps unique). `mse_centered`
+in the eval metrics ignores per-query brightness on every texture.
 
 ## Why this rung
 

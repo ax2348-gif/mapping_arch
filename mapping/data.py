@@ -34,12 +34,22 @@ UNKNOWN = dict(VOCAB)
 #                 MNIST's near-black residue, 0 leaves natural images as
 #                 they are
 #   start_window  start-phase window, one tile (Config requires >= tile)
-# 'mnist' is Config's default and the original task.
+#   tag           (optional) the bank file must carry this string as its
+#                 'texture' key; a texture without a tag refuses any file
+#                 that carries one (``check_texture``), so a derived bank
+#                 cannot be passed off as its source or vice versa
+# 'mnist' is Config's default and the original task. 'imagenette_hp' is
+# the Imagenette bank high-passed once at preprocessing (x minus its
+# Gaussian blur, sigma 2 px, fixed affine map back to uint8;
+# scripts/get_imagenette_hp.py), which removes the per-episode brightness
+# a model could otherwise predict without any geometry.
 TEXTURES = {
     'mnist': dict(path='data/mnist.npz', tile=28, cutoff=32,
                   start_window=28),
     'imagenette': dict(path='data/imagenette64.npz', tile=64, cutoff=0,
                        start_window=64),
+    'imagenette_hp': dict(path='data/imagenette64_hp.npz', tile=64,
+                          cutoff=0, start_window=64, tag='imagenette_hp'),
 }
 
 
@@ -170,6 +180,27 @@ def check_bank(bank, config):
         raise ValueError(f'bank tiles are {bank.shape[-2:]}, config.tile is '
                          f'{config.tile}: the texture setting does not match '
                          f'the bank file (mapping.data.TEXTURES)')
+
+
+def check_texture(path, texture):
+    """Refuse a bank file whose identity disagrees with ``texture``: the
+    file's optional ``texture`` key must equal ``TEXTURES[texture]['tag']``
+    (both absent for the untagged banks, MNIST and raw Imagenette). Tile
+    side alone cannot tell a filtered bank from its source. Returns the
+    file's ``filter`` description (a JSON string) or None."""
+    if texture not in TEXTURES:
+        raise ValueError(f'unknown texture {texture!r}; have '
+                         f'{sorted(TEXTURES)}')
+    want = TEXTURES[texture].get('tag')
+    with np.load(path, allow_pickle=False) as f:
+        tag = str(f['texture']) if 'texture' in f.files else None
+        desc = str(f['filter']) if 'filter' in f.files else None
+    if tag != want:
+        raise ValueError(f'{path}: bank texture tag {tag!r}, texture '
+                         f'{texture!r} expects {want!r}: the texture setting '
+                         f'does not match the bank file '
+                         f'(mapping.data.TEXTURES)')
+    return desc
 
 
 # ---------------------------------------------------------------- the walk

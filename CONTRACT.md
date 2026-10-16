@@ -64,7 +64,7 @@ existed (`tests/test_contract_z2.py`, `tests/test_generator_options.py`).
   registering overlapping observations (visual odometry); this makes
   sense only with a step below 9. The trainer's shuffled-directions
   number is then a no-op and is reported as n/a.
-- **Texture** (`train.py --texture mnist|imagenette`, default mnist;
+- **Texture** (`train.py --texture mnist|imagenette|imagenette_hp`, default mnist;
   `mapping.data.TEXTURES`). The tile bank the map is built from. `mnist`
   is the original: 28 x 28 digits, pixels below 32 zeroed, which leaves
   maps about 80% black, so with overlapping windows many steps cannot be
@@ -84,6 +84,16 @@ existed (`tests/test_contract_z2.py`, `tests/test_generator_options.py`).
   natural content (sky up, gravity) cannot reveal the heading. The
   reference numbers at the end of this file are for MNIST; the floor on
   the natural bank is printed per run and is not comparable.
+  `imagenette_hp` is the same bank high-passed once at preprocessing
+  (`scripts/get_imagenette_hp.py`: each tile minus its isotropic Gaussian
+  blur, sigma 2 px, mapped back to uint8 by one fixed affine map chosen
+  on the train split), so observations and targets are edge-like texture
+  with no local mean and predicting an episode's brightness no longer
+  beats the floor; the filter commutes with the dihedral symmetries, its
+  file carries a `texture` tag that must match (`check_texture`), and
+  nothing a model receives changes. Every run also reports
+  `mse_centered`, the per-query MSE with each view's own mean removed,
+  which is blind to brightness on any texture.
 
 This is the **single offline setting with relative odometry**: full
 attention over the whole episode is allowed, queries are answered at the

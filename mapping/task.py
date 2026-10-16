@@ -59,18 +59,35 @@ def loss_fn(pred, target):
     return F.mse_loss(pred.float(), target)
 
 
+def centered_sq_err(pred, target):
+    """``(..., Q)`` per-query MSE after removing each view's own mean: the
+    prediction's mean from the prediction and the target's from the
+    target. A prediction that is the target plus any constant per query
+    scores 0, so the brightness of a view (which on natural textures a
+    model can guess from the episode without any geometry) earns
+    nothing."""
+    pc = pred - pred.mean((-1, -2), keepdim=True)
+    tc = target - target.mean((-1, -2), keepdim=True)
+    return (pc - tc).pow(2).mean((-1, -2))
+
+
 @torch.no_grad()
 def metrics(pred, target):
     """Per-pixel errors, plus the same on stroke pixels only.
 
     Background is most of a target, so a model that draws nothing scores
     well on the whole-view numbers; ``fg_*`` is where the task lives.
+    ``mse_centered`` is the mean over queries of the MSE with each view's
+    own mean removed (``centered_sq_err``): it ignores per-query
+    brightness, which on natural textures a model can predict from the
+    episode without any geometry. Reported only; the loss is plain MSE.
     """
     pred = pred.float()
     err = pred - target
     fg = target > 0
     return {
         'mse': err.pow(2).mean().item(),
+        'mse_centered': centered_sq_err(pred, target).mean().item(),
         'mae': err.abs().mean().item(),
         'within_0.1': (err.abs() < 0.1).float().mean().item(),
         'fg_mae': err.abs()[fg].mean().item() if fg.any() else float('nan'),
@@ -83,10 +100,15 @@ def metrics(pred, target):
 @torch.no_grad()
 def metrics_by_time(pred, target, time, steps):
     """``mse`` of the queries asked at the last step, and per prefix-length
-    bin (quarters of the episode), as a dict; nan where a bin is empty."""
+    bin (quarters of the episode), as a dict; nan where a bin is empty.
+    ``mse_centered_last`` is ``mse_centered`` (see ``metrics``) of the
+    last-step queries."""
     pred, err = pred.float(), (pred.float() - target).pow(2).mean((-1, -2))
-    out = {'mse_last': err[time == steps].mean().item()
-           if (time == steps).any() else float('nan')}
+    last = time == steps
+    out = {'mse_last': err[last].mean().item()
+           if last.any() else float('nan'),
+           'mse_centered_last': centered_sq_err(pred, target)[last].mean().item()
+           if last.any() else float('nan')}
     edges = [0, steps // 4, steps // 2, 3 * steps // 4, steps]
     for lo, hi in zip(edges, edges[1:]):
         m = (time >= lo) & (time < hi) if hi < steps else (time >= lo)

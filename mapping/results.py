@@ -53,8 +53,8 @@ def fit_power_law(params, losses):
 
 
 def table(rows, columns=('model', 'size', 'run', 'params', 'steps', 'lr',
-                         'qt', 'mse', 'last', 'shuffled', 'fg_mae', 'fg<0.1',
-                         'it/s')):
+                         'qt', 'mse', 'c-mse', 'last', 'shuffled', 'fg_mae',
+                         'fg<0.1', 'it/s')):
     """Rows as aligned text."""
     def cell(r, c):
         e, s = r['final_eval'], r.get('final_eval_shuffled', {})
@@ -63,6 +63,8 @@ def table(rows, columns=('model', 'size', 'run', 'params', 'steps', 'lr',
             'params': f'{r["params"]:,}', 'steps': str(r['steps']),
             'lr': f'{r["args"]["lr"]:.2g}', 'mse': f'{e["mse"]:.4f}',
             'qt': r.get('query_times', 'last')[:4],
+            'c-mse': (f'{e["mse_centered"]:.4f}' if 'mse_centered' in e
+                      else '-'),
             'last': f'{e["mse_last"]:.4f}' if 'mse_last' in e else '-',
             'shuffled': f'{s["mse"]:.4f}' if s else '-',
             'fg_mae': f'{e["fg_mae"]:.3f}',

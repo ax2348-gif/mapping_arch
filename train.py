@@ -34,7 +34,7 @@ import time
 import torch
 
 import mapping.tasks as tasks
-from mapping.data import TEXTURES
+from mapping.data import TEXTURES, check_texture
 from mapping.checkpoint import save_checkpoint
 from mapping.loader import eval_set, load_banks, train_loader
 from mapping.plot import plot_run
@@ -80,10 +80,12 @@ def parse():
                    help='tile bank (generator setting, not a new task): '
                         'sets the tile side, brightness cutoff and start '
                         'window together (mapping.data.TEXTURES); the bank '
-                        'file must have that tile side or the run refuses')
+                        'file must have that tile side and identity tag '
+                        '(mapping.data.check_texture) or the run refuses')
     p.add_argument('--bank', default=None,
                    help="bank file; default the texture's "
-                        '(data/mnist.npz, data/imagenette64.npz)')
+                        '(data/mnist.npz, data/imagenette64.npz, '
+                        'data/imagenette64_hp.npz)')
     p.add_argument('--no-bf16', action='store_true')
     p.add_argument('--compile', action='store_true')
     p.add_argument('--device', default='cuda' if torch.cuda.is_available()
@@ -184,9 +186,12 @@ def main():
     # with all of them replaced by "unknown" it cannot change anything
     shuffle_informative = args.odometry_dropout < 1.0
     try:
-        train_bank, eval_bank = load_banks(args.bank, config)
+        train_bank, eval_bank = load_banks(args.bank, config, args.texture)
+        bank_filter = check_texture(args.bank, args.texture)
     except ValueError as e:
         raise SystemExit(f'--texture {args.texture} --bank {args.bank}: {e}')
+    if bank_filter is not None:     # a derived bank's exact parameters
+        texture['bank_filter'] = bank_filter
     start = 0
     branch = None
     if args.branch:
@@ -247,7 +252,8 @@ def main():
 
     print(f'{args.task} {args.model}/{args.size} -> {out}: {params:,} params, '
           f'lr {args.lr:.2g}; floor mse {floor["mse"]:.4f}, '
-          f'floor fg_mae {floor["fg_mae"]:.4f}; step_px {args.step_px}, '
+          f'floor fg_mae {floor["fg_mae"]:.4f}, floor c-mse '
+          f'{floor["mse_centered"]:.4f}; step_px {args.step_px}, '
           f'odometry_dropout {args.odometry_dropout}; texture '
           f'{args.texture} ({args.bank}, tile {config.tile}, cutoff '
           f'{config.cutoff})', flush=True)
@@ -307,6 +313,7 @@ def main():
                         f' last-step {ev["mse_last"]:.4f} ')
                 print(f'step {step + 1:6d} train {rec["train_mse"]:.4f} '
                       f'eval mse {ev["mse"]:.4f}{by_t} '
+                      f'c-mse {ev["mse_centered"]:.4f} '
                       f'fg_mae {ev["fg_mae"]:.4f} '
                       f'fg<0.1 {ev["fg_within_0.1"]:.3f} '
                       f'| dirs shuffled mse '

@@ -10,7 +10,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, IterableDataset
 
-from mapping.data import EpisodeStream, check_bank, load_bank, make_batch
+from mapping.data import (EpisodeStream, check_bank, check_texture,
+                          load_bank, make_batch)
 
 TRAIN_SPLIT, EVAL_SPLIT = 'train', 'test'
 EVAL_SEED_TAG = 7919   # mixed into the eval seed so it never equals a train seed
@@ -54,10 +55,14 @@ def eval_set(config, bank, batch, batches, seed):
     return out
 
 
-def load_banks(path, config):
+def load_banks(path, config, texture=None):
     """``(train_bank, eval_bank)`` from the bank's two splits, with the
     config's cutoff. Fails here, before any worker starts, if the bank's
-    tile side is not ``config.tile`` (``mapping.data.check_bank``)."""
+    tile side is not ``config.tile`` (``mapping.data.check_bank``) or,
+    given the ``texture`` name, if the file's identity tag disagrees with
+    it (``mapping.data.check_texture``)."""
+    if texture is not None:
+        check_texture(path, texture)
     train = load_bank(path, config.cutoff, TRAIN_SPLIT, config.dihedral)[0]
     test = load_bank(path, config.cutoff, EVAL_SPLIT, config.dihedral)[0]
     for bank in (train, test):

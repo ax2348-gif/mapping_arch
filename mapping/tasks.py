@@ -11,9 +11,9 @@ Two generator settings apply to either task without making a new one:
 ``odometry_dropout`` (each odometry symbol replaced by a reserved unknown
 symbol with that probability; when it is above 0 the spec's vocabulary
 grows by one so tables have a row for it). A third, ``texture``
-(``mapping.data.TEXTURES``: 'mnist' or 'imagenette'), picks the tile bank
-and with it the tile side, brightness cutoff and start window; it does not
-touch the spec, so models are sized exactly as before.
+(``mapping.data.TEXTURES``: 'mnist', 'imagenette' or 'imagenette_hp'),
+picks the tile bank and with it the tile side, brightness cutoff and start
+window; it does not touch the spec, so models are sized exactly as before.
 
 ``z2`` is the default everywhere, so code written before ``se2`` existed
 behaves as it did. Checkpoints record their task; ones without it are z2.

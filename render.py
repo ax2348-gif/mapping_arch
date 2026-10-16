@@ -28,7 +28,8 @@ def main():
     import inspect
     model, args, spec, task = load_checkpoint(a.checkpoint, a.device)
     config = tasks.config_from_args(task, spec, args)
-    _, eval_bank = load_banks(args['bank'], config)
+    _, eval_bank = load_banks(args['bank'], config,
+                              args.get('texture', 'mnist'))
     batches = eval_set(config, eval_bank, 64, 2, args['seed'])
     out = a.out or os.path.join(os.path.dirname(a.checkpoint), 'grid.png')
     title = ''

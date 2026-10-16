@@ -10,3 +10,4 @@ data/imagenette_raw/
 *.egg-info/
 jobs/
 quarantine/
+data/imagenette64_hp.npz

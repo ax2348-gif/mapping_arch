@@ -17,6 +17,8 @@ pip install --no-deps fla-core==0.5.2 einops # kernels (hybrid4 and later);
 python scripts/get_mnist.py                 # writes data/mnist.npz once
 python -I scripts/get_imagenette.py         # optional natural-image bank:
                                             # data/imagenette64.npz
+python -I scripts/get_imagenette_hp.py      # its high-passed variant (reads
+                                            # the above): imagenette64_hp.npz
 python profile_loader.py                    # optional: data path sanity
 ```
 
@@ -35,7 +37,18 @@ with tarfile's `data` filter and writes the npz; run it with `python -I`,
 since the archive is untrusted data. The texture fixes the tile side (64),
 the cutoff (0: natural images are not thresholded) and the start window
 (one tile) together (`mapping.data.TEXTURES`); a bank file whose tile side
-disagrees with the texture is refused. Observations stay 9 x 9 single
+disagrees with the texture is refused. `--texture imagenette_hp` is the
+same bank high-passed once (`scripts/get_imagenette_hp.py`: each tile
+minus its Gaussian blur, sigma 2 px, symmetric border, then one fixed
+affine map back to uint8 chosen on the train split, about 0.2% of pixels
+clipped). Raw natural images let a model predict each episode's mean
+brightness with no geometry at all: on SE(2) visual odometry at step 3
+that alone takes pixel MSE from the floor 0.072 to 0.046. On the
+high-passed bank the same baseline is 0.997 of the floor, while about
+99.5% of steps stay uniquely registrable. Its file carries a `texture`
+tag and its exact filter parameters; a bank whose tag disagrees with the
+texture is refused, and the parameters are recorded in the run as
+`bank_filter`. Observations stay 9 x 9 single
 channel and the model-facing spec does not change, so every model runs
 unchanged. The ImageNet images keep ImageNet's terms of use
 (non-commercial research).
@@ -108,6 +121,10 @@ python train.py --task se2 --model hybrid4 --size xs --query-times uniform \
     --step-px 3 --odometry-dropout 1.0 --texture imagenette \
     --run seed0_vo_imagenette                      # VO on natural images
 python tools/registrability.py --texture imagenette --step-px 1 2 3
+python train.py --task se2 --model hybrid4 --size xs --query-times uniform \
+    --step-px 3 --odometry-dropout 1.0 --texture imagenette_hp \
+    --run seed0_vo_imagenette_hp                   # VO, brightness removed
+python tools/registrability.py --texture imagenette_hp --step-px 3
 python summarize.py                                             # all runs
 python summarize.py --fit                                       # best per rung + fits
 ```
@@ -115,10 +132,15 @@ python summarize.py --fit                                       # best per rung 
 `train.py` evaluates on a fixed set from the bank's test split (MNIST
 test, or Imagenette val), so no evaluation tile instance was seen in
 training. The texture, bank file, tile, cutoff and start window are in the
-log header, `final.json` and the checkpoint arguments; runs that differ
+log header, `final.json` and the checkpoint arguments (with `bank_filter` for a
+derived bank); runs that differ
 in texture are never merged by `summarize.py --fit`. It reports the error with
 true directions and with each episode's directions permuted in time; the
-gap between them is the odometry the model is using. `summarize.py` reads
+gap between them is the odometry the model is using. Beside `mse` it
+reports `mse_centered` (`c-mse`): per query, the MSE after removing the
+prediction's own mean and the target's own mean, averaged over queries,
+so per-query brightness earns nothing; a report only, the loss is plain
+MSE. `summarize.py` reads
 every `final.json` under `results/`.
 
 ## Scaling sweeps
