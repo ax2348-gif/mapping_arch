@@ -426,3 +426,30 @@ All run through Hydra (run.py) from the exp/causal branch on Torch.
 **Seen before registration (not part of the test):**
 - 100k cosine, seed 0: causal hybrid4 s 0.0160 (last-step 0.0347) against bidirectional 0.0164 (0.0423).
 - 400k WSD, seed 0, mid-run at 100k: causal vanilla4 s 0.0403 (last-step 0.0608) against bidirectional 0.0247 (0.0537).
+
+### 2026-10-16: H1d, the causal penalty grows with walk length for vanilla4 but not hybrid4 (REGISTERED before any run)
+
+**Status.** Pre-registered at the user's request before any run of this sweep exists. It runs WHETHER OR NOT H1c passes. If H1c passes, it is the priority follow-up.
+
+**Claim (H1d).**
+- A causal transformer cannot fold later odometry into past tokens' keys and values, so each query must compose every turn between an old observation and now. Its causal penalty should GROW with walk length T.
+- hybrid4's recurrence rotates the stored state once per step, a constant cost per step, so its penalty should stay FLAT in T.
+- If this holds, causal attention and the causal delta rule differ by an exponent in composition length, not a constant multiplier.
+
+**Design.**
+- Discrete SE(2) (se2d), MNIST, size s.
+- The H1c recipe: 400k WSD, batch 64, uniform query times, 8 queries, seed 0.
+- Walk lengths T ∈ {16, 32, 64, 128}; models hybrid4, hybrid4_causal, vanilla4, vanilla4_causal.
+- Existing or queued cells: T = 32 all four (seed 0); T = 64 bidirectional (scaling study) and causal (H1c grid). New: T = 16 and T = 128 for all four models (8 runs).
+
+**Metric.** The H1c penalty, causal ÷ bidirectional FINAL last-step error, with the same resolution guard (absolute difference when the bidirectional error is below 0.005). A cell where the BIDIRECTIONAL model fails "solved" is reported but excluded from the verdict: its penalty is not interpretable.
+
+**Prediction (relative thresholds):**
+- **vanilla4:** the penalty increases monotonically over the interpretable T values, and penalty(largest interpretable T) ≥ 1.5 × penalty(T = 32).
+- **hybrid4:** the penalty stays ≤ 1.2 at every interpretable T.
+- **Supported:** both hold. **Refuted:** the vanilla4 penalty is flat or decreasing in T (max/min ≤ 1.2 over T), or the hybrid4 penalty exceeds 1.5 at some interpretable T. Anything else is mixed.
+
+**Caveats, registered.**
+- One seed. Seeds 1-2 are added if the result is borderline.
+- At T = 128, s may not solve even bidirectionally; those cells are then excluded, as above.
+- Attention cost grows with T (~1,361 tokens per episode at T = 128), so the T = 128 runs are slower. Wall-clock is reported but not part of the verdict.
