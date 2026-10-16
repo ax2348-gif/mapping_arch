@@ -238,3 +238,4 @@ Published pages, private until shared:
 | theory review | https://claude.ai/artifact/DJ4WFQ5V7ArJrDV31EQ8bN |
 | applications review | https://claude.ai/artifact/WnVhdCjzUtq1VRo6mySS8A |
 | literature synthesis | https://claude.ai/artifact/MSr6KNebLT7Rttep2nnU1H |
+| causality literature review (belief in activations, causal vs bidirectional, 2026-10-16) | https://claude.ai/artifact/G3Ud86sAZtJw3wneRKg2BH |
