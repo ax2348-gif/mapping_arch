@@ -113,8 +113,12 @@ that does the geometry for it is excluded:
 Allowed and encouraged: any attention variant, recurrence, state space or
 linear-attention layers, memory or register tokens, looped or weight-tied
 depth, mixture of experts, gated MLPs, learned per-patch and per-step
-embeddings, normalisation and initialisation of your choice. Pure PyTorch,
-no custom CUDA kernels, no external architecture packages.
+embeddings, normalisation and initialisation of your choice. Standard
+operations may use established kernel libraries (for example
+`flash-linear-attention` for linear-attention and delta-rule scans, or
+PyTorch's fused attention) rather than hand-written PyTorch: scaling
+sweeps need the speed. The model file still owns the layer's wiring, and
+the audit covers everything the library is fed.
 
 Every model file ends with an **audit section** in its docstring listing
 every place positional or geometric information enters the network and why
