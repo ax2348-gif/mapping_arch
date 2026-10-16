@@ -107,6 +107,13 @@ def test_rope_step_of_query_tokens(name, batch, monkeypatch):
         net(batch['observations'], batch['odometry'], batch['query_pose'],
             query_time=qt)
     pos = seen['pos'][0]
+    if getattr(net, 'sequence', 'sorted') == 'layout':
+        # layout order [observations (33 x 25), odometry (32), queries (8 x 25)]
+        steps = torch.arange(33, device=DEV)
+        assert torch.equal(pos[:33 * 25], steps.repeat_interleave(25))
+        assert torch.equal(pos[33 * 25:33 * 25 + 32], steps[:-1])
+        assert torch.equal(pos[33 * 25 + 32:], qt[0].repeat_interleave(25))
+        return
     order = token_order(qt, 33, 8, 25)[0]
     L = 33 * 26 - 1
     pos_of = torch.empty_like(order)

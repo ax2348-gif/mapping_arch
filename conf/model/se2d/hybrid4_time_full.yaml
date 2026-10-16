@@ -1,0 +1,14 @@
+# @package _global_
+# hybrid4_time_full: hybrid4_time with its last layer hybrid4's full
+# bidirectional Gated DeltaNet over all tokens (same layer count).
+defaults:
+  - /task: se2d
+
+model:
+  name: hybrid4_time_full
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.se2d.hybrid4_time.Hybrid4Time
+    _partial_: true
+    last: gdn

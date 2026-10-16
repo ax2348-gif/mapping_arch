@@ -1,0 +1,14 @@
+# @package _global_
+# hybrid4_time: hybrid4 with its delta-rule layers restricted to the time
+# axis (odometry tokens write, readers and queries read; DeltaProduct, two
+# Householder steps per odometry token); last layer attention.
+defaults:
+  - /task: se2d
+
+model:
+  name: hybrid4_time
+  ladder: width       # conf/ladders/width.yaml; model.size=<rung>
+  size: xs
+  arch:
+    _target_: mapping.models.se2d.hybrid4_time.Hybrid4Time
+    _partial_: true
