@@ -25,8 +25,11 @@ class Vanilla4c(Hybrid4c):
     attention = Attention
     block = Block
 
-    def __init__(self, spec, width, patch=3):
-        super().__init__(spec, width, mixer='attention', patch=patch)
+    QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+
+    def __init__(self, spec, width, patch=3, query_mode='mixed'):
+        super().__init__(spec, width, mixer='attention', patch=patch,
+                         query_mode=query_mode)
 
 
 def build(size, spec):

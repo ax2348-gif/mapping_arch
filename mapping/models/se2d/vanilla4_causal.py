@@ -15,7 +15,11 @@ from mapping.models.se2d.vanilla4 import (LR, SCALING_RULE, SIZES,  # noqa: F401
 class CausalAttention(Attention):
     """vanilla4's attention, masked causally over the sorted token order."""
 
-    def forward(self, x, cos, sin):
+    causal = True
+
+    def forward(self, x, cos, sin, layout=None):
+        if layout is not None:          # query_mode='inert': causal & inert mask
+            return super().forward(x, cos, sin, layout)
         b, l, w = x.shape
         q, k, v = self.qkv(x).view(b, l, 3, self.heads, -1).unbind(2)
         q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
@@ -25,8 +29,10 @@ class CausalAttention(Attention):
 
 
 class Vanilla4Causal(Vanilla4):
-    def __init__(self, spec, width):
-        super().__init__(spec, width)
+    QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+
+    def __init__(self, spec, width, query_mode='mixed'):
+        super().__init__(spec, width, query_mode)
         for blk in self.blocks:          # same modules and initial values
             blk.mixer.__class__ = CausalAttention
 

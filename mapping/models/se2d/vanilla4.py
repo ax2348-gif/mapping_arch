@@ -240,6 +240,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from mapping.models.query_mode import QueryLayout, check_query_mode
 from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
@@ -318,10 +319,17 @@ class Attention(nn.Module):
         self.qkv = MuLinear(width, 3 * width, mult, std)
         self.out = MuLinear(width, width, mult, out_std)
 
-    def forward(self, x, cos, sin):
+    causal = False      # query_mode='inert': a causal subclass sets True
+
+    def forward(self, x, cos, sin, layout=None):
         b, l, w = x.shape
         q, k, v = self.qkv(x).view(b, l, 3, self.heads, -1).unbind(2)
         q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
+        if layout is not None:          # query_mode='inert'
+            o = F.scaled_dot_product_attention(
+                q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2),
+                attn_mask=layout.attn_mask(self.causal))
+            return self.out(o.transpose(1, 2).reshape(b, l, w))
         o = F.scaled_dot_product_attention(q.transpose(1, 2),
                                            k.transpose(1, 2),
                                            v.transpose(1, 2))
@@ -358,18 +366,26 @@ class Block(nn.Module):
         self.norm2 = nn.LayerNorm(width)
         self.mlp = MLP(width, mult, std, out_std)
 
-    def forward(self, x, cos, sin):
+    def forward(self, x, cos, sin, layout=None):
         h = self.norm1(x)
-        h = (self.mixer(h, cos, sin) if isinstance(self.mixer, Attention)
-             else self.mixer(h))
+        if layout is not None:          # query_mode='inert'
+            h = (self.mixer(h, cos, sin, layout) if isinstance(self.mixer, Attention)
+                 else self.mixer(h, layout))
+        else:
+            h = (self.mixer(h, cos, sin) if isinstance(self.mixer, Attention)
+                 else self.mixer(h))
         x = x + h
         return x + self.mlp(self.norm2(x))
 
 
 class Vanilla4(nn.Module):
-    def __init__(self, spec, width):
+    QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+
+    def __init__(self, spec, width, query_mode='mixed'):
         super().__init__()
         assert spec.view == 9, 'tokeniser assumes 9x9 views (3x3 patches)'
+        check_query_mode(self, query_mode)
+        self.query_mode = query_mode
         self.spec = spec
         self.width = width
         heads = width // HEAD_DIM
@@ -457,11 +473,16 @@ class Vanilla4(nn.Module):
         x = torch.gather(x, 1, order[..., None].expand(-1, -1, w))
         pos = torch.gather(pos, 1, order)
         cos, sin = rope_cos_sin(pos, HEAD_DIM)
-        for block in self.blocks:
-            x = block(x, cos, sin)
+        if self.query_mode == 'inert':
+            layout = QueryLayout(order, t1 * 10 - 1, q, 9)
+            for block in self.blocks:
+                x = block(x, cos, sin, layout)
+        else:
+            for block in self.blocks:
+                x = block(x, cos, sin)
         inverse = torch.argsort(order, 1)                        # back to layout
         x = torch.gather(x, 1, inverse[..., None].expand(-1, -1, w))
-        y = self.readout(self.norm(x[:, -q * 9:]))                # (b,q*9,9)
+        y = self.readout(self.norm(x[:, x.shape[1] - q * 9:]))    # (b,q*9,9)
         return (y.view(b, q, 3, 3, 3, 3).permute(0, 1, 2, 4, 3, 5)
                 .reshape(b, q, 9, 9))
 

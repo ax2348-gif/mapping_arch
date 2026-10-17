@@ -149,11 +149,13 @@ def differences(a, b, prefix=''):
     return out
 
 
-# run.* fields added after runs were saved, so absent from older config.yaml
-# files: the run directory template (2026-10-16). They say where a run is
-# written, never what it trains, so recomposing an older run may add them
-# (the current defaults) without that counting as drift.
-ADDED_RUN_FIELDS = ('run.root', 'run.dir', 'run.note', 'run.tag', 'run.provenance')
+# Fields added after runs were saved, so absent from older config.yaml
+# files: the run directory template (2026-10-16), which says where a run is
+# written, never what it trains; and model.query_mode (2026-10-17), whose
+# default (mixed) is what every run before it trained. Recomposing an older
+# run may add them (the current defaults) without that counting as drift.
+ADDED_RUN_FIELDS = ('run.root', 'run.dir', 'run.note', 'run.tag', 'run.provenance',
+                    'model.query_mode')   # 2026-10-17; absent = mixed, its default
 
 # Run fields that are metadata about a launch, not settings: never compared
 # as drift, never carried into a rerun's sources (a rerun gets its own note)
@@ -202,7 +204,10 @@ def rerun(frm, overrides):
     if added:                                # saved before the run.dir template
         base = OmegaConf.to_container(OmegaConf.load(os.path.join(CONF, 'config.yaml')))
         for k in added:                      # the template itself, resolved below
-            OmegaConf.update(cfg, k, base['run'][k.split('.', 1)[1]], force_add=True)
+            node = base
+            for part in k.split('.'):
+                node = node[part]
+            OmegaConf.update(cfg, k, node, force_add=True)
     for o in overrides:
         key = _key(o)
         if '=' not in o or o[0] in '+~' or '/' in key:

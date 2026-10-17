@@ -103,6 +103,7 @@ import torch.nn.functional as F
 from mapping.models.se2d.hybrid4 import (BASE_WIDTH, HEAD_DIM, LR,  # noqa: F401
                                         SCALING_RULE, SIZES, Attention, Block,
                                         GatedDeltaNet, MuLinear, rope_cos_sin)
+from mapping.models.query_mode import QueryLayout, check_query_mode
 from mapping.models.se2c import register
 from mapping.se2c.encoding import (ODOMETRY_FEATURES, QUERY_FEATURES,
                                    encode_odometry, encode_query)
@@ -145,9 +146,13 @@ def token_order(query_time, t1, q, P):
 
 
 class Hybrid4c(nn.Module):
-    def __init__(self, spec, width, mixer='hybrid', patch=PATCH):
+    QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+
+    def __init__(self, spec, width, mixer='hybrid', patch=PATCH, query_mode='mixed'):
         super().__init__()
         assert spec.view % patch == 0, 'view must be a multiple of the patch'
+        check_query_mode(self, query_mode)
+        self.query_mode = query_mode
         self.spec = spec
         self.width = width
         self.patch = patch       # 3 for every rung; 5 only for the cost check
@@ -207,11 +212,16 @@ class Hybrid4c(nn.Module):
         x = torch.gather(x, 1, order[..., None].expand(-1, -1, w))
         pos = torch.gather(pos, 1, order)
         cos, sin = rope_cos_sin(pos, HEAD_DIM)
-        for blk in self.blocks:
-            x = blk(x, cos, sin)
+        if self.query_mode == 'inert':
+            layout = QueryLayout(order, t1 * (P + 1) - 1, q, P)
+            for blk in self.blocks:
+                x = blk(x, cos, sin, layout)
+        else:
+            for blk in self.blocks:
+                x = blk(x, cos, sin)
         inverse = torch.argsort(order, 1)
         x = torch.gather(x, 1, inverse[..., None].expand(-1, -1, w))
-        y = self.readout(self.norm(x[:, -q * P:]))                    # (b,q*P,9)
+        y = self.readout(self.norm(x[:, x.shape[1] - q * P:]))        # (b,q*P,9)
         return unpatchify(y.view(b, q, P, self.patch ** 2), S, self.patch)
 
 

@@ -292,10 +292,20 @@ class Model:
     this is the registered model (the same ladder and fixed arguments as
     its module). So a model's architecture is always its name at a rung:
     an override that would train something else is an error, never a run
-    whose saved config differs from what trained."""
+    whose saved config differs from what trained.
 
-    def __init__(self, name, ladder, size, size_kwargs, arch):
+    ``query_mode`` (``mixed`` | ``inert``, mapping/models/query_mode.py)
+    is passed to the class only when it is not ``mixed``, so a mixed run's
+    constructor arguments, checkpoint ``arch`` and args record are what
+    they were before the field existed; ``inert`` on a class that does not
+    implement it is refused."""
+
+    def __init__(self, name, ladder, size, size_kwargs, arch, query_mode='mixed'):
+        from mapping.models.query_mode import QUERY_MODES
         self.name, self.ladder, self.size = name, ladder, str(size)
+        if query_mode not in QUERY_MODES:
+            raise ValueError(f'model.query_mode={query_mode!r}: must be one of {QUERY_MODES}')
+        self.query_mode = query_mode
         rung = ladder_rung(ladder, self.size)
         size_kwargs = {k: _plain(v) for k, v in dict(size_kwargs).items()}
         if size_kwargs != rung:
@@ -312,6 +322,12 @@ class Model:
                 f'one to conf/ladders/{ladder}.yaml')
         self.size_kwargs, self.fixed = rung, fixed
         self.kwargs = {**rung, **fixed}
+        if query_mode != 'mixed':
+            if query_mode not in getattr(arch.func, '__dict__', {}).get('QUERY_MODES', ()):
+                raise ValueError(f'model.query_mode={query_mode!r}: {name} '
+                                 f'({arch.func.__qualname__}) does not implement it '
+                                 f'(mapping/models/query_mode.py)')
+            self.kwargs['query_mode'] = query_mode
         self.cls = arch.func
         self.arch = functools.partial(arch.func, *arch.args, **self.kwargs)
         inspect.signature(arch.func).bind(None, *arch.args, **self.kwargs)
@@ -379,6 +395,8 @@ class Experiment:
             a.device = r.device
         a.lr, a.weight_decay, a.clip, a.batch = o.lr, o.weight_decay, o.clip, o.batch
         a.schedule = s.name
+        if self.model.query_mode != 'mixed':   # absent for mixed: records as before it
+            a.query_mode = self.model.query_mode
         for f in fields(s):                  # warmup, cooldown, ...
             setattr(a, f.name, getattr(s, f.name))
         a.eval_batches, a.eval_every, a.log_every = e.batches, e.every, e.log_every

@@ -18,6 +18,11 @@ _target_: mapping.config.Experiment
 model:
   _target_: mapping.config.Model
   size_kwargs: ${ladder:${model.ladder},${model.size}}
+  # how query tokens mix (mapping/models/query_mode.py): mixed (ordinary tokens,
+  # every model before the option) | inert (read-only: no GDN write, no short
+  # conv, attend to history and their own tokens only); inert is refused by a
+  # model that does not implement it
+  query_mode: mixed
 
 optim:
   _target_: mapping.config.AdamW

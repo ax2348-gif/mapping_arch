@@ -215,6 +215,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 
+from mapping.models.query_mode import QueryLayout, check_query_mode
 from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
@@ -411,7 +412,9 @@ class GatedDeltaNet(nn.Module):
                                       beta.contiguous(), scale=1.0)
         return o
 
-    def forward(self, x):
+    def forward(self, x, layout=None):
+        if layout is not None:
+            return self.forward_inert(x, layout)
         b, l, _ = x.shape
         h, d, half = self.heads, self.d, self.heads // 2
         qkv = torch.stack([self.q(x), self.k(x), self.v(x)], 2)  # (b,l,3,h*d)
@@ -431,6 +434,49 @@ class GatedDeltaNet(nn.Module):
         bh = torch.cat([beta[:, :, :half], beta[:, :, half:].flip(1)], 2)
         o = self.scan(q, k, v, gh, bh)                            # (b,l,h,d)
         o = torch.cat([o[:, :, :half], o[:, :, half:].flip(1)], 2)
+        o = self.norm(o).to(x.dtype) * F.silu(self.gate(x)).view(b, l, h, d)
+        return self.out(o.reshape(b, l, h * d))
+
+    # query_mode='inert' (mapping/models/query_mode.py) ------------------
+    # ``bidirectional``: heads [0, H/2) left to right, [H/2, H) right to
+    # left; a subclass with every head left to right sets it False.
+    bidirectional = True
+
+    def _to_scan_order(self, z, dim):
+        """Flip the right-to-left half of the heads (``dim``) in time
+        (dim 1); its own inverse. Identity when every head scans left to
+        right."""
+        if not self.bidirectional:
+            return z
+        half = self.heads // 2
+        a, r = z.narrow(dim, 0, half), z.narrow(dim, half, z.shape[dim] - half)
+        return torch.cat([a, r.flip(1)], dim)
+
+    def short_conv(self, qkv):
+        """SiLU of the causal short convolution of ``qkv`` (b, n, 3, h, d),
+        sorted order in and out, each head in its own scan order."""
+        b, n = qkv.shape[:2]
+        seq = self._to_scan_order(qkv, 3).reshape(b, n, -1)
+        seq = F.pad(seq.transpose(1, 2), (self.conv - 1, 0))
+        seq = F.silu(self.short(seq)).transpose(1, 2).view(qkv.shape)
+        return self._to_scan_order(seq, 3)
+
+    def forward_inert(self, x, layout):
+        """Query tokens read the state and never change it (beta = 0, g =
+        0, in both directions); history tokens' short convolution runs over
+        the history-only sequence; query tokens get no convolution."""
+        b, l, _ = x.shape
+        h, d = self.heads, self.d
+        qkv = torch.stack([self.q(x), self.k(x), self.v(x)], 2).view(b, l, 3, h, d)
+        write = layout.hist.float()[..., None]                    # (b,l,1)
+        g = F.logsigmoid(self.decay(x).float()) / DECAY_TAU * write
+        beta = 2 * torch.sigmoid(self.beta(x).float()) * write
+        seq = layout.scatter(F.silu(qkv), self.short_conv(layout.gather(qkv)))
+        q, k, v = self._to_scan_order(seq, 3).unbind(2)
+        q = F.normalize(q.float(), dim=-1).to(v.dtype) * d ** -0.5
+        k = F.normalize(k.float(), dim=-1).to(v.dtype)
+        o = self.scan(q, k, v, self._to_scan_order(g, 2), self._to_scan_order(beta, 2))
+        o = self._to_scan_order(o, 2)
         o = self.norm(o).to(x.dtype) * F.silu(self.gate(x)).view(b, l, h, d)
         return self.out(o.reshape(b, l, h * d))
 
@@ -461,10 +507,17 @@ class Attention(nn.Module):
         self.qkv = MuLinear(width, 3 * width, mult, std)
         self.out = MuLinear(width, width, mult, out_std)
 
-    def forward(self, x, cos, sin):
+    causal = False      # query_mode='inert': a causal subclass sets True
+
+    def forward(self, x, cos, sin, layout=None):
         b, l, w = x.shape
         q, k, v = self.qkv(x).view(b, l, 3, self.heads, -1).unbind(2)
         q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
+        if layout is not None:          # query_mode='inert'
+            o = F.scaled_dot_product_attention(
+                q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2),
+                attn_mask=layout.attn_mask(self.causal))
+            return self.out(o.transpose(1, 2).reshape(b, l, w))
         o = F.scaled_dot_product_attention(q.transpose(1, 2),
                                            k.transpose(1, 2),
                                            v.transpose(1, 2))
@@ -501,18 +554,26 @@ class Block(nn.Module):
         self.norm2 = nn.LayerNorm(width)
         self.mlp = MLP(width, mult, std, out_std)
 
-    def forward(self, x, cos, sin):
+    def forward(self, x, cos, sin, layout=None):
         h = self.norm1(x)
-        h = (self.mixer(h, cos, sin) if isinstance(self.mixer, Attention)
-             else self.mixer(h))
+        if layout is not None:          # query_mode='inert'
+            h = (self.mixer(h, cos, sin, layout) if isinstance(self.mixer, Attention)
+                 else self.mixer(h, layout))
+        else:
+            h = (self.mixer(h, cos, sin) if isinstance(self.mixer, Attention)
+                 else self.mixer(h))
         x = x + h
         return x + self.mlp(self.norm2(x))
 
 
 class Hybrid4(nn.Module):
-    def __init__(self, spec, width):
+    QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+
+    def __init__(self, spec, width, query_mode='mixed'):
         super().__init__()
         assert spec.view == 9, 'tokeniser assumes 9x9 views (3x3 patches)'
+        check_query_mode(self, query_mode)
+        self.query_mode = query_mode
         self.spec = spec
         self.width = width
         heads = width // HEAD_DIM
@@ -603,11 +664,16 @@ class Hybrid4(nn.Module):
         x = torch.gather(x, 1, order[..., None].expand(-1, -1, w))
         pos = torch.gather(pos, 1, order)
         cos, sin = rope_cos_sin(pos, HEAD_DIM)
-        for block in self.blocks:
-            x = block(x, cos, sin)
+        if self.query_mode == 'inert':
+            layout = QueryLayout(order, t1 * 10 - 1, q, 9)
+            for block in self.blocks:
+                x = block(x, cos, sin, layout)
+        else:
+            for block in self.blocks:
+                x = block(x, cos, sin)
         inverse = torch.argsort(order, 1)                        # back to layout
         x = torch.gather(x, 1, inverse[..., None].expand(-1, -1, w))
-        y = self.readout(self.norm(x[:, -q * 9:]))                # (b,q*9,9)
+        y = self.readout(self.norm(x[:, x.shape[1] - q * 9:]))    # (b,q*9,9)
         return (y.view(b, q, 3, 3, 3, 3).permute(0, 1, 2, 4, 3, 5)
                 .reshape(b, q, 9, 9))
 

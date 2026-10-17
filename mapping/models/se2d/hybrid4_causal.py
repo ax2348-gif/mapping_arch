@@ -39,8 +39,11 @@ class CausalGatedDeltaNet(GatedDeltaNet):
     """hybrid4's Gated DeltaNet with every head scanning left to right."""
 
     causal = True      # read by tools/transition_probe.py (no flipped heads)
+    bidirectional = False   # query_mode='inert': no flipped heads either
 
-    def forward(self, x):
+    def forward(self, x, layout=None):
+        if layout is not None:          # query_mode='inert'
+            return self.forward_inert(x, layout)
         b, l, _ = x.shape
         h, d = self.heads, self.d
         qkv = torch.stack([self.q(x), self.k(x), self.v(x)], 2)      # (b,l,3,h*d)
@@ -59,7 +62,11 @@ class CausalGatedDeltaNet(GatedDeltaNet):
 class CausalAttention(Attention):
     """hybrid4's attention, masked causally over the sorted token order."""
 
-    def forward(self, x, cos, sin):
+    causal = True
+
+    def forward(self, x, cos, sin, layout=None):
+        if layout is not None:          # query_mode='inert': causal & inert mask
+            return super().forward(x, cos, sin, layout)
         b, l, w = x.shape
         q, k, v = self.qkv(x).view(b, l, 3, self.heads, -1).unbind(2)
         q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
@@ -69,8 +76,10 @@ class CausalAttention(Attention):
 
 
 class Hybrid4Causal(Hybrid4):
-    def __init__(self, spec, width):
-        super().__init__(spec, width)
+    QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+
+    def __init__(self, spec, width, query_mode='mixed'):
+        super().__init__(spec, width, query_mode)
         # same modules and initial values as hybrid4 at the same seed; only
         # the operators' forward changes
         for blk in self.blocks:

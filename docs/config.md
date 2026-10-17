@@ -73,7 +73,7 @@ python run.py ... --print                             # resolved config, and the
 
 | group / node | options | object (`mapping.config`) | fields |
 | --- | --- | --- | --- |
-| `model` (required) | `<task>/<name>`, one file per registered model | `Model` | `name`, `ladder`, `size` (a rung of the ladder), `size_kwargs` (resolved from `conf/ladders/<ladder>.yaml`), `arch` (the class, `_partial_`, with fixed arguments such as hybrid45b's `placement`) |
+| `model` (required) | `<task>/<name>`, one file per registered model | `Model` | `name`, `ladder`, `size` (a rung of the ladder), `size_kwargs` (resolved from `conf/ladders/<ladder>.yaml`), `arch` (the class, `_partial_`, with fixed arguments such as hybrid45b's `placement`), `query_mode` (`mixed` \| `inert`, below) |
 | `task` (chosen by the model; `task=<variant>` overrides) | `z2`, `se2d`, `se2c` (each includes `_episode`) | `Task` | `name`, `episode_steps`, `queries`, `query_times` |
 | `generator` (chosen by the task; `generator=<variant>` overrides) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
 | `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` (`Schedule.lr(step, steps, peak)`) | `warmup` (+ `cooldown` for wsd) |
@@ -103,6 +103,30 @@ spec)`, the path loaders and tools use, gives the same numbers.
   the ladder files against them entry for entry and in order, and that
   config-built models equal `build(size, spec)` models parameter for
   parameter, at every size of every model.
+
+**`model.query_mode`: how query tokens mix** (mapping/models/query_mode.py,
+2026-10-17). `mixed`, the default, is every model as before: query tokens
+are ordinary tokens (they write the Gated DeltaNet state, sit in the short
+convolution's windows, and attention is full). `inert` makes them
+read-only: beta = 0 and decay g = 0 for query tokens in every delta-rule
+head and both directions; the short convolution of history tokens runs
+over the history-only sequence and query tokens get none; attention is
+masked so history attends to history only and a query's tokens to history
+and their own query (a causal model intersects this with its causal mask);
+RoPE is unchanged. History activations then do not depend on the queries,
+and a query's answer does not depend on the other queries
+(tests/test_query_mode.py).
+- Implemented by se2d `hybrid4`, `vanilla4`, `hybrid4_causal`,
+  `vanilla4_causal` and se2c `hybrid4c`, `vanilla4c`; each declares it in
+  its own class (`QUERY_MODES`). Any other model refuses `inert`, also a
+  subclass that inherits the constructor.
+- `mixed` is not passed to the model, so a mixed run's constructor
+  arguments, checkpoint `arch` and args record are byte-for-byte what they
+  were before the field (its outputs are bit-identical; tested against the
+  commit before it). `inert` adds `query_mode` to `arch` (so checkpoints
+  rebuild it) and to the args record. No `train.py` flag (frozen).
+- A config.yaml saved before the field has no `model.query_mode`;
+  `--from` reads its absence as `mixed`.
 
 ## Field map: config key and train.py flag
 
