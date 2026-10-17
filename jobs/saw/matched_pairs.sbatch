@@ -17,7 +17,7 @@
 #SBATCH --account=torch_pr_1024_tandon_advanced
 #SBATCH --partition=h200_public,h200_tandon
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=24
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 #SBATCH --time=12:00:00
 #SBATCH --array=0-1%2
