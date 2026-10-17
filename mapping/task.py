@@ -20,6 +20,7 @@ diagnostics only; a model that reads them is cheating. Integrating the
 directions into positions is the model's job, inside its parameters.
 """
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -33,11 +34,16 @@ class TaskSpec:
     directions: int = 4      # 5 under odometry dropout: 4 is "unknown"
     step_px: int = 9
     queries: int = 8
+    offset_max_pin: Optional[int] = None   # task.offset_max: None is T * step_px
 
     @property
     def offset_max(self):
         """Query offsets lie in [-offset_max, offset_max] on each axis: the
-        farthest a window can be from the last one is T steps back."""
+        farthest a window can be from the last one is T steps back. A run may
+        pin it (``task.offset_max``) to keep a model's offset encoding fixed
+        across episode lengths."""
+        if self.offset_max_pin is not None:
+            return self.offset_max_pin
         return self.steps * self.step_px
 
 

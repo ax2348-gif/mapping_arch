@@ -74,7 +74,7 @@ python run.py ... --print                             # resolved config, and the
 | group / node | options | object (`mapping.config`) | fields |
 | --- | --- | --- | --- |
 | `model` (required) | `<task>/<name>`, one file per registered model | `Model` | `name`, `ladder`, `size` (a rung of the ladder), `size_kwargs` (resolved from `conf/ladders/<ladder>.yaml`), `arch` (the class, `_partial_`, with fixed arguments such as hybrid45b's `placement`), `query_mode` (`mixed` \| `inert`, below), `scan_precision` (`tf32` \| `ieee`, below) |
-| `task` (chosen by the model; `task=<variant>` overrides) | `z2`, `se2d`, `se2c` (each includes `_episode`) | `Task` | `name`, `episode_steps`, `queries`, `query_times` |
+| `task` (chosen by the model; `task=<variant>` overrides) | `z2`, `se2d`, `se2c` (each includes `_episode`) | `Task` | `name`, `episode_steps`, `queries`, `query_times`, `offset_max` |
 | `generator` (chosen by the task; `generator=<variant>` overrides) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers path`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
 | `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` (`Schedule.lr(step, steps, peak)`) | `warmup` (+ `cooldown` for wsd) |
 | `optim` | in `config.yaml` | `AdamW` | `lr` (default: the model's, via `${model_lr:...}`), `weight_decay`, `clip`, `batch` |
@@ -198,6 +198,20 @@ continues a run (weights, optimizer, step), and refused together with it.
   record gets `init_from` (absent without a warm start, so other runs
   record as before). A `--from` rerun therefore verifies the same file.
 - No `train.py` flag. Tests: tests/test_init_from.py.
+
+**`task.offset_max`: pin the query-offset scale** (2026-10-17; z2 and
+se2d). Models normalise the query offset by the spec's `offset_max`
+(se2d hybrid4: `query_offset / offset_max` before its Fourier features),
+which is `episode_steps * step_px` by default, so changing the episode
+length rescales the encoding. `null`, the default, keeps that: the spec,
+the saved spec record and the args record are what they were before the
+field. A number pins it (`TaskSpec.offset_max_pin`): `task.offset_max=288`
+gives a T = 64 model the T = 32 encoding of every pixel offset, for a warm
+start across episode lengths (`run.init_from`). Offsets beyond the pin
+encode as values above 1 rather than being clipped. Recorded as
+`offset_max` in the args record and `offset_max_pin` in final.json /
+log.jsonl and the checkpoint spec, only when set; se2c refuses it.
+Tests: tests/test_paths.py::test_offset_max_pin.
 
 ## Field map: config key and train.py flag
 

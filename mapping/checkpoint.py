@@ -38,12 +38,21 @@ def save(record, path, state):
     record.checkpoint(state.get('step', record.data['progress']['last_step']), path)
 
 
+def spec_record(spec):
+    """The spec's fields as saved: ``offset_max_pin`` only when set, so a
+    run without ``task.offset_max`` saves what it always did."""
+    d = dict(spec.__dict__)
+    if d.get('offset_max_pin', 0) is None:
+        del d['offset_max_pin']
+    return d
+
+
 def save_checkpoint(record, path, model, args, spec, task='z2', arch=None, step=None):
     """``final.pt``: the weights, the args record, the spec and the task.
     ``arch``: ``mapping.config.Model.record()``, the class and constructor
     arguments the model was built with. Written through ``save``."""
     state = {'model': model.state_dict(), 'args': dict(args),
-             'spec': spec.__dict__, 'task': task}
+             'spec': spec_record(spec), 'task': task}
     if arch is not None:
         state['arch'] = arch
     save(record, path, state)
@@ -76,7 +85,8 @@ def load_checkpoint(path, device='cpu'):
         _, spec = tasks.config_and_spec(
             task, args['episode_steps'], args['queries'], args['seed'],
             args.get('query_times', 'last'), args.get('step_px', 9),
-            args.get('odometry_dropout', 0.0), args.get('texture', 'mnist'))
+            args.get('odometry_dropout', 0.0), args.get('texture', 'mnist'),
+            args.get('path', 'walk'), args.get('offset_max'))
     if 'arch' in state:
         model = build_from_arch(state['arch'], spec)
     else:

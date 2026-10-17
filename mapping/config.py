@@ -235,7 +235,8 @@ class BankGenerator(Generator):
         """``(mapping.data.Config, TaskSpec)`` for ``task`` (a ``Task``)."""
         return tasks.config_and_spec(task.name, task.episode_steps, task.queries,
                                      seed, task.query_times, self.step_px,
-                                     self.odometry_dropout, self.texture, self.path)
+                                     self.odometry_dropout, self.texture, self.path,
+                                     task.offset_max)
 
 
 @dataclass(frozen=True)
@@ -278,6 +279,7 @@ class Task(Node):
     queries: int
     query_times: str             # last | uniform
     generator: Generator
+    offset_max: Optional[int] = None   # pin the spec's query-offset scale; None: T * step_px
 
     def __post_init__(self):
         super().__post_init__()
@@ -287,6 +289,14 @@ class Task(Node):
         if not isinstance(self.generator, want):
             raise TypeError(f'task {self.name} needs a {want.__name__}, '
                             f'got {type(self.generator).__name__}')
+        if self.offset_max is not None:
+            if isinstance(self.offset_max, bool) or not isinstance(self.offset_max, int) \
+                    or self.offset_max < 1:
+                raise ValueError(f'task.offset_max={self.offset_max!r}: a positive number '
+                                 f'of pixels, or null (episode_steps * step_px)')
+            if want is not BankGenerator:
+                raise ValueError(f'task.offset_max is a setting of the tile-bank tasks '
+                                 f'(z2, se2d); task {self.name} has no offset_max')
 
 
 def _plain(v):
@@ -441,6 +451,8 @@ class Experiment:
         a.eval_batches, a.eval_every, a.log_every = e.batches, e.every, e.log_every
         for f in fields(t):                  # episode_steps, queries, query_times, ...
             if f.name not in ('name', 'generator'):
+                if f.name == 'offset_max' and t.offset_max is None:
+                    continue                 # absent unless pinned: records as before it
                 setattr(a, f.name, getattr(t, f.name))
         g = t.generator
         for f in fields(g):

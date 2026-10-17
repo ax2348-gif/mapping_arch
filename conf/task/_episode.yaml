@@ -5,3 +5,6 @@ task:
   episode_steps: 32     # walk steps T (T + 1 observations)
   queries: 8
   query_times: last      # last: every query at step T; uniform: at a step drawn from 0..T
+  # the query-offset scale models normalise by (TaskSpec.offset_max): null is
+  # episode_steps * step_px; a number pins it (288 keeps the T=32 encoding at any T)
+  offset_max: null

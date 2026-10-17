@@ -159,7 +159,8 @@ ADDED_RUN_FIELDS = ('run.root', 'run.dir', 'run.note', 'run.tag', 'run.provenanc
                     'model.query_mode',   # 2026-10-17; absent = mixed, its default
                     'model.scan_precision',   # 2026-10-17; absent = tf32, its default
                     'run.init_from', 'run.init_sha256',   # 2026-10-17; absent = null,
-                    'run.init_run_id')                    # no warm start
+                    'run.init_run_id',                    # no warm start
+                    'task.offset_max')    # 2026-10-17; absent = null, T * step_px
 
 # Run fields that are metadata about a launch, not settings: never compared
 # as drift, never carried into a rerun's sources (a rerun gets its own note)

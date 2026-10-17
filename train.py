@@ -303,6 +303,8 @@ def main(experiment, config=None, sources=None):
                          f'run.out), or replace it with run.overwrite=true')
 
     gpu_data = task.get('gpu_data', False)   # se2c: generated on the GPU
+    if gpu_data and t.offset_max is not None:
+        raise SystemExit(f'task.offset_max: {t.name} has no offset_max (z2, se2d only)')
     by_query = getattr(task['task'], 'metrics_by_query', None)
     # the shuffled-odometry diagnostic permutes the model-facing symbols;
     # with all of them replaced by "unknown" it cannot change anything
@@ -334,9 +336,10 @@ def main(experiment, config=None, sources=None):
         branch = torch.load(r.branch, map_location='cpu', weights_only=False)
         start = branch['step']
         defaults = {'step_px': 9, 'odometry_dropout': 0.0,
-                    'query_times': 'last', 'texture': 'mnist', 'path': 'walk'}
+                    'query_times': 'last', 'texture': 'mnist', 'path': 'walk',
+                    'offset_max': None}
         for key in ('task', 'model', 'size', 'batch', 'seed', 'step_px',
-                    'odometry_dropout', 'query_times', 'texture', 'path'):
+                    'odometry_dropout', 'query_times', 'texture', 'path', 'offset_max'):
             saved = branch['args'].get(key, defaults.get(key))
             if key == 'task':               # old checkpoints say 'se2'
                 saved = tasks.canonical(saved)
@@ -454,6 +457,7 @@ def main(experiment, config=None, sources=None):
                               'start': start, 'step_px': args.step_px,
                               **({'path': args.path} if hasattr(args, 'path') else {}),
                               **({'init_from': init} if init is not None else {}),
+                              **({'offset_max_pin': t.offset_max} if t.offset_max is not None else {}),
                               'odometry_dropout': args.odometry_dropout,
                               'offset_max': getattr(spec, 'offset_max', None),
                               'shuffle_informative': shuffle_informative,
@@ -529,6 +533,7 @@ def main(experiment, config=None, sources=None):
                  'step_px': args.step_px,
                  **({'path': args.path} if hasattr(args, 'path') else {}),
                  **({'init_from': init} if init is not None else {}),
+                 **({'offset_max_pin': t.offset_max} if t.offset_max is not None else {}),
                  'odometry_dropout': args.odometry_dropout,
                  'shuffle_informative': shuffle_informative,
                  **texture,

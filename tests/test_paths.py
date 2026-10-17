@@ -162,3 +162,28 @@ def test_config_field_reaches_generator_and_record():
         assert config.path == path
         a = vars(e.legacy_args())
         assert a.get('path', 'walk') == path and ('path' in a) == (path != 'walk')
+
+
+def test_offset_max_pin():
+    """``task.offset_max``: null keeps ``steps * step_px`` (the spec, and
+    so the saved spec record, as before the field); a pin makes T = 64 give
+    the T = 32 query-offset encoding for the same pixel offset."""
+    import mapping.tasks as tasks
+    from mapping.checkpoint import spec_record
+    from mapping.models.se2d.hybrid4 import build
+    import torch
+    _, s32 = tasks.config_and_spec('se2d', 32, 8, 0)
+    _, s64 = tasks.config_and_spec('se2d', 64, 8, 0)
+    _, p64 = tasks.config_and_spec('se2d', 64, 8, 0, offset_max=288)
+    assert s32 == tasks.get('se2d')['task'].TaskSpec()
+    assert 'offset_max_pin' not in spec_record(s32)
+    assert (s32.offset_max, s64.offset_max, p64.offset_max) == (288, 576, 288)
+    assert spec_record(p64)['offset_max_pin'] == 288
+    # the model's offset features: same weights, same pixel offset
+    torch.manual_seed(0)
+    m32 = build('xs', s32)
+    m64 = build('xs', p64)
+    m64.load_state_dict(m32.state_dict())
+    off = torch.tensor([[[37, -101], [-250, 3]]])
+    assert torch.equal(m32.offset_features(off), m64.offset_features(off))
+    assert not torch.equal(m32.offset_features(off), build('xs', s64).offset_features(off))

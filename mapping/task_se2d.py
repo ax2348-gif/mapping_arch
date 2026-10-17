@@ -22,6 +22,7 @@ and returns
 Loss, metrics and the constant floor are those of the Z^2 task.
 """
 from dataclasses import dataclass
+from typing import Optional
 
 from mapping.task import (constant_floor, loss_fn, metrics,  # noqa: F401
                           metrics_by_time)
@@ -37,9 +38,15 @@ class TaskSpec:
     turns: int = 4
     step_px: int = 9
     queries: int = 8
+    offset_max_pin: Optional[int] = None   # task.offset_max: None is T * step_px
 
     @property
     def offset_max(self):
+        """The query-offset scale a model normalises by: ``steps *
+        step_px``, unless the run pins it (``task.offset_max``, e.g. 288 to
+        keep the T = 32 encoding at another episode length)."""
+        if self.offset_max_pin is not None:
+            return self.offset_max_pin
         return self.steps * self.step_px
 
 

@@ -89,7 +89,7 @@ def results_dir(name, root=RESULTS):
 
 def config_and_spec(name, steps, queries, seed, query_times='last',
                     step_px=9, odometry_dropout=0.0, texture='mnist',
-                    path='walk'):
+                    path='walk', offset_max=None):
     """The generator config and the model-facing spec for a task. With the
     defaults both are exactly what they were before ``step_px``,
     ``odometry_dropout`` and ``texture`` existed. The texture sets the
@@ -109,6 +109,8 @@ def config_and_spec(name, steps, queries, seed, query_times='last',
     extra = {}
     if odometry_dropout > 0:     # a row for the reserved "unknown" symbol
         extra[t['odometry']] = VOCAB[t['heading']] + 1
+    if offset_max is not None:   # task.offset_max: pin the offset scale
+        extra['offset_max_pin'] = int(offset_max)
     spec = t['task'].TaskSpec(view=config.obs, steps=config.steps,
                               step_px=config.step, queries=config.queries,
                               **extra)
@@ -125,5 +127,5 @@ def config_from_args(task, spec, args):
         args.get('step_px', spec.step_px),
         args.get('odometry_dropout', 0.0),
         args.get('texture', 'mnist'),
-        args.get('path', 'walk'))
+        args.get('path', 'walk'), args.get('offset_max'))
     return config
