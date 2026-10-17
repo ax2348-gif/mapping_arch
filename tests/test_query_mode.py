@@ -460,3 +460,22 @@ def test_no_recompile_when_queries_or_steps_change():
         for q, T in ((1, 33), (3, 33), (64, 33), (300, 33), (8, 17), (64, 25)):
             go(q, T)
         assert counters['stats']['unique_graphs'] == before, (name, mode)
+
+
+@pytest.mark.parametrize('name', ['hybrid4', 'vanilla4'])
+def test_token_order_is_exact_at_any_length(name):
+    """token_order is a stable sort by (step, kind, layout index) at any
+    sequence length: the same permutation as before for training lengths,
+    and queries stay between their step's observation and odometry tokens
+    beyond 1e5 tokens (where the old float tie-break broke)."""
+    import numpy as np
+    cls = tasks.get('se2d')['models'].get(name).build('xs', spec('se2d')).__class__
+    for q in (8, 64, 12000):
+        qt = torch.randint(0, 33, (2, q), generator=torch.Generator().manual_seed(q))
+        order = cls.token_order(qt, 33, q)
+        steps = np.arange(33)
+        ctx = np.concatenate([np.stack([steps * 3] * 9, 1), (steps * 3 + 2)[:, None]], 1).reshape(-1)[:-1]
+        for r in range(2):
+            key = np.concatenate([ctx, np.repeat(qt[r].numpy() * 3 + 1, 9)])
+            want = np.lexsort((np.arange(len(key)), key))
+            assert np.array_equal(order[r].numpy(), want), (name, q)

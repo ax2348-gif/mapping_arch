@@ -625,10 +625,15 @@ class Hybrid4(nn.Module):
                             1).reshape(-1)[:-1]                     # (t1*10-1,)
         qry_key = (query_time[:, :, None] * 30 + 10).expand(-1, -1, 9)
         qry_key = qry_key.reshape(b, -1)                           # (b, q*9)
-        key = torch.cat([ctx_key[None].expand(b, -1), qry_key], 1).double()
+        key = torch.cat([ctx_key[None].expand(b, -1), qry_key], 1)
         # ties (the nine tokens of a query, several queries at one step)
-        # keep their layout order: query index, then patch index
-        key = key + torch.arange(key.shape[1], device=dev, dtype=key.dtype) * 1e-4
+        # keep their layout order: query index, then patch index. Integer
+        # keys: the float tie-break (index * 1e-4) used before reached the
+        # kinds' spacing of 10 at layout index 1e5 and misplaced queries
+        # past the step's odometry token in sequences over ~100k tokens
+        # (dense probes); below that the permutation is the same.
+        n = key.shape[1]
+        key = key.long() * n + torch.arange(n, device=dev)
         return torch.argsort(key, 1)
 
     def forward(self, obs, odometry, query_pose, query_time=None):  # SE2
