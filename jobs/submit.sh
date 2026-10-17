@@ -2,7 +2,7 @@
 # Submit a Torch job only after the dependency preflight passes, on the login
 # node, in the job's own venv: a missing package fails here in seconds instead
 # of after the queue wait (job 20101203 died on scipy 32 s after starting).
-#   jobs/submit.sh jobs/lift/<job>.sbatch [extra sbatch args]
+#   bash jobs/submit.sh jobs/lift/<job>.sbatch [extra sbatch args]
 # Run from the job's git clone on Torch. The sbatch must also run the preflight
 # itself (`python scripts/check_env.py || exit 1`), which this script checks.
 set -euo pipefail

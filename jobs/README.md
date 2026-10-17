@@ -9,7 +9,7 @@ Layout:
 Launchers sit next to the configs, never inside conf/: Hydra composes only
 YAML from conf/, and a launcher is a record of a submission, not a setting.
 
-**Submitting on Torch: always `jobs/submit.sh <job>.sbatch`, never bare `sbatch`.**
+**Submitting on Torch: always `bash jobs/submit.sh <job>.sbatch`, never bare `sbatch`** (`bash`: the scratch clones run with core.fileMode false, so the exec bit is lost).
 It runs `scripts/check_env.py` in the job's venv on the login node and refuses
 to submit on any missing or undeclared dependency, or on modified tracked files.
 Every new sbatch also runs `python scripts/check_env.py || exit 1` before
