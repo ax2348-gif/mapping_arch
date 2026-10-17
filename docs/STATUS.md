@@ -348,3 +348,11 @@ docs/scaling_study_design.md.
   - Session-scratchpad report data and run logs archived to results/session_archive_2026-10-16/ (untracked, 160 MB; see its README).
 
 - **2026-10-16, first ocean BEV run queued on Torch (user):** job 20101203, git clone /scratch/ax2348/mapping_ocean (exp/ocean-task @13df1b3), preset `ocean_bev_l_wsd`: hybrid4c l, 200k WSD, 32 px BEV queries, amp 4 (from the pinned 5; user asked for a slightly gentler sea). Model and budget match the best se2c run (hybrid4c l 200k WSD, 0.0015, 4.3 H200 h). Amp 4 vs 5 (256 episodes): median first valid query step 11 vs 12, redraws 0 vs 5. Behind H1c/H1d/odq/H1f in the queue (per-user GPU cap).
+
+- **2026-10-17, texture stress test (se2c, inference only), PREDICTIONS registered before results** (branch exp/texture-ood, agent running):
+  - User: generalisation is decided mostly by the task, not the model; vanilla4c won't do much worse.
+  - Mine:
+    1. Odometry is given in se2c, so localisation doesn't depend on texture. The test isolates the patch codec (encode, rotate, resample, decode).
+    2. Dense, in-band textures (checkerboards and stripes at training-band scales, Voronoi, grids) transfer well: normalised MSE within ~1.5-3x of in-distribution. Anisotropy alone doesn't break it; stripe orientation comes out right.
+    3. Failures: (a) frequencies above the band (1-px lines, fine checks) blur or alias; (b) the sparse-dot sweep degrades smoothly, then collapses once dots are sub-patch and isolated; (c) smooth / low-frequency textures get the training prior imposed: posterised or hallucinated ridge structure (the training nonlinearity makes near-binary ridges).
+    4. The hybrid/vanilla ratio of normalised MSE stays about the in-distribution ratio on every texture (agreeing with the user that robustness is task-determined). The far bin keeps vanilla's extra blur, so high-contrast textures (checkerboard) widen the raw gap without changing the ratio much.
