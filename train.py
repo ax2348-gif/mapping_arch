@@ -334,17 +334,18 @@ def main(experiment, config=None, sources=None):
         branch = torch.load(r.branch, map_location='cpu', weights_only=False)
         start = branch['step']
         defaults = {'step_px': 9, 'odometry_dropout': 0.0,
-                    'query_times': 'last', 'texture': 'mnist'}
+                    'query_times': 'last', 'texture': 'mnist', 'path': 'walk'}
         for key in ('task', 'model', 'size', 'batch', 'seed', 'step_px',
-                    'odometry_dropout', 'query_times', 'texture'):
+                    'odometry_dropout', 'query_times', 'texture', 'path'):
             saved = branch['args'].get(key, defaults.get(key))
             if key == 'task':               # old checkpoints say 'se2'
                 saved = tasks.canonical(saved)
-            if saved != vars(args)[key]:
+            have = vars(args).get(key, defaults.get(key))
+            if saved != have:
                 raise SystemExit(f'--branch {key} mismatch: checkpoint '
                                  f'{branch["args"].get(key, defaults.get(key))!r}, '
                                  f'run '
-                                 f'{vars(args)[key]!r}')
+                                 f'{have!r}')
         parent = os.path.join(os.path.dirname(os.path.abspath(r.branch)), 'config.yaml')
         if config is not None and os.path.exists(parent):
             changed = branch_changes(parent, config)
@@ -437,6 +438,7 @@ def main(experiment, config=None, sources=None):
                               'lr': lr, 'floor': floor,
                               'schedule': sched.name, 'branch': r.branch,
                               'start': start, 'step_px': args.step_px,
+                              **({'path': args.path} if hasattr(args, 'path') else {}),
                               'odometry_dropout': args.odometry_dropout,
                               'offset_max': getattr(spec, 'offset_max', None),
                               'shuffle_informative': shuffle_informative,
@@ -510,6 +512,7 @@ def main(experiment, config=None, sources=None):
         final = {'task': t.name, 'model': e.model.name, 'size': e.model.size,
                  'run': run, 'query_times': t.query_times,
                  'step_px': args.step_px,
+                 **({'path': args.path} if hasattr(args, 'path') else {}),
                  'odometry_dropout': args.odometry_dropout,
                  'shuffle_informative': shuffle_informative,
                  **texture,

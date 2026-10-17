@@ -6,3 +6,5 @@ bank: null              # null: the texture's bank file
 step_px: 9              # walk step in pixels
 odometry_dropout: 0.0   # probability each odometry symbol becomes "unknown"
 workers: 4              # loader processes
+path: walk              # walk | saw | no_revisit_view (mapping.data.PATHS): the walk, or
+                        # the walk conditioned on no revisit / no late view contact (exact rejection)

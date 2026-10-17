@@ -1,0 +1,50 @@
+walk uniform {"revisit_episode_frac": 0.95498046875, "revisits_mean": 5.93974609375, "late_contact_episode_frac": 0.9994140625, "turn_straight_right_left": [0.33326297883064515, 0.33413558467741933, 0.33260143649193546], "end_to_end_steps_mean": 8.9791015625, "end_to_end_steps_q10_q50_q90": [4.0, 8.0, 16.0], "odometry_move_hist": [81682, 81917, 81749, 82332], "odometry_turn_hist": [82080, 82266, 81775, 81559], "gen_ms_per_batch_mean": 23.918601086820072, "gen_ms_per_batch_p95": 24.577389887417667, "reobserved": 0.35667724609375, "seam_far": 0.52196044921875, "span_needed_mean": 8.98603515625, "span_first_mean": 10.26767578125, "dist_mean": 26.891274944679413, "dist_q50_q90": [21.470910553583888, 56.92099788303083], "cells_hist": [0.091064453125, 0.4595703125, 0.449365234375], "span_needed_near_mid_far": [0.27841796875, 0.4110107421875, 0.3105712890625], "span_first_near_mid_far": [0.23753662109375, 0.38104248046875, 0.3814208984375]}
+walk last {"revisit_episode_frac": 0.95498046875, "revisits_mean": 5.93974609375, "late_contact_episode_frac": 0.9994140625, "turn_straight_right_left": [0.33326297883064515, 0.33413558467741933, 0.33260143649193546], "end_to_end_steps_mean": 8.9791015625, "end_to_end_steps_q10_q50_q90": [4.0, 8.0, 16.0], "odometry_move_hist": [81685, 81965, 81821, 82209], "odometry_turn_hist": [82281, 82193, 81942, 81264], "gen_ms_per_batch_mean": 6.300607137711507, "gen_ms_per_batch_p95": 6.412843393627554, "reobserved": 0.55206298828125, "seam_far": 0.698095703125, "span_needed_mean": 17.35538330078125, "span_first_mean": 20.09052734375, "dist_mean": 42.18562487317253, "dist_q50_q90": [37.12142238654117, 80.15609770940699], "cells_hist": [0.038330078125, 0.3650146484375, 0.5966552734375], "span_needed_near_mid_far": [0.05804443359375, 0.24725341796875, 0.6947021484375], "span_first_near_mid_far": [0.03316650390625, 0.1749267578125, 0.79190673828125]}
+saw uniform {"revisit_episode_frac": 0.0, "revisits_mean": 0.0, "late_contact_episode_frac": 0.983984375, "turn_straight_right_left": [0.38796938004032255, 0.3060546875, 0.3059759324596774], "end_to_end_steps_mean": 14.3794921875, "end_to_end_steps_q10_q50_q90": [8.0, 14.0, 22.0], "odometry_move_hist": [81803, 81921, 82078, 81878], "odometry_turn_hist": [81595, 82040, 82169, 81876], "gen_ms_per_batch_mean": 33.871617912074676, "gen_ms_per_batch_p95": 35.02243259863462, "reobserved": 0.0, "seam_far": 0.36754150390625, "span_needed_mean": 9.0919189453125, "span_first_mean": 9.0919189453125, "dist_mean": 37.766483721098886, "dist_q50_q90": [31.0, 80.72174428244226], "cells_hist": [0.10648193359375, 0.56749267578125, 0.326025390625], "span_needed_near_mid_far": [0.27982177734375, 0.40113525390625, 0.31904296875], "span_first_near_mid_far": [0.27982177734375, 0.40113525390625, 0.31904296875]}
+saw last {"revisit_episode_frac": 0.0, "revisits_mean": 0.0, "late_contact_episode_frac": 0.983984375, "turn_straight_right_left": [0.38796938004032255, 0.3060546875, 0.3059759324596774], "end_to_end_steps_mean": 14.3794921875, "end_to_end_steps_q10_q50_q90": [8.0, 14.0, 22.0], "odometry_move_hist": [82099, 82314, 81481, 81786], "odometry_turn_hist": [81508, 82229, 82044, 81899], "gen_ms_per_batch_mean": 11.74835182115752, "gen_ms_per_batch_p95": 12.127316495752893, "reobserved": 0.0, "seam_far": 0.50106201171875, "span_needed_mean": 17.27508544921875, "span_first_mean": 17.27508544921875, "dist_mean": 61.66933414247412, "dist_q50_q90": [58.0, 112.92918134831227], "cells_hist": [0.05579833984375, 0.50032958984375, 0.4438720703125], "span_needed_near_mid_far": [0.0690185546875, 0.24757080078125, 0.68341064453125], "span_first_near_mid_far": [0.0690185546875, 0.24757080078125, 0.68341064453125]}
+no_revisit_view uniform {"revisit_episode_frac": 0.0, "revisits_mean": 0.0, "late_contact_episode_frac": 0.0, "turn_straight_right_left": [0.4911069808467742, 0.25481665826612904, 0.2540763608870968], "end_to_end_steps_mean": 18.09609375, "end_to_end_steps_q10_q50_q90": [10.0, 18.0, 26.0], "odometry_move_hist": [82116, 81770, 81806, 81988], "odometry_turn_hist": [81997, 82009, 81676, 81998], "gen_ms_per_batch_mean": 90.94344235209121, "gen_ms_per_batch_p95": 102.9621034133015, "reobserved": 0.0, "seam_far": 0.0, "span_needed_mean": 8.42266845703125, "span_first_mean": 8.42266845703125, "dist_mean": 43.86362148352612, "dist_q50_q90": [36.22154055254967, 94.92101980067429], "cells_hist": [0.15001220703125, 0.84998779296875, 0.0], "span_needed_near_mid_far": [0.32783203125, 0.3844482421875, 0.2877197265625], "span_first_near_mid_far": [0.32783203125, 0.3844482421875, 0.2877197265625]}
+no_revisit_view last {"revisit_episode_frac": 0.0, "revisits_mean": 0.0, "late_contact_episode_frac": 0.0, "turn_straight_right_left": [0.4911069808467742, 0.25481665826612904, 0.2540763608870968], "end_to_end_steps_mean": 18.09609375, "end_to_end_steps_q10_q50_q90": [10.0, 18.0, 26.0], "odometry_move_hist": [81938, 81832, 81933, 81977], "odometry_turn_hist": [82176, 82216, 81207, 82081], "gen_ms_per_batch_mean": 64.93103306329775, "gen_ms_per_batch_p95": 75.05041650729254, "reobserved": 0.0, "seam_far": 0.0, "span_needed_mean": 16.39244384765625, "span_first_mean": 16.39244384765625, "dist_mean": 75.5828854684403, "dist_q50_q90": [72.17340230306452, 136.02940858505562], "cells_hist": [0.1140625, 0.8859375, 0.0], "span_needed_near_mid_far": [0.09793701171875, 0.24893798828125, 0.653125], "span_first_near_mid_far": [0.09793701171875, 0.24893798828125, 0.653125]}
+{
+ "episodes": 10240,
+ "span_bins": [
+  0,
+  4,
+  12,
+  33
+ ],
+ "acceptance_saw": 0.0483455,
+ "acceptance_no_revisit_view": 0.0007265,
+ "view_gap_k": 1,
+ "exactness_saw": {
+  "n": 96691,
+  "turn_filtered": [
+   0.38854168300015246,
+   0.3059336676429504,
+   0.30552464935689716
+  ],
+  "turn_sampled": [
+   0.38838688325730686,
+   0.3056874559829934,
+   0.30592566075969974
+  ],
+  "turn_tv": 0.00040101140280257574,
+  "end_mean_filtered": 14.381731495175352,
+  "end_mean_sampled": 14.378587459018936
+ },
+ "exactness_no_revisit_view": {
+  "n": 1453,
+  "turn_filtered": [
+   0.49506027573651845,
+   0.2531802943853651,
+   0.25175942987811645
+  ],
+  "turn_sampled": [
+   0.4903758630641831,
+   0.25517838509868346,
+   0.2544457518371334
+  ],
+  "turn_tv": 0.004684412672335325,
+  "end_mean_filtered": 17.977976600137648,
+  "end_mean_sampled": 18.11837577426015
+ }
+}

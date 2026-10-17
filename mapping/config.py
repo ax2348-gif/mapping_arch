@@ -208,6 +208,7 @@ class BankGenerator(Generator):
     step_px: int
     odometry_dropout: float
     workers: int                 # loader processes
+    path: str                    # mapping.data.PATHS: walk | saw | no_revisit_view
 
     def bank_path(self):
         from mapping.data import TEXTURES
@@ -217,7 +218,7 @@ class BankGenerator(Generator):
         """``(mapping.data.Config, TaskSpec)`` for ``task`` (a ``Task``)."""
         return tasks.config_and_spec(task.name, task.episode_steps, task.queries,
                                      seed, task.query_times, self.step_px,
-                                     self.odometry_dropout, self.texture)
+                                     self.odometry_dropout, self.texture, self.path)
 
 
 @dataclass(frozen=True)
@@ -425,6 +426,8 @@ class Experiment:
         g = t.generator
         for f in fields(g):
             v = getattr(g, f.name)
+            if f.name == 'path' and v == 'walk':   # absent for walk: records as before it
+                continue
             setattr(a, g.record.get(f.name, f.name), list(v) if isinstance(v, tuple) else v)
         # argparse's types, as if every value had come in as a flag (an
         # override weight_decay=0 is then 0.0, as --weight-decay 0 gives)

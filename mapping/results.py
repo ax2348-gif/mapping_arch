@@ -39,7 +39,7 @@ def best_per_size(rows):
     for r in rows:
         key = (r['model'], r['size'], r.get('query_times', 'last'),
                r.get('step_px', 9), r.get('odometry_dropout', 0.0),
-               r.get('texture', 'mnist'))
+               r.get('texture', 'mnist'), r.get('path', 'walk'))
         if key not in best or (r['final_eval']['mse']
                                < best[key]['final_eval']['mse']):
             best[key] = r

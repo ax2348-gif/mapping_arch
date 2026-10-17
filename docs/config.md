@@ -75,7 +75,7 @@ python run.py ... --print                             # resolved config, and the
 | --- | --- | --- | --- |
 | `model` (required) | `<task>/<name>`, one file per registered model | `Model` | `name`, `ladder`, `size` (a rung of the ladder), `size_kwargs` (resolved from `conf/ladders/<ladder>.yaml`), `arch` (the class, `_partial_`, with fixed arguments such as hybrid45b's `placement`), `query_mode` (`mixed` \| `inert`, below), `scan_precision` (`tf32` \| `ieee`, below) |
 | `task` (chosen by the model; `task=<variant>` overrides) | `z2`, `se2d`, `se2c` (each includes `_episode`) | `Task` | `name`, `episode_steps`, `queries`, `query_times` |
-| `generator` (chosen by the task; `generator=<variant>` overrides) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
+| `generator` (chosen by the task; `generator=<variant>` overrides) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers path`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
 | `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` (`Schedule.lr(step, steps, peak)`) | `warmup` (+ `cooldown` for wsd) |
 | `optim` | in `config.yaml` | `AdamW` | `lr` (default: the model's, via `${model_lr:...}`), `weight_decay`, `clip`, `batch` |
 | `run` | in `config.yaml` | `Run` | `name out root dir note tag provenance.max_untracked_mb steps seed save_every branch device bf16 compile overwrite` |
@@ -156,6 +156,24 @@ gradients, tests/test_scan_precision.py).
   those of before the field (bit-identical, tested). `ieee` adds
   `scan_precision` to `arch` and the args record. No `train.py` flag. A
   config.yaml saved before the field reads as `tf32`.
+
+**`task.generator.path`: the walk, or the walk conditioned on a
+constraint** (mapping/data.py `PATHS`, 2026-10-17, z2 and se2d). `walk`,
+the default, is the walk as always: batches bit-identical to before the
+field, and absent from the args record and final.json (as `query_mode`).
+`saw`: no lattice position visited twice. `no_revisit_view`: `saw`, and no
+footprint overlaps or shares an edge with the footprint of a step more
+than `k = obs // step` earlier (k = 1 at step 9: consecutive views abut;
+corner contact allowed). Both are sampled by exact rejection: whole walks
+from the unchanged walk sampler, kept only if they pass, so a kept walk is
+the walk conditioned on the constraint and nothing else (no growth or
+dead-end bias; tests/test_paths.py checks it against enumeration).
+Everything after the walk (phase, map, queries, headings) is drawn as
+before. Acceptance at T = 32, step 9: saw 4.8%, no_revisit_view 0.073%;
+generator time per batch of 64 (one process, uniform query times) walk
+24 ms, saw 34 ms, no_revisit_view 91 ms, so raise `task.generator.workers`
+to keep up (the batch sequence does not depend on it). No `train.py` flag.
+Numbers: experiments/se2d_saw/.
 
 ## Field map: config key and train.py flag
 

@@ -1,0 +1,32 @@
+{
+ "/home/adrianna/code/mapping/results/se2/hybrid4/xs/seed0_100k_qt/final.pt": {
+  "path": "walk",
+  "trained_path": "walk",
+  "mse": 0.018011383712291718,
+  "mse_shuffled": 0.14029264450073242,
+  "queries": 8192,
+  "span_near": {
+   "frac": 0.2734375,
+   "mse": 0.011360443197190762,
+   "mse_shuffled": 0.0984356626868248
+  },
+  "span_mid": {
+   "frac": 0.4024658203125,
+   "mse": 0.01790829561650753,
+   "mse_shuffled": 0.15312539041042328
+  },
+  "span_far": {
+   "frac": 0.3240966796875,
+   "mse": 0.02375074289739132,
+   "mse_shuffled": 0.15967124700546265
+  },
+  "reobserved": {
+   "frac": 0.3505859375,
+   "mse": 0.01929759792983532
+  },
+  "not_reobserved": {
+   "frac": 0.6494140625,
+   "mse": 0.017317021265625954
+  }
+ }
+}

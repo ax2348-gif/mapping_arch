@@ -53,6 +53,20 @@ TEXTURES = {
 }
 
 
+# Walk paths (Config.path). 'walk' is random_walk. The others are the same
+# walk CONDITIONED on a constraint, sampled exactly by rejection: whole walks
+# are drawn from random_walk and kept only if they satisfy it, so an accepted
+# walk is distributed as the walk given the constraint and has no other
+# structure (no growth or dead-end bias).
+#   saw              no lattice position is visited twice
+#   no_revisit_view  saw, and the footprint at step t neither overlaps nor
+#                    shares an edge with the footprint at any step s < t - k,
+#                    k = obs // step (view_gap): steps within k of each other
+#                    touch on a straight run, as consecutive views do. A
+#                    shared corner (one point) is allowed.
+PATHS = ('walk', 'saw', 'no_revisit_view')
+
+
 def texture_settings(name):
     """The Config fields a texture fixes: ``tile``, ``cutoff``,
     ``start_window``."""
@@ -81,6 +95,9 @@ class Config:
     odometry_dropout: float = 0.0   # probability that each step's odometry
                                     # symbol is replaced by the reserved
                                     # "unknown" symbol (see make_batch)
+    path: str = 'walk'      # PATHS: 'walk' is the walk as always; 'saw' and
+                            # 'no_revisit_view' are that walk conditioned on
+                            # a constraint, by exact rejection (constrained_walk)
     seed: int = 0
 
     def __post_init__(self):
@@ -93,6 +110,8 @@ class Config:
             raise ValueError(f'odometry_dropout {self.odometry_dropout}')
         if not 1 <= self.step:
             raise ValueError(f'step {self.step}')
+        if self.path not in PATHS:
+            raise ValueError(f'path {self.path!r}; have {PATHS}')
 
 
 
@@ -217,6 +236,64 @@ def random_walk(rng, batch, steps, step):
     displacement = np.zeros((batch, steps + 1, 2), dtype=np.int64)
     np.cumsum(moves, axis=1, out=displacement[:, 1:])
     return directions, displacement
+
+
+def view_gap(obs, step):
+    """``k`` of 'no_revisit_view': on a straight run the footprints of
+    steps s < t overlap or share an edge iff ``(t - s) * step <= obs``."""
+    return obs // step
+
+
+def self_avoiding(displacement):
+    """``(n,)`` bool: no position of ``(n, T + 1, 2)`` repeats."""
+    d = displacement.astype(np.int64)
+    span = 2 * int(np.abs(d).max(initial=0)) + 1
+    key = np.sort(d[..., 0] * span + d[..., 1], axis=1)
+    return ~(key[:, 1:] == key[:, :-1]).any(axis=1)
+
+
+def view_avoiding(displacement, obs, gap):
+    """``(n,)`` bool: no two footprints (``obs``-square windows at
+    ``(n, T + 1, 2)``) of steps more than ``gap`` apart overlap or share an
+    edge; corner contact is allowed."""
+    d = displacement.astype(np.int64)
+    dy = np.abs(d[:, :, None, 0] - d[:, None, :, 0])
+    dx = np.abs(d[:, :, None, 1] - d[:, None, :, 1])
+    meet = ((dy <= obs) & (dx < obs)) | ((dy < obs) & (dx <= obs))
+    t = np.arange(d.shape[1])
+    far = np.abs(t[:, None] - t[None, :]) > gap
+    return ~(meet & far).any(axis=(1, 2))
+
+
+def accept(displacement, path, obs, step):
+    """``(n,)`` bool: which walks satisfy ``path`` (PATHS)."""
+    ok = self_avoiding(displacement)
+    if path == 'no_revisit_view':
+        keep = np.flatnonzero(ok)
+        ok[keep] = view_avoiding(displacement[keep], obs, view_gap(obs, step))
+    return ok
+
+
+def constrained_walk(rng, batch, steps, step, obs, path, chunk=8192,
+                     max_walks=10 ** 8):
+    """``random_walk`` conditioned on ``path``: draw chunks of whole
+    walks from ``random_walk``, keep those ``accept`` passes, in order,
+    until ``batch`` are kept. Exact: each kept walk is an independent draw
+    of the walk given the constraint."""
+    kept_d, kept_disp, n, drawn = [], [], 0, 0
+    while n < batch:
+        if drawn >= max_walks:
+            raise RuntimeError(f'path {path!r}: {n} of {batch} walks accepted '
+                               f'in {drawn} draws; the constraint is too rare '
+                               f'to sample by rejection')
+        directions, displacement = random_walk(rng, chunk, steps, step)
+        ok = accept(displacement, path, obs, step)
+        kept_d.append(directions[ok])
+        kept_disp.append(displacement[ok])
+        n += int(ok.sum())
+        drawn += chunk
+    return (np.concatenate(kept_d)[:batch],
+            np.concatenate(kept_disp)[:batch])
 
 
 # ------------------------------------------------------------- one episode
@@ -351,6 +428,11 @@ def make_batch(rng, config, bank, batch):
     come after everything else, so with ``heading`` off the batch is
     byte-identical to what the Z^2 generator always produced.
 
+    ``config.path`` other than 'walk' replaces the walk by the walk
+    conditioned on a constraint (``constrained_walk``, PATHS); everything
+    after the walk (start phase, map, queries, headings) is drawn as
+    always, from the same ``rng``. With 'walk' nothing changes.
+
     Odometry dropout (``config.odometry_dropout`` p > 0): each step's
     symbol in ``directions`` / ``odometry`` is independently replaced, with
     probability p, by ``UNKNOWN[config.heading]`` (4 on Z^2, 16 on SE(2)),
@@ -363,7 +445,11 @@ def make_batch(rng, config, bank, batch):
     """
     c = config
     check_bank(bank, c)
-    directions, displacement = random_walk(rng, batch, c.steps, c.step)
+    if c.path == 'walk':
+        directions, displacement = random_walk(rng, batch, c.steps, c.step)
+    else:
+        directions, displacement = constrained_walk(rng, batch, c.steps,
+                                                    c.step, c.obs, c.path)
     observations = np.empty((batch, c.steps + 1, c.obs, c.obs), np.uint8)
     targets = np.empty((batch, c.queries, c.obs, c.obs), np.uint8)
     positions = np.empty((batch, c.steps + 1, 2), np.int32)

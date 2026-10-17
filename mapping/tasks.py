@@ -88,7 +88,8 @@ def results_dir(name, root=RESULTS):
 
 
 def config_and_spec(name, steps, queries, seed, query_times='last',
-                    step_px=9, odometry_dropout=0.0, texture='mnist'):
+                    step_px=9, odometry_dropout=0.0, texture='mnist',
+                    path='walk'):
     """The generator config and the model-facing spec for a task. With the
     defaults both are exactly what they were before ``step_px``,
     ``odometry_dropout`` and ``texture`` existed. The texture sets the
@@ -103,7 +104,7 @@ def config_and_spec(name, steps, queries, seed, query_times='last',
                                           queries=queries)
     config = Config(steps=steps, queries=queries, seed=seed,
                     heading=t['heading'], query_times=query_times,
-                    step=step_px, odometry_dropout=odometry_dropout,
+                    step=step_px, odometry_dropout=odometry_dropout, path=path,
                     **texture_settings(texture))
     extra = {}
     if odometry_dropout > 0:     # a row for the reserved "unknown" symbol
@@ -123,5 +124,6 @@ def config_from_args(task, spec, args):
         args.get('query_times', 'last'),
         args.get('step_px', spec.step_px),
         args.get('odometry_dropout', 0.0),
-        args.get('texture', 'mnist'))
+        args.get('texture', 'mnist'),
+        args.get('path', 'walk'))
     return config
