@@ -73,7 +73,7 @@ python run.py ... --print                             # resolved config, and the
 
 | group / node | options | object (`mapping.config`) | fields |
 | --- | --- | --- | --- |
-| `model` (required) | `<task>/<name>`, one file per registered model | `Model` | `name`, `ladder`, `size` (a rung of the ladder), `size_kwargs` (resolved from `conf/ladders/<ladder>.yaml`), `arch` (the class, `_partial_`, with fixed arguments such as hybrid45b's `placement`), `query_mode` (`mixed` \| `inert`, below) |
+| `model` (required) | `<task>/<name>`, one file per registered model | `Model` | `name`, `ladder`, `size` (a rung of the ladder), `size_kwargs` (resolved from `conf/ladders/<ladder>.yaml`), `arch` (the class, `_partial_`, with fixed arguments such as hybrid45b's `placement`), `query_mode` (`mixed` \| `inert`, below), `scan_precision` (`tf32` \| `ieee`, below) |
 | `task` (chosen by the model; `task=<variant>` overrides) | `z2`, `se2d`, `se2c` (each includes `_episode`) | `Task` | `name`, `episode_steps`, `queries`, `query_times` |
 | `generator` (chosen by the task; `generator=<variant>` overrides) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
 | `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` (`Schedule.lr(step, steps, peak)`) | `warmup` (+ `cooldown` for wsd) |
@@ -134,6 +134,28 @@ and a query's answer does not depend on the other queries
   rebuild it) and to the args record. No `train.py` flag (frozen).
 - A config.yaml saved before the field has no `model.query_mode`;
   `--from` reads its absence as `mixed`.
+
+**`model.scan_precision`: Gated DeltaNet scan arithmetic**
+(mapping/models/scan_precision.py, 2026-10-17). `tf32`, the default, is
+every run before the field: fla's fused chunk-64 kernel on the inputs as
+given (bf16 under autocast), its fp32 dots in TF32 (the fused WY solve
+hard-codes it). That is off the exact recurrence by up to ~0.1 on trained
+layers with beta near 2 and decay near 1, and up to 26% of held-out MSE on
+se2c hybrid4c (branch exp/gdn-kernel-check, experiments/gdn_kernel/).
+`ieee`: q, k, v, g, beta in fp32 into the kernel, chunk 32 (fla's
+standalone IEEE `solve_tril`), and `TRITON_F32_DEFAULT=ieee` around every
+forward and backward kernel call, restored after (never process-wide); the
+output is cast back. Exact to fp32 (~1e-5 forward, ~1e-6 relative
+gradients, tests/test_scan_precision.py).
+- Declared (`SCAN_PRECISIONS` in the class body) by se2d `hybrid4`,
+  `hybrid4_causal` and se2c `hybrid4c`, `hybrid4c_causal`; every Gated
+  DeltaNet layer of them, mixed and inert. Any other model refuses `ieee`
+  (models without a Gated DeltaNet, and hybrid4 variants that do not
+  declare it).
+- `tf32` is not passed to the model: arch, args record and outputs are
+  those of before the field (bit-identical, tested). `ieee` adds
+  `scan_precision` to `arch` and the args record. No `train.py` flag. A
+  config.yaml saved before the field reads as `tf32`.
 
 ## Field map: config key and train.py flag
 

@@ -24,9 +24,11 @@ from mapping.models.se2d.hybrid4_causal import (CausalAttention,
 
 class Hybrid4cCausal(Hybrid4c):
     QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+    SCAN_PRECISIONS = ('tf32', 'ieee')  # mapping/models/scan_precision.py
 
-    def __init__(self, spec, width, patch=3, query_mode='mixed'):
-        super().__init__(spec, width, patch=patch, query_mode=query_mode)
+    def __init__(self, spec, width, patch=3, query_mode='mixed', scan_precision='tf32'):
+        super().__init__(spec, width, patch=patch, query_mode=query_mode,
+                         scan_precision=scan_precision)
         for blk in self.blocks:          # same modules and initial values
             blk.mixer.__class__ = (CausalGatedDeltaNet
                                    if isinstance(blk.mixer, GatedDeltaNet)

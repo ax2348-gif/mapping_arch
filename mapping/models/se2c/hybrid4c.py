@@ -104,6 +104,7 @@ from mapping.models.se2d.hybrid4 import (BASE_WIDTH, HEAD_DIM, LR,  # noqa: F401
                                         SCALING_RULE, SIZES, Attention, Block,
                                         GatedDeltaNet, MuLinear, rope_cos_sin)
 from mapping.models.query_mode import QueryLayout, check_query_mode
+from mapping.models.scan_precision import check_scan_precision, set_scan_precision
 from mapping.models.se2c import register
 from mapping.se2c.encoding import (ODOMETRY_FEATURES, QUERY_FEATURES,
                                    encode_odometry, encode_query)
@@ -147,12 +148,16 @@ def token_order(query_time, t1, q, P):
 
 class Hybrid4c(nn.Module):
     QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+    SCAN_PRECISIONS = ('tf32', 'ieee')  # mapping/models/scan_precision.py
 
-    def __init__(self, spec, width, mixer='hybrid', patch=PATCH, query_mode='mixed'):
+    def __init__(self, spec, width, mixer='hybrid', patch=PATCH, query_mode='mixed',
+                 scan_precision='tf32'):
         super().__init__()
         assert spec.view % patch == 0, 'view must be a multiple of the patch'
         check_query_mode(self, query_mode)
+        check_scan_precision(self, scan_precision)
         self.query_mode = query_mode
+        self.scan_precision = scan_precision
         self.spec = spec
         self.width = width
         self.patch = patch       # 3 for every rung; 5 only for the cost check
@@ -178,6 +183,7 @@ class Hybrid4c(nn.Module):
         self.readout = MuLinear(width, patch * patch, mult, std, zero=True)
         for emb in (self.patch_pos, self.query_pos):
             nn.init.normal_(emb.weight, std=0.02)
+        set_scan_precision(self, scan_precision, GatedDeltaNet)
 
     # the mixer and block classes (vanilla4c swaps in vanilla4's)
     attention = Attention

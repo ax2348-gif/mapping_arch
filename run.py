@@ -151,11 +151,13 @@ def differences(a, b, prefix=''):
 
 # Fields added after runs were saved, so absent from older config.yaml
 # files: the run directory template (2026-10-16), which says where a run is
-# written, never what it trains; and model.query_mode (2026-10-17), whose
-# default (mixed) is what every run before it trained. Recomposing an older
+# written, never what it trains; and model.query_mode and
+# model.scan_precision (2026-10-17), whose defaults (mixed, tf32) are what
+# every run before them trained. Recomposing an older
 # run may add them (the current defaults) without that counting as drift.
 ADDED_RUN_FIELDS = ('run.root', 'run.dir', 'run.note', 'run.tag', 'run.provenance',
-                    'model.query_mode')   # 2026-10-17; absent = mixed, its default
+                    'model.query_mode',   # 2026-10-17; absent = mixed, its default
+                    'model.scan_precision')   # 2026-10-17; absent = tf32, its default
 
 # Run fields that are metadata about a launch, not settings: never compared
 # as drift, never carried into a rerun's sources (a rerun gets its own note)

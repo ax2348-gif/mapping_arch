@@ -69,9 +69,10 @@ class CausalAttention(Attention):
 
 class Hybrid4Causal(Hybrid4):
     QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+    SCAN_PRECISIONS = ('tf32', 'ieee')  # mapping/models/scan_precision.py
 
-    def __init__(self, spec, width, query_mode='mixed'):
-        super().__init__(spec, width, query_mode)
+    def __init__(self, spec, width, query_mode='mixed', scan_precision='tf32'):
+        super().__init__(spec, width, query_mode, scan_precision)
         # same modules and initial values as hybrid4 at the same seed; only
         # the operators' forward changes
         for blk in self.blocks:

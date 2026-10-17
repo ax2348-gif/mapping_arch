@@ -23,6 +23,11 @@ model:
   # conv, attend to history and their own tokens only); inert is refused by a
   # model that does not implement it
   query_mode: mixed
+  # Gated DeltaNet scan arithmetic (mapping/models/scan_precision.py): tf32 (fla's
+  # chunk-64 kernel as given, TF32 dots: every run before the option) | ieee
+  # (fp32 inputs, chunk 32, IEEE dots: exact to fp32); ieee is refused by a model
+  # without a Gated DeltaNet
+  scan_precision: tf32
 
 optim:
   _target_: mapping.config.AdamW

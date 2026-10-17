@@ -217,6 +217,8 @@ from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 
 from mapping.models.query_mode import (QueryLayout, attend, causal_block_mask,
                                         check_query_mode)
+from mapping.models.scan_precision import (check_scan_precision, ieee_scan,
+                                           set_scan_precision)
 from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
@@ -407,7 +409,11 @@ class GatedDeltaNet(nn.Module):
         self.norm = nn.RMSNorm(HEAD_DIM)
         self.out = MuLinear(inner, width, mult, out_std)
 
+    scan_precision = 'tf32'     # set per layer by the model (mapping/models/scan_precision.py)
+
     def scan(self, q, k, v, g, beta):
+        if self.scan_precision == 'ieee':
+            return ieee_scan(q, k, v, g, beta)
         o, _ = chunk_gated_delta_rule(q.contiguous(), k.contiguous(),
                                       v.contiguous(), g.contiguous(),
                                       beta.contiguous(), scale=1.0)
@@ -569,12 +575,15 @@ class Block(nn.Module):
 
 class Hybrid4(nn.Module):
     QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+    SCAN_PRECISIONS = ('tf32', 'ieee')  # mapping/models/scan_precision.py
 
-    def __init__(self, spec, width, query_mode='mixed'):
+    def __init__(self, spec, width, query_mode='mixed', scan_precision='tf32'):
         super().__init__()
         assert spec.view == 9, 'tokeniser assumes 9x9 views (3x3 patches)'
         check_query_mode(self, query_mode)
+        check_scan_precision(self, scan_precision)
         self.query_mode = query_mode
+        self.scan_precision = scan_precision
         self.spec = spec
         self.width = width
         heads = width // HEAD_DIM
@@ -601,6 +610,7 @@ class Hybrid4(nn.Module):
         for emb in (self.patch_pos, self.query_pos, self.dir_emb,
                     self.turn_emb):                            # SE2
             nn.init.normal_(emb.weight, std=0.02)
+        set_scan_precision(self, scan_precision, GatedDeltaNet)
 
     def offset_features(self, query_offset):
         o = query_offset.float() / self.spec.offset_max           # (b,q,2)

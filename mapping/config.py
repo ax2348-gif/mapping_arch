@@ -298,14 +298,25 @@ class Model:
     is passed to the class only when it is not ``mixed``, so a mixed run's
     constructor arguments, checkpoint ``arch`` and args record are what
     they were before the field existed; ``inert`` on a class that does not
-    implement it is refused."""
+    implement it is refused.
 
-    def __init__(self, name, ladder, size, size_kwargs, arch, query_mode='mixed'):
+    ``scan_precision`` (``tf32`` | ``ieee``, mapping/models/scan_precision.py)
+    likewise: passed only when not ``tf32`` (every run before the field
+    trained tf32), and ``ieee`` is refused by a class that does not declare
+    it (one without a Gated DeltaNet)."""
+
+    def __init__(self, name, ladder, size, size_kwargs, arch, query_mode='mixed',
+                 scan_precision='tf32'):
         from mapping.models.query_mode import QUERY_MODES
+        from mapping.models.scan_precision import SCAN_PRECISIONS
         self.name, self.ladder, self.size = name, ladder, str(size)
         if query_mode not in QUERY_MODES:
             raise ValueError(f'model.query_mode={query_mode!r}: must be one of {QUERY_MODES}')
+        if scan_precision not in SCAN_PRECISIONS:
+            raise ValueError(f'model.scan_precision={scan_precision!r}: must be one of '
+                             f'{SCAN_PRECISIONS}')
         self.query_mode = query_mode
+        self.scan_precision = scan_precision
         rung = ladder_rung(ladder, self.size)
         size_kwargs = {k: _plain(v) for k, v in dict(size_kwargs).items()}
         if size_kwargs != rung:
@@ -328,6 +339,12 @@ class Model:
                                  f'({arch.func.__qualname__}) does not implement it '
                                  f'(mapping/models/query_mode.py)')
             self.kwargs['query_mode'] = query_mode
+        if scan_precision != 'tf32':
+            if scan_precision not in getattr(arch.func, '__dict__', {}).get('SCAN_PRECISIONS', ()):
+                raise ValueError(f'model.scan_precision={scan_precision!r}: {name} '
+                                 f'({arch.func.__qualname__}) does not implement it '
+                                 f'(mapping/models/scan_precision.py)')
+            self.kwargs['scan_precision'] = scan_precision
         self.cls = arch.func
         self.arch = functools.partial(arch.func, *arch.args, **self.kwargs)
         inspect.signature(arch.func).bind(None, *arch.args, **self.kwargs)
@@ -397,6 +414,8 @@ class Experiment:
         a.schedule = s.name
         if self.model.query_mode != 'mixed':   # absent for mixed: records as before it
             a.query_mode = self.model.query_mode
+        if self.model.scan_precision != 'tf32':   # absent for tf32: records as before it
+            a.scan_precision = self.model.scan_precision
         for f in fields(s):                  # warmup, cooldown, ...
             setattr(a, f.name, getattr(s, f.name))
         a.eval_batches, a.eval_every, a.log_every = e.batches, e.every, e.log_every
