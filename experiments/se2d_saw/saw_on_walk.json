@@ -1,0 +1,32 @@
+{
+ "results/se2d/hybrid4/xs/seed0_100k_qt_saw/final.pt": {
+  "path": "walk",
+  "trained_path": "saw",
+  "mse": 0.023958999663591385,
+  "mse_shuffled": 0.12361428886651993,
+  "queries": 8192,
+  "span_near": {
+   "frac": 0.2734375,
+   "mse": 0.01289100106805563,
+   "mse_shuffled": 0.09017333388328552
+  },
+  "span_mid": {
+   "frac": 0.4024658203125,
+   "mse": 0.02274014987051487,
+   "mse_shuffled": 0.13728836178779602
+  },
+  "span_far": {
+   "frac": 0.3240966796875,
+   "mse": 0.03481055051088333,
+   "mse_shuffled": 0.13484755158424377
+  },
+  "reobserved": {
+   "frac": 0.3505859375,
+   "mse": 0.027090633288025856
+  },
+  "not_reobserved": {
+   "frac": 0.6494140625,
+   "mse": 0.02226839028298855
+  }
+ }
+}
