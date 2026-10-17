@@ -1,0 +1,38 @@
+{
+ "results/se2d/hybrid4_causal/s/inert_seed0_400k_qt_wsd_saw/step100000.pt": {
+  "path": "saw",
+  "trained_path": "saw",
+  "opts": {
+   "steps": "64",
+   "offset_max": "288"
+  },
+  "steps": 64,
+  "offset_max": 288,
+  "mse": 0.02405388280749321,
+  "mse_shuffled": 0.1252562701702118,
+  "queries": 8192,
+  "span_near": {
+   "frac": 0.16455078125,
+   "mse": 0.003515825839713216,
+   "mse_shuffled": 0.09047283977270126
+  },
+  "span_mid": {
+   "frac": 0.288818359375,
+   "mse": 0.0052596284076571465,
+   "mse_shuffled": 0.13784995675086975
+  },
+  "span_far": {
+   "frac": 0.546630859375,
+   "mse": 0.040166545659303665,
+   "mse_shuffled": 0.12907302379608154
+  },
+  "reobserved": {
+   "frac": 0.0,
+   "mse": null
+  },
+  "not_reobserved": {
+   "frac": 1.0,
+   "mse": 0.02405388280749321
+  }
+ }
+}

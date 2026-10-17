@@ -1,7 +1,12 @@
 """Held-out eval of se2d checkpoints, split by composition span, on any walk
 path.
 
-    python experiments/se2d_saw/eval_split.py OUT.json PATH CKPT [CKPT ...]
+    python experiments/se2d_saw/eval_split.py OUT.json PATH [steps=N] [offset_max=M] CKPT [CKPT ...]
+
+``steps=N`` evaluates on N-step episodes and ``offset_max=M`` pins the
+spec's offset scale; the model is then rebuilt at that spec and given the
+checkpoint's weights (as ``run.init_from`` does), for zero-shot length
+transfer.
 
 PATH (mapping.data.PATHS) replaces the checkpoint's own walk path, so a
 model trained on one path is evaluated on another; everything else of the
@@ -24,17 +29,31 @@ import torch  # noqa: E402
 
 import mapping.tasks as tasks  # noqa: E402
 import train  # noqa: E402
-from mapping.checkpoint import load_checkpoint  # noqa: E402
+from mapping.checkpoint import build_from_arch, load_checkpoint  # noqa: E402
 from mapping.data import make_batch  # noqa: E402
 from mapping.loader import EVAL_SEED_TAG, load_banks  # noqa: E402
 from spans import BINS, NAMES, query_stats  # noqa: E402
 
-OUT, PATH, CKPTS = sys.argv[1], sys.argv[2], sys.argv[3:]
+OUT, PATH = sys.argv[1], sys.argv[2]
+OPTS = dict(a.split('=', 1) for a in sys.argv[3:] if '=' in a)
+CKPTS = [a for a in sys.argv[3:] if '=' not in a]
 BATCH, BATCHES = 64, 16
 
 
 def run(ck):
     net, args, spec, task = load_checkpoint(ck, 'cuda')
+    if OPTS:
+        args = dict(args, episode_steps=int(OPTS.get('steps', spec.steps)))
+        if 'offset_max' in OPTS:
+            args['offset_max'] = int(OPTS['offset_max'])
+        _, spec = tasks.config_and_spec(task, args['episode_steps'], spec.queries,
+                                        args['seed'], args.get('query_times', 'last'),
+                                        args.get('step_px', 9), args.get('odometry_dropout', 0.0),
+                                        args.get('texture', 'mnist'), PATH, args.get('offset_max'))
+        state = net.state_dict()
+        net = build_from_arch(torch.load(ck, map_location='cpu', weights_only=False)['arch'],
+                              spec).to('cuda').eval()
+        net.load_state_dict(state)
     config = replace(tasks.config_from_args(task, spec, args), path=PATH)
     _, bank = load_banks(args.get('bank') or 'data/mnist.npz', config,
                          args.get('texture', 'mnist'))
@@ -59,7 +78,8 @@ def run(ck):
                            .flatten().cpu().numpy())
     err, err_sh = np.concatenate(err), np.concatenate(err_sh)
     q = {k: np.concatenate([x[k] for x in q]) for k in q[0]}
-    res = {'path': PATH, 'trained_path': args.get('path', 'walk'),
+    res = {'path': PATH, 'trained_path': args.get('path', 'walk'), 'opts': OPTS,
+           'steps': config.steps, 'offset_max': spec.offset_max,
            'mse': float(err.mean()), 'mse_shuffled': float(err_sh.mean()),
            'queries': int(err.size)}
     bins = np.digitize(q['span_needed'], BINS[1:-1])
