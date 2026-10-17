@@ -356,3 +356,12 @@ docs/scaling_study_design.md.
     2. Dense, in-band textures (checkerboards and stripes at training-band scales, Voronoi, grids) transfer well: normalised MSE within ~1.5-3x of in-distribution. Anisotropy alone doesn't break it; stripe orientation comes out right.
     3. Failures: (a) frequencies above the band (1-px lines, fine checks) blur or alias; (b) the sparse-dot sweep degrades smoothly, then collapses once dots are sub-patch and isolated; (c) smooth / low-frequency textures get the training prior imposed: posterised or hallucinated ridge structure (the training nonlinearity makes near-binary ridges).
     4. The hybrid/vanilla ratio of normalised MSE stays about the in-distribution ratio on every texture (agreeing with the user that robustness is task-determined). The far bin keeps vanilla's extra blur, so high-contrast textures (checkerboard) widen the raw gap without changing the ratio much.
+- **2026-10-17, texture stress test RESULTS** (exp/texture-ood c6e78ab, ca5e845; results/texture_stress/ in that worktree, 340 PNGs plus overview):
+  - Feature size is what breaks transfer, not sparsity or anisotropy. Low-frequency textures beat in-distribution (nmse ≤ 0.002 at l). Fine detail fails: checker 4 px 0.76, strokes with 4–8 px periods ~0.9–1.0. Fallback queries (a pure re-render) fail too on checker 4, so the shared image encoder/readout is the bottleneck, not the map.
+  - Scored against my predictions:
+    - (2) partly: one-direction waves equal in-distribution, but bricks and fine checks are far worse than 3×.
+    - (3a) right: fine detail fails.
+    - (3b) wrong: sparsity gives no collapse, and nmse improves as density drops.
+    - (3c) wrong: low frequency is the best case, with no posterisation; the training prior shows only as rounded checker corners.
+    - (4) wrong: hybrid/vanilla goes from ~3.5× in-distribution to 1.0–1.2× on breaking textures. The user's call (task-determined, vanilla not much worse) holds out of distribution.
+  - Confound: l has half m's steps.
