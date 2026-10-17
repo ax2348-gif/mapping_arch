@@ -23,8 +23,10 @@ from mapping.models.se2d.hybrid4_causal import (CausalAttention,
 
 
 class Hybrid4cCausal(Hybrid4c):
-    def __init__(self, spec, width, patch=3):
-        super().__init__(spec, width, patch=patch)
+    QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+
+    def __init__(self, spec, width, patch=3, query_mode='mixed'):
+        super().__init__(spec, width, patch=patch, query_mode=query_mode)
         for blk in self.blocks:          # same modules and initial values
             blk.mixer.__class__ = (CausalGatedDeltaNet
                                    if isinstance(blk.mixer, GatedDeltaNet)

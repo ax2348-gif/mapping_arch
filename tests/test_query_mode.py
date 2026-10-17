@@ -37,7 +37,8 @@ SDPA_REF = os.environ.get('QUERY_MODE_SDPA_REF', 'c55e2ee')   # last commit with
 SE2D = tasks.get('se2d')
 SE2C = tasks.get('se2c')
 INERT = [('se2d', 'hybrid4'), ('se2d', 'vanilla4'), ('se2d', 'hybrid4_causal'),
-         ('se2d', 'vanilla4_causal'), ('se2c', 'hybrid4c'), ('se2c', 'vanilla4c')]
+         ('se2d', 'vanilla4_causal'), ('se2c', 'hybrid4c'), ('se2c', 'vanilla4c'),
+         ('se2c', 'hybrid4c_causal'), ('se2c', 'vanilla4c_causal')]
 
 
 def spec(task):
@@ -396,7 +397,9 @@ def checkout(ref, tmp_path):
 def compare(ref, new):
     """``{model/mode: (masked, max |diff|, max |diff| / max |ref|)}``."""
     keys = sorted(k for k in ref if not k.endswith('#masked'))
-    assert keys == sorted(k for k in new if not k.endswith('#masked'))
+    # models added after ref (e.g. se2c causal, merged from exp/se2c-causal)
+    # are compared against their own branch in test_se2c_causal_mixed_matches_branch
+    assert set(keys) <= {k for k in new if not k.endswith('#masked')}
     return {k: (new[k + '#masked'], (ref[k] - new[k]).abs().max().item(),
                 ((ref[k] - new[k]).abs().max() / ref[k].abs().max()).item()) for k in keys}
 
@@ -419,6 +422,21 @@ def test_mixed_matches_master(device, tmp_path):
     masked = {k: v for k, v in res.items() if v[0]}
     assert masked or device == 'cpu'
     assert all(v[2] < 1e-4 for v in masked.values()), masked
+
+
+SE2C_CAUSAL_REF = os.environ.get('QUERY_MODE_SE2C_CAUSAL_REF', 'af46aca')   # exp/se2c-causal
+
+
+@pytest.mark.parametrize('device', DEVICES)
+def test_se2c_causal_mixed_matches_branch(device, tmp_path):
+    """hybrid4c_causal and vanilla4c_causal in mixed mode against the
+    exp/se2c-causal commit they came from (SDPA is_causal there, flex here):
+    within fp32 tolerance."""
+    ref = outputs(checkout(SE2C_CAUSAL_REF, tmp_path), device, tmp_path, 'ref', ['mixed'])
+    new = outputs(HERE, device, tmp_path, 'new', ['mixed'])
+    res = {k: v for k, v in compare(ref, new).items() if k.startswith('se2c/') and '_causal' in k}
+    assert len(res) == (1 if device == 'cpu' else 2), sorted(res)   # hybrid needs CUDA (fla)
+    assert all(v[2] < 1e-4 for v in res.values()), res
 
 
 @pytest.mark.parametrize('device', DEVICES)

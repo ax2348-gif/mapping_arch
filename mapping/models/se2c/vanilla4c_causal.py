@@ -12,8 +12,10 @@ from mapping.models.se2d.vanilla4_causal import CausalAttention
 
 
 class Vanilla4cCausal(Vanilla4c):
-    def __init__(self, spec, width, patch=3):
-        super().__init__(spec, width, patch=patch)
+    QUERY_MODES = ('mixed', 'inert')    # mapping/models/query_mode.py
+
+    def __init__(self, spec, width, patch=3, query_mode='mixed'):
+        super().__init__(spec, width, patch=patch, query_mode=query_mode)
         for blk in self.blocks:
             blk.mixer.__class__ = CausalAttention
 
