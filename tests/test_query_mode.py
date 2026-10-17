@@ -28,11 +28,12 @@ import pytest
 import torch
 
 import mapping.tasks as tasks
-from mapping.models.query_mode import QueryLayout
+from mapping.models.query_mode import QueryLayout, attend
 
 CUDA = torch.cuda.is_available()
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REF = os.environ.get('QUERY_MODE_REF', '8b2e419')     # master before query_mode
+SDPA_REF = os.environ.get('QUERY_MODE_SDPA_REF', 'c55e2ee')   # last commit with SDPA masks
 SE2D = tasks.get('se2d')
 SE2C = tasks.get('se2c')
 INERT = [('se2d', 'hybrid4'), ('se2d', 'vanilla4'), ('se2d', 'hybrid4_causal'),
@@ -253,19 +254,25 @@ def test_prediction_alone_equals_among_others(task, name, device, dtype, exact):
 
 def test_attention_mask_structure():
     """history -> history; query -> history + itself; never another query;
-    causal intersects with token order."""
+    causal intersects with token order. The mask_mod evaluated on every
+    (i, k), and the block mask built from it, which must agree."""
     order = torch.tensor([[0, 1, 5, 6, 2, 3, 7, 8, 4]])    # 5 history, 2 queries of 2
     lay = QueryLayout(order, 5, 2, 2)
-    assert lay.group.tolist() == [[0, 0, 1, 1, 0, 0, 2, 2, 0]]
+    assert lay.qid.tolist() == [[0, 0, 1, 1, 0, 0, 2, 2, 0]]
     assert lay.hist_idx.tolist() == [[0, 1, 4, 5, 8]]
-    m = lay.attn_mask()[0, 0]
-    g = lay.group[0]
-    for i in range(9):
-        for k in range(9):
-            want = bool(g[k] == 0) or bool(g[i] == g[k])
-            assert bool(m[i, k]) == want
-    c = lay.attn_mask(causal=True)[0, 0]
-    assert torch.equal(c, m & torch.ones(9, 9, dtype=torch.bool).tril())
+    i, k = torch.meshgrid(torch.arange(9), torch.arange(9), indexing='ij')
+    z = torch.zeros_like(i)
+    g = lay.qid[0]
+    want = (g[k] == 0) | (g[i] == g[k])
+    assert torch.equal(lay.mask_mod()(z, z, i, k), want)
+    assert torch.equal(lay.mask_mod(True)(z, z, i, k), want & (k <= i))
+    # through flex: one-hot values read back which keys each row attended
+    v = torch.eye(9)[None, None]
+    for causal in (False, True):
+        q = torch.zeros(1, 1, 9, 9)                        # uniform scores
+        o = attend(q, q, v, lay.block_mask(causal))[0, 0]
+        m = want & (k <= i) if causal else want
+        assert torch.allclose(o, m.float() / m.sum(1, keepdim=True)), causal
 
 
 def test_a_subclass_does_not_inherit_inert():
@@ -305,13 +312,14 @@ def test_config_field_reaches_model_record_and_args():
     assert inert.model.build(spec('se2d')).query_mode == 'inert'
 
 
-# ---- mixed: bit-identical to the code before the option -------------------
+# ---- the code before: master (mixed) and the SDPA-mask path (every mode) ---
 
-REF_SCRIPT = r'''
+REF_SCRIPT = r"""
 import sys, torch
 sys.path.insert(0, sys.argv[1])
 import mapping.tasks as tasks
-dev = sys.argv[2]
+dev, modes = sys.argv[2], sys.argv[4].split(',')
+torch.backends.cuda.matmul.allow_tf32 = False
 out = {}
 for task in ('se2d', 'se2c'):
     reg = tasks.get(task)['models']
@@ -321,62 +329,134 @@ for task in ('se2d', 'se2c'):
         module = reg.get(name)
         if dev == 'cpu' and 'hybrid' in name:
             continue
-        torch.manual_seed(0)
-        net = module.build(next(iter(module.SIZES)), sp)
-        torch.manual_seed(1)
-        torch.nn.init.normal_(net.readout.weight, std=0.5)
-        net = net.to(dev).eval()
-        g = torch.Generator().manual_seed(7)
-        b, q = 2, 8
-        if task == 'se2d':
-            obs = torch.rand(b, 33, 9, 9, generator=g)
-            odo = torch.randint(0, 16, (b, 32), generator=g)
-            pose = torch.cat([torch.randint(-80, 80, (b, q, 2), generator=g),
-                              torch.randint(0, 4, (b, q, 1), generator=g)], -1)
-        else:
-            obs = torch.rand(b, 33, 15, 15, generator=g)
-            odo = torch.cat([torch.randn(b, 32, 2, generator=g) * 6,
-                             (torch.rand(b, 32, 1, generator=g) * 2 - 1) * 3.14], -1)
-            pose = torch.cat([torch.randn(b, q, 2, generator=g) * 20,
-                              (torch.rand(b, q, 1, generator=g) * 2 - 1) * 3.14], -1)
-        qt = torch.randint(0, 33, (b, q), generator=g)
-        with torch.no_grad():
-            try:
-                y = net(obs.to(dev), odo.to(dev), pose.to(dev), query_time=qt.to(dev))
-            except TypeError:
-                y = net(obs.to(dev), odo.to(dev), pose.to(dev))
-        out[f'{task}/{name}'] = y.float().cpu()
+        size = next(iter(module.SIZES))
+        for mode in modes:
+            torch.manual_seed(0)
+            net = module.build(size, sp)
+            if mode != 'mixed':
+                if mode not in type(net).__dict__.get('QUERY_MODES', ()):
+                    continue
+                torch.manual_seed(0)
+                net = type(net)(sp, **module.SIZES[size], query_mode=mode)
+            torch.manual_seed(1)
+            torch.nn.init.normal_(net.readout.weight, std=0.5)
+            net = net.to(dev).eval()
+            g = torch.Generator().manual_seed(7)
+            b, q = 2, 8
+            if task == 'se2d':
+                obs = torch.rand(b, 33, 9, 9, generator=g)
+                odo = torch.randint(0, 16, (b, 32), generator=g)
+                pose = torch.cat([torch.randint(-80, 80, (b, q, 2), generator=g),
+                                  torch.randint(0, 4, (b, q, 1), generator=g)], -1)
+            else:
+                obs = torch.rand(b, 33, 15, 15, generator=g)
+                odo = torch.cat([torch.randn(b, 32, 2, generator=g) * 6,
+                                 (torch.rand(b, 32, 1, generator=g) * 2 - 1) * 3.14], -1)
+                pose = torch.cat([torch.randn(b, q, 2, generator=g) * 20,
+                                  (torch.rand(b, q, 1, generator=g) * 2 - 1) * 3.14], -1)
+            qt = torch.randint(0, 33, (b, q), generator=g)
+            with torch.no_grad():
+                try:
+                    y = net(obs.to(dev), odo.to(dev), pose.to(dev), query_time=qt.to(dev))
+                except TypeError:
+                    y = net(obs.to(dev), odo.to(dev), pose.to(dev))
+            key = f'{task}/{name}/{mode}'
+            out[key] = y.float().cpu()
+            # attention under a mask (flex now): causal attention or inert
+            out[key + '#masked'] = mode != 'mixed' or any(
+                type(m).__name__.endswith('Attention') and getattr(m, 'causal', False)
+                for m in net.modules())
 torch.save(out, sys.argv[3])
-'''
+"""
 
 
-def outputs(root, device, tmp_path, tag):
+def outputs(root, device, tmp_path, tag, modes):
     script = tmp_path / 'ref_outputs.py'
     script.write_text(REF_SCRIPT)
     dst = tmp_path / f'{tag}.pt'
     env = dict(os.environ, PYTHONPATH=str(root), CUBLAS_WORKSPACE_CONFIG=':4096:8')
-    subprocess.run([sys.executable, str(script), str(root), device, str(dst)],
-                   cwd=str(root), env=env, check=True)
+    subprocess.run([sys.executable, str(script), str(root), device, str(dst), ','.join(modes)],
+                   cwd=str(root), env=env, check=True, stderr=subprocess.DEVNULL)
     return torch.load(dst)
 
 
-@pytest.mark.parametrize('device', ['cpu', pytest.param('cuda', marks=pytest.mark.skipif(
-    not CUDA, reason='needs CUDA'))])
-def test_mixed_is_bit_identical_to_master(device, tmp_path):
-    """Every se2d and se2c model, built and run in a fresh process on the
-    reference commit's code and on this checkout's (default query_mode,
-    i.e. mixed): identical outputs, bit for bit."""
+def checkout(ref, tmp_path):
     try:
-        blob = subprocess.run(['git', '-C', HERE, 'archive', REF, 'mapping', 'conf'],
+        blob = subprocess.run(['git', '-C', HERE, 'archive', ref, 'mapping', 'conf'],
                               capture_output=True, check=True).stdout
     except subprocess.CalledProcessError:
-        pytest.skip(f'reference commit {REF} not available')
-    ref_root = tmp_path / 'ref'
-    ref_root.mkdir()
-    tarfile.open(fileobj=io.BytesIO(blob)).extractall(ref_root, filter='data')
-    os.symlink(os.path.join(HERE, 'data'), ref_root / 'data')
-    ref = outputs(ref_root, device, tmp_path, 'ref')
-    new = outputs(HERE, device, tmp_path, 'new')
-    assert ref.keys() == new.keys() and len(ref) >= (3 if device == 'cpu' else 20)
-    diff = {k: (ref[k] - new[k]).abs().max().item() for k in ref if not torch.equal(ref[k], new[k])}
-    assert not diff, f'mixed outputs differ from {REF}: {diff}'
+        pytest.skip(f'reference commit {ref} not available')
+    root = tmp_path / f'ref_{ref}'
+    root.mkdir()
+    tarfile.open(fileobj=io.BytesIO(blob)).extractall(root, filter='data')
+    os.symlink(os.path.join(HERE, 'data'), root / 'data')
+    return root
+
+
+def compare(ref, new):
+    """``{model/mode: (masked, max |diff|, max |diff| / max |ref|)}``."""
+    keys = sorted(k for k in ref if not k.endswith('#masked'))
+    assert keys == sorted(k for k in new if not k.endswith('#masked'))
+    return {k: (new[k + '#masked'], (ref[k] - new[k]).abs().max().item(),
+                ((ref[k] - new[k]).abs().max() / ref[k].abs().max()).item()) for k in keys}
+
+
+DEVICES = ['cpu', pytest.param('cuda', marks=pytest.mark.skipif(not CUDA, reason='needs CUDA'))]
+
+
+@pytest.mark.parametrize('device', DEVICES)
+def test_mixed_matches_master(device, tmp_path):
+    """Every se2d and se2c model in mixed mode against master before the
+    option, in fresh processes: bit-identical where attention is unmasked
+    (plain SDPA, unchanged); where it is causal (SDPA is_causal then, flex
+    now), within fp32 tolerance."""
+    ref = outputs(checkout(REF, tmp_path), device, tmp_path, 'ref', ['mixed'])
+    new = outputs(HERE, device, tmp_path, 'new', ['mixed'])
+    res = compare(ref, new)
+    assert len(res) >= (3 if device == 'cpu' else 20)
+    unmasked = {k: v for k, v in res.items() if not v[0] and v[1] != 0}
+    assert not unmasked, f'unmasked models changed: {unmasked}'
+    masked = {k: v for k, v in res.items() if v[0]}
+    assert masked or device == 'cpu'
+    assert all(v[2] < 1e-4 for v in masked.values()), masked
+
+
+@pytest.mark.parametrize('device', DEVICES)
+def test_flex_matches_the_sdpa_mask_path(device, tmp_path):
+    """Every model and mode against the last commit with SDPA masks
+    (boolean inert mask, is_causal): unmasked bit-identical, masked within
+    fp32 tolerance."""
+    modes = ['mixed', 'inert']
+    ref = outputs(checkout(SDPA_REF, tmp_path), device, tmp_path, 'ref', modes)
+    new = outputs(HERE, device, tmp_path, 'new', modes)
+    res = compare(ref, new)
+    assert sum(k.endswith('/inert') for k in res) >= (2 if device == 'cpu' else 6)
+    assert not {k: v for k, v in res.items() if not v[0] and v[1] != 0}
+    bad = {k: v for k, v in res.items() if v[0] and v[2] >= 1e-4}
+    assert not bad, bad
+    worst = max((v for v in res.values() if v[0]), key=lambda v: v[2])
+    print(f'max deviation over masked models: |d| {worst[1]:.2e}, relative {worst[2]:.2e}')
+
+
+def test_no_recompile_when_queries_or_steps_change():
+    """After one warm-up forward and backward at Q = 8, T = 32: other query
+    counts and episode lengths compile nothing (the mask reads metadata
+    tensors; flex_attention and create_block_mask are compiled dynamic)."""
+    if not CUDA:
+        pytest.skip('compiled flex runs on CUDA')
+    from torch._dynamo.utils import counters
+    for task, name, mode in [('se2d', 'hybrid4', 'inert'), ('se2d', 'vanilla4_causal', 'inert'),
+                             ('se2d', 'vanilla4_causal', 'mixed')]:
+        net = build(task, name, mode, 'cuda', torch.float32, reference_scan=False)
+
+        def go(q, T=33):
+            obs, odo, pose, qt = inputs(task, q, device='cuda')
+            obs, odo, qt = obs[:, :T], odo[:, :T - 1], qt.clamp(max=T - 1)
+            with torch.no_grad():
+                net(obs, odo, pose, query_time=qt)
+            net(obs, odo, pose, query_time=qt).pow(2).mean().backward()
+        go(8)
+        before = counters['stats']['unique_graphs']
+        for q, T in ((1, 33), (3, 33), (64, 33), (300, 33), (8, 17), (64, 25)):
+            go(q, T)
+        assert counters['stats']['unique_graphs'] == before, (name, mode)

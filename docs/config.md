@@ -120,6 +120,13 @@ and a query's answer does not depend on the other queries
   `vanilla4_causal` and se2c `hybrid4c`, `vanilla4c`; each declares it in
   its own class (`QUERY_MODES`). Any other model refuses `inert`, also a
   subclass that inherits the constructor.
+- Every masked attention (inert, and causal models in either mode) runs one
+  path: FlexAttention with a block mask built by one `mask_mod` from
+  per-token metadata (query id, token index), compiled with dynamic shapes,
+  so a new query count or episode length does not recompile and memory is
+  linear in the tokens (4096 queries on one history: ~120 MiB at xs, as
+  unmasked). Full bidirectional attention (mixed, non-causal) needs no mask
+  and stays plain SDPA, bit-identical to before.
 - `mixed` is not passed to the model, so a mixed run's constructor
   arguments, checkpoint `arch` and args record are byte-for-byte what they
   were before the field (its outputs are bit-identical; tested against the

@@ -5,27 +5,16 @@ mechanism trace is hybrid4_causal's (tests/test_causal.py).
 """
 import sys
 
-import torch.nn.functional as F
-
 from mapping.models.se2d import register
 from mapping.models.se2d.vanilla4 import (LR, SCALING_RULE, SIZES,  # noqa: F401
-                                          Attention, Vanilla4, apply_rope)
+                                          Attention, Vanilla4)
 
 
 class CausalAttention(Attention):
-    """vanilla4's attention, masked causally over the sorted token order."""
+    """vanilla4's attention, masked causally over the sorted token order: the
+    parent's FlexAttention path with the causal mask (mapping/models/query_mode.py)."""
 
     causal = True
-
-    def forward(self, x, cos, sin, layout=None):
-        if layout is not None:          # query_mode='inert': causal & inert mask
-            return super().forward(x, cos, sin, layout)
-        b, l, w = x.shape
-        q, k, v = self.qkv(x).view(b, l, 3, self.heads, -1).unbind(2)
-        q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
-        o = F.scaled_dot_product_attention(q.transpose(1, 2), k.transpose(1, 2),
-                                           v.transpose(1, 2), is_causal=True)
-        return self.out(o.transpose(1, 2).reshape(b, l, w))
 
 
 class Vanilla4Causal(Vanilla4):

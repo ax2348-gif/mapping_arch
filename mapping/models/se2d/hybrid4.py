@@ -215,7 +215,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 
-from mapping.models.query_mode import QueryLayout, check_query_mode
+from mapping.models.query_mode import (QueryLayout, attend, causal_block_mask,
+                                        check_query_mode)
 from mapping.models.se2d import register  # SE2
 
 ROPE_BASE = 10000.0
@@ -507,16 +508,16 @@ class Attention(nn.Module):
         self.qkv = MuLinear(width, 3 * width, mult, std)
         self.out = MuLinear(width, width, mult, out_std)
 
-    causal = False      # query_mode='inert': a causal subclass sets True
+    causal = False      # a causal subclass sets True (mapping/models/query_mode.py)
 
     def forward(self, x, cos, sin, layout=None):
         b, l, w = x.shape
         q, k, v = self.qkv(x).view(b, l, 3, self.heads, -1).unbind(2)
         q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
-        if layout is not None:          # query_mode='inert'
-            o = F.scaled_dot_product_attention(
-                q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2),
-                attn_mask=layout.attn_mask(self.causal))
+        if layout is not None or self.causal:   # a mask: FlexAttention
+            mask = (layout.block_mask(self.causal) if layout is not None
+                    else causal_block_mask(b, l, x.device))
+            o = attend(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), mask)
             return self.out(o.transpose(1, 2).reshape(b, l, w))
         o = F.scaled_dot_product_attention(q.transpose(1, 2),
                                            k.transpose(1, 2),

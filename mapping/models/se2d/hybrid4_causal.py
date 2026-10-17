@@ -12,7 +12,8 @@ Changes from hybrid4, and nothing else:
    widths, short convolution (width 4, causal in the scan direction),
    beta in (0, 2), decay, gate and norm; the right-to-left head becomes a
    second left-to-right head.
-2. **Attention:** causal over the sorted token order (``is_causal``), RoPE
+2. **Attention:** causal over the sorted token order (a FlexAttention
+   causal mask, mapping/models/query_mode.py; was SDPA ``is_causal``), RoPE
    on the step index as before.
 
 Mechanism trace (asserted in tests/test_causal.py). The blocks run on
@@ -32,7 +33,7 @@ import torch.nn.functional as F
 from mapping.models.se2d import register
 from mapping.models.se2d.hybrid4 import (DECAY_TAU, LR, SCALING_RULE,  # noqa: F401
                                          SIZES, Attention, GatedDeltaNet,
-                                         Hybrid4, apply_rope)
+                                         Hybrid4)
 
 
 class CausalGatedDeltaNet(GatedDeltaNet):
@@ -60,19 +61,10 @@ class CausalGatedDeltaNet(GatedDeltaNet):
 
 
 class CausalAttention(Attention):
-    """hybrid4's attention, masked causally over the sorted token order."""
+    """hybrid4's attention, masked causally over the sorted token order: the
+    parent's FlexAttention path with the causal mask (mapping/models/query_mode.py)."""
 
     causal = True
-
-    def forward(self, x, cos, sin, layout=None):
-        if layout is not None:          # query_mode='inert': causal & inert mask
-            return super().forward(x, cos, sin, layout)
-        b, l, w = x.shape
-        q, k, v = self.qkv(x).view(b, l, 3, self.heads, -1).unbind(2)
-        q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
-        o = F.scaled_dot_product_attention(q.transpose(1, 2), k.transpose(1, 2),
-                                           v.transpose(1, 2), is_causal=True)
-        return self.out(o.transpose(1, 2).reshape(b, l, w))
 
 
 class Hybrid4Causal(Hybrid4):
