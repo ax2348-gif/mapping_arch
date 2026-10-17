@@ -356,6 +356,11 @@ def main(experiment, config=None, sources=None):
                                  f'schedule.* and optim.weight_decay/clip may change')
         if start >= r.steps:
             raise SystemExit(f'checkpoint step {start} >= run.steps {r.steps}')
+    init = None
+    if r.init_from:                          # weights-only warm start: a new run
+        init = load_init(r, e, t.name, config, sources)
+    elif r.init_sha256 is not None or r.init_run_id is not None:
+        raise SystemExit('run.init_sha256 / run.init_run_id are set without run.init_from')
     if gpu_data:
         d = task['task'].from_config(g.config(t, r.seed), device, start,
                                      ev.batches, o.batch)
@@ -405,13 +410,22 @@ def main(experiment, config=None, sources=None):
         raw_model.load_state_dict(branch['model'])
         opt.load_state_dict(branch['opt'])
         print(f'branched from {r.branch} at step {start}', flush=True)
+    if init is not None:                     # weights only; optimizer and step fresh
+        try:
+            raw_model.load_state_dict(init.pop('state'), strict=True)
+        except RuntimeError as err:
+            raise SystemExit(f'run.init_from={r.init_from}: the weights do not fit '
+                             f'this model: {err}')
+        print(f'initialised from {init["path"]} (run {init["run_id"]}, step '
+              f'{init["step"]}, sha256 {init["sha256"][:12]}); new run from step 0',
+              flush=True)
 
     # everything is checked: pin the code and open the ledger record, then
     # (only now) write the run directory
     data_files = [bank] if not gpu_data else (
         [TEXTURES[g.texture]['path']] if g.texture in TEXTURES else [])
     record = provenance.begin(e, config, sources, where, data_files, device=device,
-                              parent=branch)
+                              parent=branch, init=init)
     with record.lifetime():
         os.makedirs(out, exist_ok=True)
         record.attach(out, overwrite=r.overwrite)
@@ -439,6 +453,7 @@ def main(experiment, config=None, sources=None):
                               'schedule': sched.name, 'branch': r.branch,
                               'start': start, 'step_px': args.step_px,
                               **({'path': args.path} if hasattr(args, 'path') else {}),
+                              **({'init_from': init} if init is not None else {}),
                               'odometry_dropout': args.odometry_dropout,
                               'offset_max': getattr(spec, 'offset_max', None),
                               'shuffle_informative': shuffle_informative,
@@ -513,6 +528,7 @@ def main(experiment, config=None, sources=None):
                  'run': run, 'query_times': t.query_times,
                  'step_px': args.step_px,
                  **({'path': args.path} if hasattr(args, 'path') else {}),
+                 **({'init_from': init} if init is not None else {}),
                  'odometry_dropout': args.odometry_dropout,
                  'shuffle_informative': shuffle_informative,
                  **texture,
@@ -550,6 +566,73 @@ def main(experiment, config=None, sources=None):
 # must be the parent's. task.generator.workers is a loader setting.
 BRANCH_MAY_CHANGE = ('run.', 'eval.', 'schedule.', 'optim.weight_decay', 'optim.clip',
                      'task.generator.workers')
+
+
+def load_init(r, e, task, config, sources=None):
+    """The ``run.init_from`` checkpoint, checked: it must carry the exact
+    architecture of this run (class and every constructor argument, so the
+    rung, query_mode and scan_precision) and be for this task; task and
+    generator settings may differ. Its sha256 and parent run id are checked
+    against ``run.init_sha256`` / ``run.init_run_id`` when set and written
+    into ``config`` and ``sources['overrides']`` when not (so config.yaml,
+    overrides.yaml and the ledger carry them, and ``--from`` reruns verify
+    the same checkpoint).
+    The run id is the checkpoint's embedded provenance stamp, cross-checked
+    against the RUN_ID file beside it; with no stamp the RUN_ID file is the
+    (weaker, recorded) evidence; with neither the run is refused. Returns
+    ``{path, sha256, run_id, run_id_evidence, step, state}``."""
+    import hashlib
+    path = os.path.abspath(r.init_from)
+    if not os.path.isfile(path):
+        raise SystemExit(f'run.init_from={r.init_from}: no such file')
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    sha = h.hexdigest()
+    if r.init_sha256 is not None and r.init_sha256 != sha:
+        raise SystemExit(f'run.init_from={r.init_from}: sha256 {sha} is not '
+                         f'run.init_sha256={r.init_sha256} (the checkpoint changed)')
+    ck = torch.load(path, map_location='cpu', weights_only=False)
+    if 'arch' not in ck:
+        raise SystemExit(f'run.init_from={r.init_from}: the checkpoint records no '
+                         f'architecture ("arch"), so an exact match cannot be checked')
+    want = e.model.record()
+    if ck['arch'] != want:
+        raise SystemExit(f'run.init_from={r.init_from}: architecture mismatch: '
+                         f'checkpoint {ck["arch"]}, this run {want}. A warm start needs '
+                         f'the same model, rung, query_mode and scan_precision')
+    saved = tasks.canonical((ck.get('args') or {}).get('task', 'z2'))
+    if saved != task:
+        raise SystemExit(f'run.init_from={r.init_from}: a {saved} checkpoint, this run '
+                         f'is {task}')
+    stamp = (ck.get('provenance') or {}).get('run_id')
+    id_file = os.path.join(os.path.dirname(path), 'RUN_ID')
+    on_disk = open(id_file).read().strip() if os.path.exists(id_file) else None
+    if stamp and on_disk and stamp != on_disk:
+        raise SystemExit(f'run.init_from={r.init_from}: embedded run id {stamp} but '
+                         f'{id_file} says {on_disk}')
+    run_id = stamp or on_disk
+    if run_id is None:
+        raise SystemExit(f'run.init_from={r.init_from}: no parent run id (no provenance '
+                         f'stamp in the checkpoint, no RUN_ID beside it)')
+    evidence = 'checkpoint stamp' + (' + RUN_ID file' if on_disk else '') if stamp \
+        else 'RUN_ID file only (no stamp in the checkpoint)'
+    if r.init_run_id is not None and r.init_run_id != run_id:
+        raise SystemExit(f'run.init_from={r.init_from}: run id {run_id} is not '
+                         f'run.init_run_id={r.init_run_id}')
+    if config is not None:
+        from omegaconf import OmegaConf, open_dict
+        with open_dict(config):
+            OmegaConf.update(config, 'run.init_sha256', sha)
+            OmegaConf.update(config, 'run.init_run_id', run_id)
+    if sources is not None:
+        keys = {o.split('=', 1)[0].lstrip('+~') for o in sources.get('overrides') or []}
+        for k, v in (('run.init_sha256', sha), ('run.init_run_id', run_id)):
+            if k not in keys:
+                sources['overrides'] = list(sources.get('overrides') or []) + [f"{k}='{v}'"]
+    return {'path': path, 'sha256': sha, 'run_id': run_id, 'run_id_evidence': evidence,
+            'step': ck.get('step'), 'state': ck['model']}
 
 
 def branch_changes(parent, config):

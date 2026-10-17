@@ -25,6 +25,7 @@ import functools
 import inspect
 import math
 import os
+import re
 from dataclasses import dataclass, fields, is_dataclass
 from typing import Optional
 
@@ -102,6 +103,9 @@ class Run(Node):
     seed: int
     save_every: int              # write step<k>.pt every k steps; 0: never
     branch: Optional[str]        # a step<k>.pt to continue from
+    init_from: Optional[str]     # a checkpoint whose weights start a new run
+    init_sha256: Optional[str]   # its sha256: None filled at launch, else verified
+    init_run_id: Optional[str]   # its run id: None filled at launch, else verified
     device: Optional[str]        # None: cuda if available, else cpu
     bf16: bool                   # bf16 autocast (CUDA only; ignored on CPU)
     compile: bool
@@ -116,6 +120,19 @@ class Run(Node):
         if not isinstance(self.provenance, Provenance):
             raise TypeError(f'run.provenance must instantiate a Provenance, got '
                             f'{type(self.provenance).__name__}')
+        if self.init_from is not None and self.branch is not None:
+            raise ValueError('run.init_from and run.branch together: branch continues a '
+                             'run (weights, optimizer, step); init_from starts a new run '
+                             'from weights only. Pick one')
+        if self.init_from is None and (self.init_sha256 or self.init_run_id):
+            raise ValueError('run.init_sha256 / run.init_run_id are set without '
+                             'run.init_from')
+        if self.init_sha256 is not None and not re.fullmatch(r'[0-9a-f]{64}', self.init_sha256):
+            raise ValueError(f'run.init_sha256={self.init_sha256!r} is not a sha256 hex digest')
+        if self.init_run_id is not None and not re.fullmatch(
+                r'\d{8}T\d{6}Z-[\w.-]+-[0-9a-f]{6}', self.init_run_id):
+            raise ValueError(f'run.init_run_id={self.init_run_id!r} is not a run id '
+                             f'(<yyyymmddTHHMMSSZ>-<host>-<6 hex>)')
 
     def location(self):
         """Where this run writes: ``{'dir', 'root', 'rel'}``. ``dir`` is
@@ -417,6 +434,8 @@ class Experiment:
             a.query_mode = self.model.query_mode
         if self.model.scan_precision != 'tf32':   # absent for tf32: records as before it
             a.scan_precision = self.model.scan_precision
+        if r.init_from is not None:            # absent without a warm start: as before it
+            a.init_from = r.init_from
         for f in fields(s):                  # warmup, cooldown, ...
             setattr(a, f.name, getattr(s, f.name))
         a.eval_batches, a.eval_every, a.log_every = e.batches, e.every, e.log_every

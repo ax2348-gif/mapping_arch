@@ -78,7 +78,7 @@ python run.py ... --print                             # resolved config, and the
 | `generator` (chosen by the task; `generator=<variant>` overrides) | `bank` (z2, se2d), `se2c` | `BankGenerator`, `Se2cGenerator` | bank: `texture bank step_px odometry_dropout workers path`; se2c: `texture turn_n motion directions v_min v_max omega_max holdout holdout_mode query_coverage` |
 | `schedule` | `cosine`, `wsd` | `Cosine`, `WSD` (`Schedule.lr(step, steps, peak)`) | `warmup` (+ `cooldown` for wsd) |
 | `optim` | in `config.yaml` | `AdamW` | `lr` (default: the model's, via `${model_lr:...}`), `weight_decay`, `clip`, `batch` |
-| `run` | in `config.yaml` | `Run` | `name out root dir note tag provenance.max_untracked_mb steps seed save_every branch device bf16 compile overwrite` |
+| `run` | in `config.yaml` | `Run` | `name out root dir note tag provenance.max_untracked_mb steps seed save_every branch init_from init_sha256 init_run_id device bf16 compile overwrite` |
 | `eval` | in `config.yaml` | `Eval` | `batches every log_every` |
 | `experiment` | `se2c_bridge`, `se2d_scaling_wsd`, or any file via `--exp` | none: it only sets the fields above | |
 
@@ -174,6 +174,30 @@ generator time per batch of 64 (one process, uniform query times) walk
 24 ms, saw 34 ms, no_revisit_view 91 ms, so raise `task.generator.workers`
 to keep up (the batch sequence does not depend on it). No `train.py` flag.
 Numbers: experiments/se2d_saw/.
+
+**`run.init_from`: a weights-only warm start** (2026-10-17). A NEW run
+(its own run id, a fresh optimizer and schedule, steps from 0) whose model
+starts from a checkpoint's weights; distinct from `run.branch`, which
+continues a run (weights, optimizer, step), and refused together with it.
+- The checkpoint must carry the exact architecture of the run (its `arch`:
+  class and every constructor argument, so the rung, `query_mode` and
+  `scan_precision`) and be for the same task; anything else is refused.
+  Task and generator settings may differ (`task.episode_steps`,
+  `task.generator.path`, `task.query_times`, ...): that is its use. Note
+  that a model may normalise inputs by the spec (se2d hybrid4 divides the
+  query offset by `offset_max = steps * step_px`), so a new episode length
+  rescales those inputs for the inherited weights.
+- Provenance: `run.init_sha256` and `run.init_run_id`, when null, are
+  filled at launch with the checkpoint's sha256 and its run id (the
+  embedded provenance stamp, cross-checked against the RUN_ID file beside
+  it; the RUN_ID file alone is accepted and recorded as weaker evidence;
+  neither is refused) and written into config.yaml and overrides.yaml;
+  when set they are verified. The ledger record has
+  `parent.init_from = {path, sha256, run_id, run_id_evidence, step}`,
+  `xp show` prints it, log.jsonl / final.json carry it, and the args
+  record gets `init_from` (absent without a warm start, so other runs
+  record as before). A `--from` rerun therefore verifies the same file.
+- No `train.py` flag. Tests: tests/test_init_from.py.
 
 ## Field map: config key and train.py flag
 

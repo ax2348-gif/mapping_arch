@@ -430,11 +430,13 @@ def final_metrics(final):
 
 
 def begin(experiment, config, sources, location, data_files=(), device='cpu', parent=None,
-          top=CODE_ROOT):
+          top=CODE_ROOT, init=None):
     """Snapshot the code and write the ledger's start record. Called by
     ``train.main`` after every check and before the run directory or any
     training step exists. ``location``: ``Run.location()``. ``parent``: the
-    loaded ``run.branch`` checkpoint, if any. Returns the ``Record``."""
+    loaded ``run.branch`` checkpoint, if any. ``init``: the ``run.init_from``
+    warm start (``train.load_init``: path, sha256, run_id, evidence, step),
+    if any. Returns the ``Record``."""
     from omegaconf import OmegaConf
     r, m, t = experiment.run, experiment.model, experiment.task
     note = check_note(r.note)
@@ -473,7 +475,9 @@ def begin(experiment, config, sources, location, data_files=(), device='cpu', pa
                 'note': note, 'tags': list(r.tag or ())},
         'results': {'dir': os.path.abspath(loc['dir']), 'root': os.path.abspath(loc['root']),
                     'rel': loc['rel']},
-        'parent': {'branch_from': r.branch, 'parent_run_id': parent_prov.get('run_id')},
+        'parent': {'branch_from': r.branch, 'parent_run_id': parent_prov.get('run_id'),
+                   **({'init_from': {k: v for k, v in init.items() if k != 'state'}}
+                      if init is not None else {})},
         'reproduces': os.environ.get('XP_REPRODUCES') or None,
         'env': environment(freeze),
         'data': data,

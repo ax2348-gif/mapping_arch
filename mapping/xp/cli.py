@@ -238,6 +238,14 @@ def cmd_show(a, run, top):
         lines.append(f'code     {code.get("snapshot")} ({code.get("ref")})')
         lines.append(f'         base {code.get("base")} on {code.get("base_branch")}, '
                      + (f'dirty: {code.get("dirty_count")} paths' if code.get('dirty') else 'clean'))
+    par = rec.get('parent') or {}
+    if par.get('branch_from'):
+        lines.append(f'branch   from {par["branch_from"]} (run {par.get("parent_run_id")})')
+    if par.get('init_from'):
+        i = par['init_from']
+        lines.append(f'init     weights from {i.get("path")} (run {i.get("run_id")}, step '
+                     f'{i.get("step")}; {i.get("run_id_evidence")})\n'
+                     f'         sha256 {i.get("sha256")}')
     if rec.get('reproduces'):
         lines.append(f'repro of {rec["reproduces"]}')
     if repros:

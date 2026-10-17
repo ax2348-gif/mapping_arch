@@ -54,6 +54,12 @@ run:
   seed: 0
   save_every: 0         # write step<k>.pt (with optimizer) every k steps
   branch: null          # a step<k>.pt to continue from, into a new run
+  # weights-only warm start (docs/config.md, "run.init_from"): a NEW run (fresh
+  # optimizer, schedule and step 0) starting from this checkpoint's model weights;
+  # the architecture must match exactly, task settings may differ. Not with branch.
+  init_from: null
+  init_sha256: null     # null: filled at launch with the checkpoint's sha256; set: verified
+  init_run_id: null     # null: filled at launch with the checkpoint's run id; set: verified
   device: null          # null: cuda if available, else cpu
   bf16: true
   compile: false
