@@ -1,5 +1,16 @@
-# The config tree (conf/, run.py, train.py, mapping/config.py), pinned at
-# the versions it was built and tested with. torch, numpy, pillow, datasets
-# and the kernels (fla-core, einops) are installed as README.md, Setup, says.
-hydra-core==1.3.5
+# Everything the training code imports (mapping/, run.py, train.py, render.py,
+# plot_curves.py). scripts/check_env.py enforces this file: a third-party
+# import missing from it fails tests/test_requirements.py and every job's
+# preflight. Pins only where behaviour depends on the version; torch, triton
+# and numpy follow the CUDA install (README.md, Setup).
+torch                # with CUDA for training; triton ships with it
+triton
+numpy
+scipy                # mapping/ocean (coverage band)
+pillow
+matplotlib
+PyYAML
+hydra-core==1.3.5    # the config tree, pinned at the tested versions
 omegaconf==2.3.1
+fla-core==0.5.2      # kernels (hybrid4 and later); install with --no-deps
+einops               # fla-core's one dependency besides torch

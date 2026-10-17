@@ -51,8 +51,7 @@ LRFLAG=""; RUN=seed{seed}{tag}
 if [ "$LR" != "default" ]; then LRFLAG="optim.lr=$LR"; RUN=${{RUN}}_lr$LR; fi
 source {venv}/bin/activate
 cd {workdir}
-python -c "import hydra, omegaconf; print('hydra-core', hydra.__version__, 'omegaconf', omegaconf.__version__)" \\
-    || {{ echo "this venv lacks the config tree's dependencies: pip install -r requirements.txt" >&2; exit 1; }}
+python scripts/check_env.py || exit 1    # dependency preflight (requirements.txt)
 python run.py model={task}/{model} model.size=$SIZE run.name=$RUN run.steps={steps} \\
     optim.batch={batch} run.seed={seed} {workers} $LRFLAG {extra} \\
     "run.note='scaling {task} {model} $SIZE $RUN'"

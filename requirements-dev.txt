@@ -1,0 +1,6 @@
+# requirements.txt plus what tools/, tests/ and scripts/ import.
+# python scripts/check_env.py --dev
+-r requirements.txt
+pytest
+imageio              # tools/ (videos)
+datasets             # scripts/get_imagenette*.py

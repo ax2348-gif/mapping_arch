@@ -17,11 +17,11 @@ Install it once with `pip install -e .` (or use `python -m mapping.xp`).
 ## Setup
 
 ```bash
-pip install torch numpy pillow datasets     # torch with CUDA for training
-pip install --no-deps fla-core==0.5.2 einops # kernels (hybrid4 and later);
-                                             # --no-deps keeps torch untouched
-pip install -r requirements.txt              # hydra-core, omegaconf (the config
-                                             # tree, run.py and train.py), pinned
+pip install torch                            # with CUDA for training (triton ships with it)
+pip install --no-deps fla-core==0.5.2 einops # kernels; --no-deps keeps torch untouched
+pip install -r requirements.txt              # everything else the training code imports
+pip install -r requirements-dev.txt          # optional: tools/, tests/, scripts/
+python scripts/check_env.py                  # must print OK (--dev for the dev set)
 python scripts/get_mnist.py                 # writes data/mnist.npz once
 python -I scripts/get_imagenette.py         # optional natural-image bank:
                                             # data/imagenette64.npz
@@ -29,6 +29,10 @@ python -I scripts/get_imagenette_hp.py      # its high-passed variant (reads
                                             # the above): imagenette64_hp.npz
 python profile_loader.py                    # optional: data path sanity
 ```
+
+`requirements.txt` lists every third-party module the training code imports;
+`tests/test_requirements.py` fails when code imports one it does not list, and
+every Torch job runs `scripts/check_env.py` before training.
 
 Nothing else is stored. Training batches are generated on the fly from a
 seed; the only data files are the tile banks.

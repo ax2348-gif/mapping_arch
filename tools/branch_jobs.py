@@ -38,8 +38,7 @@ K=$(( S * 4 / 5 ))
 PARENT={root}/{model}/$SIZE/{parent}
 source /scratch/ax2348/venvs/mapping/bin/activate
 cd /scratch/ax2348/mapping
-python -c "import hydra, omegaconf; print('hydra-core', hydra.__version__, 'omegaconf', omegaconf.__version__)" \\
-    || {{ echo "this venv lacks the config tree's dependencies: pip install -r requirements.txt" >&2; exit 1; }}
+python scripts/check_env.py || exit 1    # dependency preflight (requirements.txt)
 test -f $PARENT/step$K.pt
 python run.py model={task}/{model} model.size=$SIZE run.steps=$S \\
     schedule=wsd run.branch=$PARENT/step$K.pt run.name={parent}_cd$(( S / 1000 ))k \\

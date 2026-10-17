@@ -539,7 +539,7 @@ def test_job_generators_write_commands_that_compose(tmp_path):
                        cwd=tmp_path, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     job = tmp_path / 'jobs' / 'se2d_hybrid4.sbatch'
-    assert 'import hydra, omegaconf' in job.read_text()
+    assert 'python scripts/check_env.py || exit 1' in job.read_text()
     argv = _job_command(job, {'$SIZE': 's', '$RUN': 'seed0_lr1e-3', '$LRFLAG': 'optim.lr=1e-3'})
     e = run.build(run.resolved(run.load(argv)))
     assert (e.model.size, e.optim.lr, e.schedule.name, e.run.name, e.task.generator.workers) == (
