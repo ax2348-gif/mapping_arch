@@ -231,3 +231,14 @@ def test_initial_proposal_matches_parent_schedule_prefix():
     parent = WSD(warmup=100, cooldown=.2)
     for step in [0, 99, 100, 50000, 99999]:
         assert exp.schedule.lr(step, exp.run.steps, exp.optim.lr) == parent.lr(step, 400000, 3e-4)
+
+
+def test_submission_arguments_parse():
+    import shlex
+    from pathlib import Path
+    import run
+    script = Path('jobs/hybrid6/initial.sbatch').read_text().replace('\\\n', '')
+    command = next(line for line in script.splitlines() if line.startswith('python run.py '))
+    cfg = run.resolved(run.load(shlex.split(command)[2:]))
+    exp = run.build(cfg)
+    assert exp.run.steps == 100000 and 'approved initial Torch run' in exp.run.note

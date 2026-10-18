@@ -19,4 +19,4 @@ python scripts/check_env.py
 echo "code $(git rev-parse HEAD) job $SLURM_JOB_ID"
 python -m experiments.hybrid6.gpu_preflight
 python run.py +experiment=hybrid6_initial \
-    'run.note=Hybrid6 calibrated camera tokens: causal inert s, SE2d SAW T32, seed0, first 100k steps matched to hybrid4 parent 563beb; approved initial Torch run'
+    "run.note='Hybrid6 calibrated camera tokens: causal inert s, SE2d SAW T32, seed0, first 100k steps matched to hybrid4 parent 563beb; approved initial Torch run'"

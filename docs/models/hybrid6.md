@@ -47,9 +47,16 @@ causality with a nonzero-output control, full-pose/calibration gradients, model
 registry/config composition, and the proposed schedule's equality to the
 parent's first 100k steps. CPU backward substitutes the existing reference
 delta scan and SDPA using the actual attention-mask predicate; a separate
-forward comparison checks that attention against CPU FlexAttention. Fused GPU
-training, learning quality, throughput, and largest-rung memory remain untested.
-No local GPU use or training run was performed.
+forward comparison checks that attention against CPU FlexAttention.
+
+Local GPU preflight subsequently passed on RTX PRO 4000 Blackwell: three
+synthetic optimizer steps at batch 2, full T=32/Q=8, finite gradients, exact
+checkpoint reconstruction, and 364530176 bytes peak tensor allocation. A
+two-step real SAW-data run through the production trainer also completed,
+including evaluation and checkpoint writing (`/tmp/hybrid6-trainer-smoke`).
+These are execution checks, not learning results. H200 execution, sustained
+throughput, learning quality, and largest-rung memory remain untested. The job
+argument parsing is also covered to catch Hydra quoting failures before queueing.
 
 ## Initial Torch experiment for review
 
