@@ -1,0 +1,11 @@
+# @package _global_
+defaults:
+  - /task: se2c
+
+model:
+  name: hybrid6c_causal
+  ladder: width
+  size: xs
+  arch:
+    _target_: mapping.models.se2c.hybrid6c_causal.Hybrid6cCausal
+    _partial_: true
