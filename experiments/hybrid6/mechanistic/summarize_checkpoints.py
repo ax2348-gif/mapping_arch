@@ -1,0 +1,28 @@
+"""Plot and summarize the fixed-history mechanistic checkpoint sweep."""
+import json,statistics as st
+from pathlib import Path
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+root=Path('results');reports={t:json.loads((root/f'mechanistic_checkpoint_sweep_t{t}/results.json').read_text()) for t in (32,64)}
+fig,axes=plt.subplots(1,2,figsize=(11,4.4),sharey=True)
+lines=['# Does clean memory organization emerge late in training?','', '2026-10-18. User-proposed checkpoint test. No new training. Same128 held-out SAW episodes per model and horizon, seed1806; source-aligned queries at quarter/half/three-quarter trajectory, asked at the end. All six available Hybrid4 checkpoints and Hybrid6 final were tested. All native replay gates pass (MSE<1e-4, relative-Q error<.03); tiny effects remain limited by replay roundoff.', '', 'Hybrid4 lineage: 50k and100k checkpoints from T32 training; then25k/50k/75k/100k more updates at T64, for125k/150k/175k/200k total. Offset scale stayed pinned at288. Final decay spans180k–200k total. Hybrid6 has100k T32 updates and decay80k–100k. Scan arithmetic differs (Hybrid4 TF32, Hybrid6 IEEE); this is a longitudinal test within Hybrid4, not a fully controlled architecture comparison.', '']
+for ax,t in zip(axes,(32,64)):
+ models=reports[t]['models'];steps=[50,100,125,150,175,200];native=[];final=[]
+ lines += [f'## Evaluation horizon T{t}','','| Model / total steps | Native MSE | Final attention history + both GDN states | Zero GDN0 query read | Zero GDN2 query read |','|---|---:|---:|---:|---:|']
+ for name,m in models.items():
+  b=m['batches'];avg=lambda condition:st.mean(x['readout']['ablations'][condition]['pixel_mse'] for x in b)
+  n=m['sampled_native_mse'];f=avg('final_history_only')
+  lines.append(f"| {name} | {n:.6f} | {f:.6f} | {avg('zero_gdn0'):.6f} | {avg('zero_gdn2'):.6f} |")
+  if name.startswith('h4'):native.append(n);final.append(f)
+ ax.plot(steps,native,'o-',label='Hybrid4 intact');ax.plot(steps,final,'s-',label='Hybrid4 final history only')
+ h=models['h6_100k'];ax.scatter([100],[h['sampled_native_mse']],marker='*',s=130,label='Hybrid6 intact');ax.scatter([100],[st.mean(b['readout']['ablations']['final_history_only']['pixel_mse'] for b in h['batches'])],marker='X',s=80,label='Hybrid6 final history only')
+ ax.axvspan(180,200,color='gray',alpha=.12);ax.axvline(100,color='gray',linestyle=':',alpha=.5);ax.set_title(f'T{t} evaluation');ax.set_xlabel('Total training updates (thousands)');ax.set_yscale('log');ax.grid(alpha=.2)
+axes[0].set_ylabel('Image MSE (log scale)');axes[1].legend(fontsize=8);fig.suptitle('Hybrid4 final-cache sufficiency emerges late; shaded region = final decay');fig.tight_layout();fig.savefig(root/'mechanistic_checkpoint_sweep.png',dpi=170)
+lines += ['', '## Interpretation', '', 'The user’s training-stage concern is supported. At T32, even Hybrid4 at175k has good intact rendering (.001604) but loses much of it when earlier attention history is removed (.019405). At200k, intact .000202 and final-only .000468 are both low. T64 shows the same late transition (.034725 final-only at175k → .000772 at200k). The compact final-cache result should not be treated as an intrinsic architectural difference between Hybrid4 and Hybrid6 based on their final checkpoints alone.', '', 'This does not show that more steps alone will clean up Hybrid6. The last Hybrid4 interval includes both more T64 training and learning-rate decay; checkpoint spacing cannot separate their effects. Hybrid6 already received a decay. Moreover, Hybrid4 GDN0 query-read dependence is present at earlier stages, whereas Hybrid6 GDN0 query-read ablation is nearly harmless. That circuit difference remains, but its persistence under further training is untested. T64 is also out of the training horizon for Hybrid6 and the first two Hybrid4 checkpoints.', '', 'The next discriminating training experiment would continue Hybrid6 through the same T64 curriculum and final decay, retaining intermediate checkpoints and repeating this suite. This is a proposal, not a launched continuation. Poor-rendering early checkpoints cannot establish meaningful rewind/addressing failures; consult their intact controls in the full reports.', '', '## Beta clipping across stages (T32)', '', 'Independent128 held-out episodes at seed1807. Clipping is in the native history computation, not a query-read intervention. Each stage reports its own intact baseline.', '', '| Checkpoint | Native | Clip GDN0 beta<=1 | Clip GDN2 beta<=1 | Clip both |','|---|---:|---:|---:|---:|']
+paths=[(f'h4_{n}k',root/f'mechanistic_checkpoint_beta/h4_{n}k/results.json') for n in (50,100,125,150,175,200)]+[('h6_100k',root/'hybrid6_mechanistic_beta/results.json')]
+for name,p in paths:
+ if not p.exists():raise RuntimeError(f'Incomplete beta sweep: {p}')
+ d=json.loads(p.read_text());rows=d['native_and_clamps'];lines.append('| '+name+' | '+' | '.join(f'{st.mean(x[k] for x in rows):.6f}' for k in ('native','clamp_gdn0','clamp_gdn2','clamp_both'))+' |')
+lines+=['', 'Full suites, including texture swaps, per-head ablations, rewind controls, odometry compensation, grid-key transfer and query-lag scans: `results/mechanistic_checkpoint_sweep_t32/report.md` and `results/mechanistic_checkpoint_sweep_t64/report.md`. Raw JSON includes checkpoint hashes and source hashes. Beta distributions and turn-conditioned statistics are in `results/mechanistic_checkpoint_beta/`. Plot: `results/mechanistic_checkpoint_sweep.png`. Reproduce the suite with `experiments/hybrid6/mechanistic/checkpoint_sweep.sh`; beta checks accept `--checkpoint` and `--out`.']
+Path('experiments/hybrid6/mechanistic/checkpoint_comparison.md').write_text('\n'.join(lines)+'\n')

@@ -53,6 +53,7 @@ run:
   steps: 2000
   seed: 0
   save_every: 0         # write step<k>.pt (with optimizer) every k steps
+  branch_transition: null # optional explicit Hybrid7 odometry-write intervention
   branch: null          # a step<k>.pt to continue from, into a new run
   # weights-only warm start (docs/config.md, "run.init_from"): a NEW run (fresh
   # optimizer, schedule and step 0) starting from this checkpoint's model weights;

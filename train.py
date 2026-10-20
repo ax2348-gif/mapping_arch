@@ -332,8 +332,13 @@ def main(experiment, config=None, sources=None):
             texture['bank_filter'] = bank_filter
     start = 0
     branch = None
+    transition = getattr(r, 'branch_transition', None)
+    if transition and not r.branch:
+        raise SystemExit('branch_transition requires run.branch')
     if r.branch:
         branch = torch.load(r.branch, map_location='cpu', weights_only=False)
+        if transition:
+            validate_branch_transition(branch, e.model.record(), transition, args)
         start = branch['step']
         defaults = {'step_px': 9, 'odometry_dropout': 0.0,
                     'query_times': 'last', 'texture': 'mnist', 'path': 'walk',
@@ -344,7 +349,7 @@ def main(experiment, config=None, sources=None):
             if key == 'task':               # old checkpoints say 'se2'
                 saved = tasks.canonical(saved)
             have = vars(args).get(key, defaults.get(key))
-            if saved != have:
+            if saved != have and not (transition and key == 'model'):
                 raise SystemExit(f'--branch {key} mismatch: checkpoint '
                                  f'{branch["args"].get(key, defaults.get(key))!r}, '
                                  f'run '
@@ -352,6 +357,8 @@ def main(experiment, config=None, sources=None):
         parent = os.path.join(os.path.dirname(os.path.abspath(r.branch)), 'config.yaml')
         if config is not None and os.path.exists(parent):
             changed = branch_changes(parent, config)
+            if transition:
+                changed = [k for k in changed if k not in ('model.name', 'model.arch.odometry_writes')]
             if changed:
                 raise SystemExit(f'--branch: the run differs from its parent ({parent}) in '
                                  f'{", ".join(changed)}. A branch continues the same run '
@@ -573,10 +580,41 @@ BRANCH_MAY_CHANGE = ('run.', 'eval.', 'schedule.', 'optim.weight_decay', 'optim.
                      'task.generator.workers')
 
 
+def validate_branch_transition(checkpoint, target_arch, transition, args):
+    """Only the explicitly requested, parameter-identical Hybrid7 write-mask change."""
+    import copy
+    if transition != 'hybrid7_odometry_writes':
+        raise SystemExit('unsupported branch transition')
+    old = checkpoint.get('args', {})
+    if (old.get('model'), args.model, old.get('task'), args.task) != (
+            'hybrid7', 'hybrid7_odom', 'se2d', 'se2d'):
+        raise SystemExit('odometry-write transition requires SE2D hybrid7 -> hybrid7_odom')
+    arch = copy.deepcopy(checkpoint.get('arch', {}))
+    if arch.get('class') != 'mapping.models.se2d.hybrid7.Hybrid7':
+        raise SystemExit('transition requires an explicit Hybrid7 architecture record')
+    kw = arch.get('kwargs', {})
+    if kw.get('odometry_writes', False) or not kw.get('inter_gdn_attention', False):
+        raise SystemExit('transition requires register-only AGAGA source')
+    kw['odometry_writes'] = True
+    if arch != target_arch:
+        raise SystemExit('transition may change ONLY odometry_writes')
+    if 'opt' not in checkpoint or 'step' not in checkpoint:
+        raise SystemExit('transition requires a training checkpoint with optimizer and step')
+
+
+def hybrid7_adapter_transfer(source_arch, target_arch, source_task, target_task):
+    """Whitelisted full-weight discrete-to-continuous adapter change only."""
+    return (source_task == 'se2d' and target_task == 'se2c'
+            and source_arch.get('class') == 'mapping.models.se2d.hybrid7.Hybrid7'
+            and target_arch.get('class') == 'mapping.models.se2c.hybrid7c.Hybrid7c'
+            and source_arch.get('kwargs') == target_arch.get('kwargs'))
+
+
 def load_init(r, e, task, config, sources=None):
     """The ``run.init_from`` checkpoint, checked: it must carry the exact
     architecture of this run (class and every constructor argument, so the
-    rung, query_mode and scan_precision) and be for this task; task and
+    rung, query_mode and scan_precision) and be for this task, except the
+    whitelisted full-weight Hybrid7 SE2D-to-SE2C adapter transfer; task and
     generator settings may differ. Its sha256 and parent run id are checked
     against ``run.init_sha256`` / ``run.init_run_id`` when set and written
     into ``config`` and ``sources['overrides']`` when not (so config.yaml,
@@ -603,12 +641,14 @@ def load_init(r, e, task, config, sources=None):
         raise SystemExit(f'run.init_from={r.init_from}: the checkpoint records no '
                          f'architecture ("arch"), so an exact match cannot be checked')
     want = e.model.record()
-    if ck['arch'] != want:
+    saved = tasks.canonical((ck.get('args') or {}).get('task', 'z2'))
+    adapter_transfer = hybrid7_adapter_transfer(ck['arch'], want, saved, task)
+    if ck['arch'] != want and not adapter_transfer:
         raise SystemExit(f'run.init_from={r.init_from}: architecture mismatch: '
                          f'checkpoint {ck["arch"]}, this run {want}. A warm start needs '
                          f'the same model, rung, query_mode and scan_precision')
     saved = tasks.canonical((ck.get('args') or {}).get('task', 'z2'))
-    if saved != task:
+    if saved != task and not adapter_transfer:
         raise SystemExit(f'run.init_from={r.init_from}: a {saved} checkpoint, this run '
                          f'is {task}')
     stamp = (ck.get('provenance') or {}).get('run_id')
@@ -637,7 +677,8 @@ def load_init(r, e, task, config, sources=None):
             if k not in keys:
                 sources['overrides'] = list(sources.get('overrides') or []) + [f"{k}='{v}'"]
     return {'path': path, 'sha256': sha, 'run_id': run_id, 'run_id_evidence': evidence,
-            'step': ck.get('step'), 'state': ck['model']}
+            'step': ck.get('step'), 'state': ck['model'],
+            **({'adapter_transfer': 'hybrid7_se2d_to_se2c'} if adapter_transfer else {})}
 
 
 def branch_changes(parent, config):

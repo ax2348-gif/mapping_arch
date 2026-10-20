@@ -1,0 +1,35 @@
+# @package _global_
+# Medium register-only Hybrid7c, fresh SE2C training after the S transfer run.
+defaults:
+  - override /model: se2c/hybrid7c
+  - override /schedule: wsd
+model:
+  size: m
+  query_mode: inert
+  scan_precision: ieee
+task:
+  episode_steps: 32
+  queries: 8
+  query_times: uniform
+  generator:
+    texture: procedural
+    motion: decoupled
+    directions: persistent
+    turn_n: 0
+    v_min: 4.5
+    v_max: 9.0
+    query_coverage: causal
+optim:
+  lr: 0.0001
+  batch: 64
+schedule:
+  warmup: 100
+  cooldown: 0.2
+run:
+  name: fresh_agagaga_m_100k_ieee_seed0
+  steps: 100000
+  save_every: 10000
+eval:
+  batches: 16
+  every: 2500
+  log_every: 500

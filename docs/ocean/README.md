@@ -17,3 +17,14 @@ that branch still has them in its history (`git archive exp/ocean docs/ocean`).
 
 Pass `--out`: the tools' default is still `docs/ocean/{sheets,videos}`,
 which would put the media back inside the tracked tree. Never commit them.
+
+## Future task design
+
+See [motion with gaps and explicit unknown regions](../partial_coverage_proposal.md)
+for the proposed joint relaxation of dense observation coverage and fully known
+queries, including visibility-aware support targets for Ocean.
+
+Before choosing motion and odometry conventions, audit the
+[endpoint-versus-twist pitfall](../odometry_twist_pitfall.md): endpoint translation
+is not generally the translational component of a twist. Separate equivalent
+input re-encoding from changes to the sampled motion distribution.

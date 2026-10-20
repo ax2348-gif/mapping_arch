@@ -243,16 +243,21 @@ def test_config_models_are_the_old_models(model):
     task, name = model.split('/')
     module = tasks.get(task)['models'].get(name)
     spec = tasks.config_and_spec(task, 32, 8, 0, 'uniform')[1]
+    overrides = ['model.query_mode=inert'] if name in ('hybrid7', 'hybrid7c', 'hybrid7_odom') else []
     for size in module.SIZES:
+        if overrides and size == 'xs':
+            with pytest.raises(ValueError, match='size S or larger'):
+                module.build(size, spec)
+            continue
         torch.manual_seed(0)
         old = module.build(size, spec).state_dict()
         torch.manual_seed(0)
-        new = run.build(compose(f'model={model}', f'model.size={size}')).model.build(spec)
+        new = run.build(compose(f'model={model}', f'model.size={size}', *overrides)).model.build(spec)
         new = new.state_dict()
         assert old.keys() == new.keys(), (model, size)
         assert all(torch.equal(old[k], new[k]) for k in old), (model, size)
         assert type(module.build(size, spec)) is type(run.build(
-            compose(f'model={model}', f'model.size={size}')).model.build(spec))
+            compose(f'model={model}', f'model.size={size}', *overrides)).model.build(spec))
 
 
 @pytest.mark.parametrize('overrides,match', [

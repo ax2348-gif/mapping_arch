@@ -1,0 +1,14 @@
+# @package _global_
+defaults:
+  - /task: se2d
+model:
+  name: hybrid7_odom
+  ladder: width
+  size: s
+  arch:
+    _target_: mapping.models.se2d.hybrid7.Hybrid7
+    _partial_: true
+    gdn_heads: 6
+    final_attention: true
+    inter_gdn_attention: true
+    odometry_writes: true

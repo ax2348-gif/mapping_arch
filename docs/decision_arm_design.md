@@ -162,3 +162,33 @@ only recent frames under memory ablation.
   It reuses every model. Days, not weeks.
 - **Stage 2:** an environment loop and an RL learner, or adapters to an
   existing benchmark. This is larger; decide after stage 1.
+
+## 2026-10-18 extension: feature queries, relative anchors, and policy readout
+
+User-proposed future direction. The original decision arm above remains a draft; this extension broadens its question and does not launch work or settle the earlier open choices.
+
+### Necessary information versus sufficient capability
+
+Successful mapping readout is not sufficient evidence for useful downstream decision making or planning. Our current rendering interface supplies a spatial address and asks for local appearance. A model can learn to answer many such local requests without exposing a representation from which a small, efficient head can locate a feature, compare destinations, or choose a route. Even when a requested location costs only a small fixed query-token budget, searching the entire map by issuing a query for every location is a different and potentially expensive computation. The learned address/readout mechanism may retain relevant information while making other operations difficult to learn.
+
+The motivating distinction is between necessary spatial information and a sufficient, usable representation. Saying that a task requiring a map requires mapping is tautological if “mapping” is defined as whatever spatial knowledge the task needs. More precisely, some tasks require preserving and relating particular spatial facts; this does not imply that reconstructing a full pixel map is necessary. A feature-relative pose or a goal-directed belief can sometimes suffice. Conversely, strong pixel reconstruction does not establish efficient access to those facts for a downstream head, nor the ability to perform planning over them. We should test these implications rather than use rendering success as their proxy.
+
+Distinguish three empirical questions: is the relevant information retained; can a bounded decoder recover it; and can a policy use it successfully? A failed decoder does not prove information is absent, and a successful large decoder or exhaustive search does not establish cheap downstream access.
+
+### Proposed query families
+
+1. **Pattern detection and localization.** Supply a feature identity, template, or pattern specification rather than its spatial address. Return existence and the anchor pose of matching observations/features relative to the agent's current frame (or another explicitly specified anchor frame). Define the feature anchor consistently, e.g. its center plus an identifiable orientation. Test one match first, then repeated patterns and set-valued outputs. Handle rotationally symmetric patterns with symmetry-aware labels rather than arbitrary unique orientations. This tests content-to-location retrieval, complementing location-to-content rendering.
+2. **Goal-conditioned policy heads.** Supply a feature descriptor and predict an action toward a previously observed instance, with the feature out of the current view. Start with supervised action or relative-waypoint targets to isolate representation/readout learning; follow with closed-loop navigation. Direct motion toward a target in an empty plane tests localization and control, not general route planning. Add obstacles, detours, alternatives, and partial observability before claiming planning capability.
+3. **Queries about observation support.** Combine the above with the [partial-coverage proposal](partial_coverage_proposal.md). Distinguish a feature not observed from evidence that it is absent in an inspected region. A policy may need to report insufficient information or seek another observation. Unknown regions must not silently become free space or negative detection labels.
+
+### Experiments that separate representation from adaptation
+
+Use the same histories and held-out scenes to compare a frozen mapping-trained backbone with trained feature/policy heads, mapping-pretrained backbones fine-tuned on downstream tasks, jointly trained mapping/downstream heads, and downstream-only training. Include an oracle spatial-information baseline with the same downstream decision problem; its privileged information must be explicit. Evaluate reconstruction after adaptation to measure retention or tradeoffs.
+
+Control head capacity, query-token count, training examples, and optimization budget. Sweep decoder capacity or training budget where a frozen head fails. Report exhaustive rendering-plus-search as an explicit baseline with its total query/compute cost, not as evidence that a single feature query works. Initially keep new query tokens inert so changing the query family does not silently introduce a memory-writing shortcut. Ensure descriptor inputs identify what to find without encoding the answer's location.
+
+Use long observation-to-decision delays, varying turns and displacement, held-out layouts and feature combinations, multiple candidate matches, and unseen goals. Make the last frame insufficient where the experiment claims memory use. Include current-view-only, history truncation, shuffled motion, and target-observation removal controls. Keep invalid or unanswerable counterfactuals labeled explicitly rather than scoring them against an answer no longer supported by the history.
+
+Report detection accuracy, false positives and missed observations, relative translation error in pixels/world units, symmetry-aware orientation error, and performance versus source age and distance. For policies report supervised action accuracy separately from closed-loop success, path efficiency, collisions, and behavior under unknown coverage. Compare these with rendering quality on the same cases; disagreement between the metrics is a finding rather than something to collapse into one score.
+
+The intended conclusion is narrower and more useful than “the model can map”: determine which spatial operations its memory makes accessible, at what readout/training cost, and whether those operations support decisions. These experiments should become a near-term complement to reconstruction benchmarks, not depend on assuming reconstruction alone proves downstream readiness.

@@ -1,0 +1,32 @@
+# @package _global_
+# Fast S learning validation with six GDN heads.
+defaults:
+  - override /model: se2d/hybrid7
+  - override /schedule: wsd
+model:
+  size: s
+  query_mode: inert
+  scan_precision: ieee
+task:
+  episode_steps: 32
+  queries: 8
+  query_times: uniform
+  generator:
+    texture: mnist
+    step_px: 9
+    path: saw
+    workers: 6
+optim:
+  lr: 0.0003
+  batch: 64
+schedule:
+  warmup: 100
+  cooldown: 0.2
+run:
+  name: hybrid7_causal_inert_saw_s_agaga_100k_ieee_seed0
+  steps: 100000
+  save_every: 10000
+eval:
+  batches: 16
+  every: 1000
+  log_every: 500

@@ -365,3 +365,118 @@ docs/scaling_study_design.md.
     - (3c) wrong: low frequency is the best case, with no posterisation; the training prior shows only as rounded checker corners.
     - (4) wrong: hybrid/vanilla goes from ~3.5× in-distribution to 1.0–1.2× on breaking textures. The user's call (task-determined, vanilla not much worse) holds out of distribution.
   - Confound: l has half m's steps.
+
+## 2026-10-18: proposed sparse motion and explicit unknown regions
+
+User-proposed future direction for SE2C and Ocean: jointly allow gaps in observed
+coverage and queries containing unknown regions, rendered with black padding or
+an explicit unknown representation. This frees motion design from full-coverage
+requirements and may encourage the model to track what it has and has not seen.
+See [partial coverage proposal](partial_coverage_proposal.md) for motivation,
+causal support semantics, Ocean visibility requirements, shortcut controls,
+and evaluation that prevents all-unknown outputs from appearing successful.
+This is a documented proposal; existing contracts and training are unchanged.
+
+## 2026-10-18: downstream queries beyond rendering
+
+The user proposes making feature detection with relative anchor-pose outputs and
+feature-conditioned navigation heads a near-term research direction. The
+[decision-arm extension](decision_arm_design.md#2026-10-18-extension-feature-queries-relative-anchors-and-policy-readout)
+distinguishes necessary spatial information from sufficient downstream access:
+location-conditioned rendering does not establish content-to-location search,
+efficient pose decoding, decisions, or planning. It specifies frozen-head,
+fine-tuning, joint-training, and downstream-only comparisons, explicit query
+budgets, and unknown-region semantics. Proposed only; no run changes.
+
+## 2026-10-18: hybrid6 S causal inert mechanistic results
+
+Completed the [hybrid6 mechanistic screen](../experiments/hybrid6/mechanistic/README.md)
+on the local100k checkpoint, including the basic beta distributions and clipping
+checks. Final attention values transfer donor texture almost completely; GDN2
+query-state reads and beta>1 history updates are critical. Correct query-offset
+compensation rescues a single edited odometry move. Early attention history
+remains necessary, and GDN-state rewind only partially rescues retrieval.
+Native replay checks pass; the record includes numerical tolerances and all
+controls. These are inference interventions, not new training runs.
+
+## 2026-10-18: earlier checkpoints qualify the hybrid6 comparison
+
+Ran the full suite on six saved Hybrid4 lineage checkpoints (50k–200k total)
+and Hybrid6 at100k, with identical128-episode cohorts at T32 and T64, plus beta
+checks. [Checkpoint comparison](../experiments/hybrid6/mechanistic/checkpoint_comparison.md):
+Hybrid4 final-cache sufficiency emerges late, between175k and200k total updates,
+an interval including final LR decay. Good intact rendering at175k does not yet
+imply clean memory sufficiency. Training stage is therefore a serious confound
+in the apparent architecture difference. No continuation training was launched.
+
+## 2026-10-18: hybrid6 frozen 15x15-view transfer fails in history processing
+
+[Matched resolution test](../experiments/hybrid6/view15_results.md),256 held-out
+SAW MNIST episodes with9px moves: central-region MSE .00202 for9→9, .14650 for
+15→15, .14636 for15→9, but .00215 for9→15. Expanding query output alone preserves
+known central retrieval; expanding observation history breaks it. More history
+tokens, new calibration offsets/content, and overlap remain confounded.
+No fine-tuning or checkpoint changes. Plots and raw data are saved under
+`results/hybrid6_view15_controls/`.
+
+## 2026-10-18: native-resolution history order sensitivity
+
+[Permutation probe](../experiments/hybrid6/permutation_results.md): pixels and
+camera metadata move together, preserving all observations, geometry and token
+counts. Swapping two adjacent patches per frame raises held-out MSE .00187→.127.
+Reversing only the final frame raises earlier-source final-query MSE .00269→.159;
+queries before that frame remain bitwise unchanged. Identity camera-interface
+replay is exact. This demonstrates serialization sensitivity, but GDN, short
+convolution, and within-frame causal attention have not been separated.
+
+## 2026-10-18: hybrid7 built and kernel-validated
+
+[Hybrid7 implementation record](../experiments/hybrid7/README.md): five registers
+per timestep, phases register→observation→outgoing odometry, block-causal
+attention, timestep-only RoPE, and attention-first alternating GDN blocks.
+Only registers convolve/write/decay; other tokens read state passively.
+Cross-timestep convolution is retained. Shared SE2D/SE2C adapters support strict
+full-weight transfer. S has867,545 parameters.51 CPU tests and actual GPU
+forward/backward/checkpoint/permutation checks passed; permutation MSE2.16e-16
+FP32 and1.62e-8 BF16. A matching100k validation preset is prepared, not launched.
+
+Hybrid7 XS six-head validation launched: fresh MNIST SAW SE2D T32, causal inert,
+five registers, six GDN heads of dim32, width64/two regular-attention heads,
+166,709 parameters. Preset `hybrid7_initial`, 100k steps, LR3e-4, WSD final20k,
+IEEE, held-out eval each1k. Tmux `hybrid7-xs`; output
+`results/se2d/hybrid7/xs/hybrid7_causal_inert_saw_xs_100k_ieee_seed0`.
+51 CPU tests and GPU kernel/checkpoint/permutation smoke passed before launch.
+Run ID `20261019T001247Z-erid-2-50c1e9`. See experiments/hybrid7/README.md.
+
+Future task-design audit: [endpoint odometry versus twist-driven motion](odometry_twist_pitfall.md).
+The central hypothesis is that non-twist inputs may induce internal states
+that are harder to manipulate or decode, despite equivalent geometric information.
+Current endpoint translation+turn also cannot be naively exponentiated as raw
+twist coordinates. The note separates equivalent Log/Exp re-encoding from
+changing the motion distribution, records supervision/transfer/subdivision
+risks, and proposes controlled checks. Hypothesis only; active runs unchanged.
+
+Hybrid7 default revised to end in attention: S uses A,G,G,A with six GDN
+heads per recurrent layer. Final-pair swap is explicit in architecture records;
+default requires S or larger to preserve initial attention. XS stopped after27k
+eval, with10k/20k checkpoints retained. S training uses the same100k fresh-data
+SE2D SAW inert IEEE recipe; see experiments/hybrid7/README.md. CPU tests:52 passed.
+
+Hybrid7 follow-up: stopped A,G,G,A after15k evaluation (MSE0.067406,
+shuffled0.069231;10k checkpoint retained). Added inter-GDN attention, making
+S A,G,A,G,A, with the same causal/inert masks and six-head GDNs. Fresh100k
+run uses name `hybrid7_causal_inert_saw_s_agaga_100k_ieee_seed0`.
+See experiments/hybrid7/README.md for controls and initialization details.
+
+Prepared `hybrid7_odom` experiment (not launched): registers and odometry
+write/convolve; observations and queries remain passive. Explicit
+`run.branch_transition=hybrid7_odometry_writes` supports strict full-weight,
+optimizer and absolute-step continuation from current AGAGA checkpoints.
+Preflight verified the30k source and all96 Adam parameter states on CPU.
+Commands and caveats: experiments/hybrid7/odometry_experiment.md.
+
+Hybrid7 SE2C transfer launched: `20261019T030918Z-erid-2-a15e03`, same
+register-only AGAGA S full weights from SE2D final100k, fresh optimizer,
+LR1e-4,100k steps, standard15px procedural continuous motion. Zero-shot
+MSE0.154025 vs shuffled0.153939; exact full tensor transfer verified.
+Details: experiments/hybrid7/se2c_transfer.md. Tmux `hybrid7-se2c`.

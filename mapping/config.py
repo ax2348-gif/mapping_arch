@@ -111,8 +111,14 @@ class Run(Node):
     compile: bool
     overwrite: bool              # write into a non-empty run directory
 
+    branch_transition: Optional[str] = None  # explicit compatible intervention
+
     def __post_init__(self):
         super().__post_init__()
+        if self.branch_transition not in (None, 'hybrid7_odometry_writes'):
+            raise ValueError('unknown branch_transition')
+        if self.branch_transition and not self.branch:
+            raise ValueError('branch_transition requires run.branch')
         if isinstance(self.tag, str):
             object.__setattr__(self, 'tag', (self.tag,))
         if isinstance(self.note, str):

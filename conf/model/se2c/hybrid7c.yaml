@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+  - /task: se2c
+model:
+  name: hybrid7c
+  ladder: width
+  size: s
+  arch:
+    _target_: mapping.models.se2c.hybrid7c.Hybrid7c
+    _partial_: true
+    gdn_heads: 6
+    final_attention: true
+    inter_gdn_attention: true
